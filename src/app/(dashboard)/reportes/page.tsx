@@ -15,7 +15,14 @@ import {
   Target,
   CheckCircle2,
   AlertTriangle,
+  Download,
 } from 'lucide-react';
+import {
+  exportSalesReport,
+  exportProductionReport,
+  exportClientsReport,
+  exportPrecisionReport,
+} from '@/lib/pdf';
 import { formatCurrency, formatM2 } from '@/lib/utils/pricing';
 import { ORDER_STATUS_LABELS } from '@/lib/utils/format';
 import type { OrderStatus } from '@/lib/types/database';
@@ -224,8 +231,18 @@ export default function ReportesPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sales by Period */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Ventas por periodo</CardTitle>
+            {salesData?.data && salesData.data.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => exportSalesReport(salesData.data, salesData.summary, period)}
+              >
+                <Download className="w-4 h-4 mr-1" />
+                PDF
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             {salesData?.data && salesData.data.length > 0 ? (
@@ -258,8 +275,21 @@ export default function ReportesPage() {
 
         {/* Production Status */}
         <Card>
-          <CardHeader>
-            <CardTitle>Estado de producción</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Estado de produccion</CardTitle>
+            {productionData?.data && productionData.data.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => exportProductionReport(
+                  productionData.data.map(d => ({ ...d, total_revenue: 0 })),
+                  { ...productionData.summary, pending_count: 0, in_production_count: 0, completed_count: 0, total_m2: 0 }
+                )}
+              >
+                <Download className="w-4 h-4 mr-1" />
+                PDF
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             {productionData?.data && productionData.data.length > 0 ? (
@@ -314,11 +344,32 @@ export default function ReportesPage() {
             <Users className="w-5 h-5" />
             Top 10 Clientes
           </CardTitle>
-          {topClients?.summary && (
-            <div className="text-sm text-gray-500">
-              {topClients.summary.top_clients_percentage.toFixed(1)}% del total
-            </div>
-          )}
+          <div className="flex items-center gap-4">
+            {topClients?.summary && (
+              <div className="text-sm text-gray-500">
+                {topClients.summary.top_clients_percentage.toFixed(1)}% del total
+              </div>
+            )}
+            {topClients?.data && topClients.data.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => exportClientsReport(
+                  topClients.data.map(c => ({
+                    client_name: c.client_name,
+                    company: c.company,
+                    total_orders: c.total_orders,
+                    total_m2: c.total_m2,
+                    total_revenue: c.total_revenue,
+                  })),
+                  topClients.summary
+                )}
+              >
+                <Download className="w-4 h-4 mr-1" />
+                PDF
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {topClients?.data && topClients.data.length > 0 ? (
@@ -395,11 +446,29 @@ export default function ReportesPage() {
       {precisionData && precisionData.summary.total_orders > 0 && (
         <>
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Target className="w-5 h-5" />
-                Precisión de Producción
+                Precision de Produccion
               </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => exportPrecisionReport(
+                  precisionData.data.map(p => ({
+                    order_number: p.order_number,
+                    client_name: p.client_name,
+                    original_m2: p.original_m2,
+                    delivered_m2: p.delivered_m2,
+                    precision_percent: p.precision_percent,
+                    difference_m2: p.difference_m2,
+                  })),
+                  precisionData.summary
+                )}
+              >
+                <Download className="w-4 h-4 mr-1" />
+                PDF
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

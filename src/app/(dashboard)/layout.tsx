@@ -16,6 +16,7 @@ import {
   Receipt,
 } from 'lucide-react';
 import { useState } from 'react';
+import { AuthGuard, LogoutButton, useAuth } from '@/components/auth';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -29,13 +30,10 @@ const navigation = [
   { name: 'Configuracion', href: '/configuracion', icon: Settings },
 ];
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -118,7 +116,10 @@ export default function DashboardLayout({
             </button>
             <div className="flex-1 lg:flex-none" />
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">Admin</span>
+              <span className="text-sm text-gray-600 hidden sm:block">
+                {user?.name || user?.email || 'Usuario'}
+              </span>
+              <LogoutButton variant="ghost" showText={false} />
             </div>
           </div>
         </header>
@@ -129,5 +130,17 @@ export default function DashboardLayout({
         </main>
       </div>
     </div>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <AuthGuard>
+      <DashboardContent>{children}</DashboardContent>
+    </AuthGuard>
   );
 }

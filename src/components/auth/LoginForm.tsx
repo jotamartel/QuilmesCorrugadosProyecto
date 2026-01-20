@@ -33,7 +33,7 @@ export function LoginForm() {
 
     try {
       await signInWithEmail(email, password);
-      router.push('/');
+      router.push('/inicio');
       router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error al iniciar sesion';

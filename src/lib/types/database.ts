@@ -18,6 +18,8 @@ export type CheckStatus = 'in_portfolio' | 'deposited' | 'cashed' | 'endorsed' |
 export type CheckExitType = 'deposit' | 'cash' | 'endorsement';
 export type IntegrationStatus = 'success' | 'error' | 'pending';
 export type IntegrationType = 'xubio' | 'arba';
+export type ClientSource = 'manual' | 'web' | 'email' | 'whatsapp';
+export type PublicQuoteStatus = 'pending' | 'contacted' | 'converted' | 'rejected';
 
 export interface PricingConfig {
   id: string;
@@ -60,6 +62,10 @@ export interface Client {
   credit_days: number;
   credit_limit: number | null;
   credit_notes: string | null;
+  // Campos de origen
+  source: ClientSource;
+  source_quote_id: string | null;
+  created_from_ip: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -677,3 +683,402 @@ export const TAX_CONDITION_TO_INVOICE_TYPE: Record<TaxCondition, 'FA' | 'FB'> = 
   consumidor_final: 'FB',
   exento: 'FB',
 };
+
+// =====================================================
+// TIPOS PARA CONTROL DE COSTOS Y RENTABILIDAD
+// =====================================================
+
+export type CostCategoryType = 'fixed' | 'variable' | 'supply' | 'labor' | 'other';
+export type CostFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface CostCategory {
+  id: string;
+  name: string;
+  type: CostCategoryType;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FixedCost {
+  id: string;
+  category_id: string | null;
+  name: string;
+  description: string | null;
+  amount: number;
+  frequency: CostFrequency;
+  start_date: string;
+  end_date: string | null;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  // Relación opcional
+  category?: CostCategory;
+}
+
+export interface Supply {
+  id: string;
+  category_id: string | null;
+  name: string;
+  description: string | null;
+  unit: string;
+  current_price: number;
+  last_price: number | null;
+  price_updated_at: string;
+  supplier: string | null;
+  min_stock: number;
+  current_stock: number;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  // Relación opcional
+  category?: CostCategory;
+}
+
+export interface SupplyPriceHistory {
+  id: string;
+  supply_id: string;
+  price: number;
+  effective_date: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface OrderCost {
+  id: string;
+  order_id: string;
+  category_id: string | null;
+  concept: string;
+  amount: number;
+  quantity: number;
+  unit_cost: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  // Relaciones opcionales
+  category?: CostCategory;
+  order?: Order;
+}
+
+export interface ProductionCostConfig {
+  id: string;
+  name: string;
+  cardboard_cost_per_m2: number;
+  glue_cost_per_m2: number;
+  ink_cost_per_m2: number;
+  labor_cost_per_m2: number;
+  energy_cost_per_m2: number;
+  waste_percentage: number;
+  overhead_percentage: number;
+  effective_from: string;
+  effective_to: string | null;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OperationalExpense {
+  id: string;
+  category_id: string | null;
+  concept: string;
+  amount: number;
+  expense_date: string;
+  payment_method: string | null;
+  receipt_number: string | null;
+  supplier: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  // Relación opcional
+  category?: CostCategory;
+}
+
+export interface OrderProfitability {
+  order_id: string;
+  order_number: string;
+  order_date: string;
+  status: OrderStatus;
+  client_id: string | null;
+  client_name: string;
+  client_company: string | null;
+  total_m2: number;
+  revenue_subtotal: number;
+  revenue_printing: number;
+  revenue_diecut: number;
+  revenue_shipping: number;
+  total_revenue: number;
+  total_direct_costs: number;
+  gross_profit: number;
+  gross_margin_percent: number;
+}
+
+// Labels para tipos de costos
+export const COST_CATEGORY_TYPE_LABELS: Record<CostCategoryType, string> = {
+  fixed: 'Fijo',
+  variable: 'Variable',
+  supply: 'Insumo',
+  labor: 'Mano de obra',
+  other: 'Otro',
+};
+
+export const COST_FREQUENCY_LABELS: Record<CostFrequency, string> = {
+  daily: 'Diario',
+  weekly: 'Semanal',
+  monthly: 'Mensual',
+  yearly: 'Anual',
+};
+
+// Requests para APIs de costos
+export interface CreateFixedCostRequest {
+  category_id?: string;
+  name: string;
+  description?: string;
+  amount: number;
+  frequency?: CostFrequency;
+  start_date: string;
+  end_date?: string;
+  notes?: string;
+}
+
+export interface CreateSupplyRequest {
+  category_id?: string;
+  name: string;
+  description?: string;
+  unit: string;
+  current_price: number;
+  supplier?: string;
+  min_stock?: number;
+  current_stock?: number;
+  notes?: string;
+}
+
+export interface CreateOrderCostRequest {
+  order_id: string;
+  category_id?: string;
+  concept: string;
+  amount: number;
+  quantity?: number;
+  unit_cost?: number;
+  notes?: string;
+}
+
+export interface CreateOperationalExpenseRequest {
+  category_id?: string;
+  concept: string;
+  amount: number;
+  expense_date: string;
+  payment_method?: string;
+  receipt_number?: string;
+  supplier?: string;
+  notes?: string;
+}
+
+export interface UpdateProductionCostConfigRequest {
+  cardboard_cost_per_m2?: number;
+  glue_cost_per_m2?: number;
+  ink_cost_per_m2?: number;
+  labor_cost_per_m2?: number;
+  energy_cost_per_m2?: number;
+  waste_percentage?: number;
+  overhead_percentage?: number;
+  notes?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COTIZACIONES PÚBLICAS (WEB)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface PublicQuote {
+  id: string;
+  quote_number: number;
+
+  // Datos del solicitante
+  requester_name: string;
+  requester_company: string | null;
+  requester_email: string;
+  requester_phone: string;
+  requester_cuit: string | null;
+  requester_tax_condition: TaxCondition;
+
+  // Dirección
+  address: string | null;
+  city: string | null;
+  province: string;
+  postal_code: string | null;
+  distance_km: number | null;
+  is_free_shipping: boolean;
+
+  // Lead tracking
+  requested_contact: boolean;
+
+  // Datos de la caja
+  length_mm: number;
+  width_mm: number;
+  height_mm: number;
+  quantity: number;
+  has_printing: boolean;
+  printing_colors: number;
+
+  // Diseño
+  design_file_url: string | null;
+  design_file_name: string | null;
+
+  // Cálculos
+  sheet_width_mm: number;
+  sheet_length_mm: number;
+  sqm_per_box: number;
+  total_sqm: number;
+  price_per_m2: number;
+  unit_price: number;
+  subtotal: number;
+  estimated_days: number;
+
+  // Tracking
+  source_ip: string | null;
+  source_user_agent: string | null;
+  message: string | null;
+
+  // Estado
+  status: PublicQuoteStatus;
+  notes: string | null;
+
+  // Conversión
+  converted_to_client_id: string | null;
+  converted_to_quote_id: string | null;
+  converted_at: string | null;
+  converted_by: string | null;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreatePublicQuoteRequest {
+  // Datos del solicitante (requeridos)
+  requester_name: string;
+  requester_email: string;
+  requester_phone: string;
+
+  // Datos opcionales del solicitante
+  requester_company?: string;
+  requester_cuit?: string;
+  requester_tax_condition?: TaxCondition;
+
+  // Dirección opcional
+  address?: string;
+  city?: string;
+  province?: string;
+  postal_code?: string;
+
+  // Datos de la caja (requeridos)
+  length_mm: number;
+  width_mm: number;
+  height_mm: number;
+  quantity: number;
+
+  // Opciones
+  has_printing?: boolean;
+  printing_colors?: number;
+
+  // Diseño
+  design_file_url?: string;
+  design_file_name?: string;
+
+  // Mensaje
+  message?: string;
+}
+
+export interface UpdatePublicQuoteRequest {
+  status?: PublicQuoteStatus;
+  notes?: string;
+}
+
+export interface ConvertPublicQuoteRequest {
+  // Datos del cliente (pueden ser editados antes de crear)
+  name?: string;
+  company?: string;
+  cuit?: string;
+  tax_condition?: TaxCondition;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  province?: string;
+  postal_code?: string;
+
+  // Opciones
+  create_quote?: boolean; // También crear cotización formal
+}
+
+export const PUBLIC_QUOTE_STATUS_LABELS: Record<PublicQuoteStatus, string> = {
+  pending: 'Pendiente',
+  contacted: 'Contactado',
+  converted: 'Convertido',
+  rejected: 'Rechazado',
+};
+
+export const CLIENT_SOURCE_LABELS: Record<ClientSource, string> = {
+  manual: 'Manual',
+  web: 'Web',
+  email: 'Email',
+  whatsapp: 'WhatsApp',
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CIUDADES DE BUENOS AIRES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface BuenosAiresCity {
+  id: number;
+  name: string;
+  partido: string | null;
+  distance_km: number;
+  is_free_shipping: boolean;
+  postal_codes: string[] | null;
+  created_at: string;
+}
+
+export interface CitiesResponse {
+  cities: BuenosAiresCity[];
+  total: number;
+}
+
+export interface PartidosResponse {
+  partidos: string[];
+}
+
+// Constante para la distancia máxima de envío gratis
+export const FREE_SHIPPING_MAX_KM = 60;
+
+// Lista de provincias argentinas para el selector
+export const ARGENTINE_PROVINCES = [
+  'Buenos Aires',
+  'CABA',
+  'Catamarca',
+  'Chaco',
+  'Chubut',
+  'Córdoba',
+  'Corrientes',
+  'Entre Ríos',
+  'Formosa',
+  'Jujuy',
+  'La Pampa',
+  'La Rioja',
+  'Mendoza',
+  'Misiones',
+  'Neuquén',
+  'Río Negro',
+  'Salta',
+  'San Juan',
+  'San Luis',
+  'Santa Cruz',
+  'Santa Fe',
+  'Santiago del Estero',
+  'Tierra del Fuego',
+  'Tucumán',
+] as const;
+
+export type ArgentineProvince = typeof ARGENTINE_PROVINCES[number];

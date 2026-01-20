@@ -1,0 +1,62 @@
+# Quilmes Corrugados - robots.txt
+# Optimizado para crawlers tradicionales y agentes de IA/LLMs
+
+User-agent: *
+Allow: /
+Allow: /cotizar
+Allow: /api/v1/
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /admin/
+Disallow: /_next/
+Disallow: /static/
+
+# Crawlers de IA específicos
+User-agent: GPTBot
+Allow: /
+Allow: /cotizar
+Allow: /api/v1/
+Allow: /llms.txt
+Crawl-delay: 1
+
+User-agent: ChatGPT-User
+Allow: /
+Allow: /cotizar
+Allow: /api/v1/
+Allow: /llms.txt
+Crawl-delay: 1
+
+User-agent: Claude-Web
+Allow: /
+Allow: /cotizar
+Allow: /api/v1/
+Allow: /llms.txt
+Crawl-delay: 1
+
+User-agent: Anthropic-AI
+Allow: /
+Allow: /cotizar
+Allow: /api/v1/
+Allow: /llms.txt
+Crawl-delay: 1
+
+User-agent: PerplexityBot
+Allow: /
+Allow: /cotizar
+Allow: /api/v1/
+Allow: /llms.txt
+Crawl-delay: 1
+
+User-agent: Cohere-AI
+Allow: /
+Allow: /cotizar
+Allow: /api/v1/
+Allow: /llms.txt
+Crawl-delay: 1
+
+# Sitemap
+Sitemap: https://quiltec.com.ar/sitemap.xml
+
+# LLMs.txt (estándar emergente para instrucciones de IA)
+# Ver: https://llmstxt.org/
+# Archivo disponible en: /llms.txt y /.well-known/llms.txt

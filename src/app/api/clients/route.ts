@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     // Parámetros
     const search = searchParams.get('search');
     const isRecurring = searchParams.get('is_recurring');
+    const source = searchParams.get('source');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
@@ -35,6 +36,11 @@ export async function GET(request: NextRequest) {
     // Filtro por cliente recurrente
     if (isRecurring !== null) {
       query = query.eq('is_recurring', isRecurring === 'true');
+    }
+
+    // Filtro por origen
+    if (source) {
+      query = query.eq('source', source);
     }
 
     const { data, error, count } = await query;

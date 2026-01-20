@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { LoadingPage } from '@/components/ui/loading';
+import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
 import {
   BarChart3,
   TrendingUp,
@@ -16,16 +17,21 @@ import {
   CheckCircle2,
   AlertTriangle,
   Download,
+  Calendar,
+  FileText,
 } from 'lucide-react';
 import {
   exportSalesReport,
   exportProductionReport,
   exportClientsReport,
   exportPrecisionReport,
+  exportFullReport,
 } from '@/lib/pdf';
 import { formatCurrency, formatM2 } from '@/lib/utils/pricing';
 import { ORDER_STATUS_LABELS } from '@/lib/utils/format';
 import type { OrderStatus } from '@/lib/types/database';
+import { format, startOfMonth, subMonths } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface SalesData {
   period: string;
@@ -89,9 +95,16 @@ const periodOptions = [
   { value: 'month', label: 'Por mes' },
 ];
 
+// Rango de fechas por defecto: últimos 3 meses
+const getDefaultDateRange = (): DateRange => ({
+  from: startOfMonth(subMonths(new Date(), 2)),
+  to: new Date(),
+});
+
 export default function ReportesPage() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
+  const [dateRange, setDateRange] = useState<DateRange>(getDefaultDateRange);
   const [salesData, setSalesData] = useState<{
     data: SalesData[];
     summary: {
@@ -125,16 +138,19 @@ export default function ReportesPage() {
 
   useEffect(() => {
     fetchReports();
-  }, [period]);
+  }, [period, dateRange]);
 
   async function fetchReports() {
     setLoading(true);
     try {
+      const fromDate = format(dateRange.from, 'yyyy-MM-dd');
+      const toDate = format(dateRange.to, 'yyyy-MM-dd');
+
       const [salesRes, productionRes, clientsRes, precisionRes] = await Promise.all([
-        fetch(`/api/reports/sales?group_by=${period}`),
+        fetch(`/api/reports/sales?group_by=${period}&from=${fromDate}&to=${toDate}`),
         fetch('/api/reports/production'),
-        fetch('/api/reports/clients?limit=10'),
-        fetch('/api/reports/precision?limit=20'),
+        fetch(`/api/reports/clients?limit=10&from=${fromDate}&to=${toDate}`),
+        fetch(`/api/reports/precision?limit=20&start_date=${fromDate}&end_date=${toDate}`),
       ]);
 
       if (salesRes.ok) setSalesData(await salesRes.json());
@@ -155,17 +171,82 @@ export default function ReportesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reportes</h1>
-          <p className="text-gray-500">Análisis de ventas y producción</p>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Reportes</h1>
+            <p className="text-gray-500">Análisis de ventas y producción</p>
+          </div>
+          <Button
+            onClick={() => exportFullReport(
+              salesData,
+              topClients ? {
+                data: topClients.data.map(c => ({
+                  client_name: c.client_name,
+                  company: c.company,
+                  total_orders: c.total_orders,
+                  total_m2: c.total_m2,
+                  total_revenue: c.total_revenue,
+                })),
+                summary: topClients.summary,
+              } : null,
+              precisionData ? {
+                data: precisionData.data.map(p => ({
+                  order_number: p.order_number,
+                  client_name: p.client_name,
+                  original_m2: p.original_m2,
+                  delivered_m2: p.delivered_m2,
+                  precision_percent: p.precision_percent,
+                  difference_m2: p.difference_m2,
+                })),
+                summary: precisionData.summary,
+              } : null,
+              productionData ? {
+                data: productionData.data.map(d => ({
+                  status: d.status,
+                  status_label: ORDER_STATUS_LABELS[d.status],
+                  count: d.count,
+                  total_m2: d.total_m2,
+                })),
+                summary: productionData.summary,
+              } : null,
+              period,
+              dateRange
+            )}
+            className="gap-2"
+          >
+            <FileText className="w-4 h-4" />
+            Exportar Reporte Completo
+          </Button>
         </div>
-        <div className="w-40">
-          <Select
-            options={periodOptions}
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-          />
+
+        {/* Filtros */}
+        <div className="flex flex-col sm:flex-row gap-4 p-4 bg-gray-50 rounded-lg">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              <Calendar className="w-4 h-4 inline mr-1" />
+              Rango de fechas
+            </label>
+            <DateRangePicker
+              value={dateRange}
+              onChange={setDateRange}
+            />
+          </div>
+          <div className="w-40">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Agrupar por
+            </label>
+            <Select
+              options={periodOptions}
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Info del rango seleccionado */}
+        <div className="text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg">
+          Mostrando datos desde <span className="font-semibold">{format(dateRange.from, "d 'de' MMMM yyyy", { locale: es })}</span> hasta <span className="font-semibold">{format(dateRange.to, "d 'de' MMMM yyyy", { locale: es })}</span>
         </div>
       </div>
 
@@ -237,7 +318,7 @@ export default function ReportesPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => exportSalesReport(salesData.data, salesData.summary, period)}
+                onClick={() => exportSalesReport(salesData.data, salesData.summary, period, dateRange)}
               >
                 <Download className="w-4 h-4 mr-1" />
                 PDF
@@ -362,7 +443,8 @@ export default function ReportesPage() {
                     total_m2: c.total_m2,
                     total_revenue: c.total_revenue,
                   })),
-                  topClients.summary
+                  topClients.summary,
+                  dateRange
                 )}
               >
                 <Download className="w-4 h-4 mr-1" />
@@ -463,7 +545,8 @@ export default function ReportesPage() {
                     precision_percent: p.precision_percent,
                     difference_m2: p.difference_m2,
                   })),
-                  precisionData.summary
+                  precisionData.summary,
+                  dateRange
                 )}
               >
                 <Download className="w-4 h-4 mr-1" />

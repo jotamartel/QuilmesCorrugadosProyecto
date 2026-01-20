@@ -7,9 +7,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { LoadingPage, LoadingSpinner } from '@/components/ui/loading';
-import { Plus, Eye, Search, Building, User, Download, Upload } from 'lucide-react';
+import { Plus, Eye, Search, Building, User, Download, Upload, Globe, MessageCircle, Mail, UserPlus } from 'lucide-react';
 import { formatDistance, PAYMENT_TERMS_LABELS } from '@/lib/utils/format';
-import type { Client, PaymentTerms } from '@/lib/types/database';
+import type { Client, PaymentTerms, ClientSource } from '@/lib/types/database';
+
+const SOURCE_CONFIG: Record<ClientSource, { label: string; icon: React.ReactNode; color: string }> = {
+  manual: { label: 'Manual', icon: <UserPlus className="w-3 h-3" />, color: 'bg-gray-100 text-gray-700' },
+  web: { label: 'Web', icon: <Globe className="w-3 h-3" />, color: 'bg-blue-100 text-blue-700' },
+  whatsapp: { label: 'WhatsApp', icon: <MessageCircle className="w-3 h-3" />, color: 'bg-green-100 text-green-700' },
+  email: { label: 'Email', icon: <Mail className="w-3 h-3" />, color: 'bg-purple-100 text-purple-700' },
+};
 
 // Columnas del CSV para importar/exportar
 const CSV_COLUMNS = [
@@ -26,17 +33,22 @@ export default function ClientesPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sourceFilter, setSourceFilter] = useState<ClientSource | 'all'>('all');
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success: number; errors: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchClients();
-  }, []);
+  }, [sourceFilter]);
 
   async function fetchClients() {
     try {
-      const res = await fetch('/api/clients');
+      const params = new URLSearchParams();
+      if (sourceFilter !== 'all') {
+        params.set('source', sourceFilter);
+      }
+      const res = await fetch(`/api/clients?${params.toString()}`);
       const data = await res.json();
       setClients(data.data || []);
     } catch (error) {
@@ -321,18 +333,34 @@ export default function ClientesPage() {
         </Card>
       )}
 
-      {/* Search */}
+      {/* Search and Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar por nombre, empresa, CUIT o email..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Buscar por nombre, empresa, CUIT o email..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">Origen:</span>
+              <select
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value as ClientSource | 'all')}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">Todos</option>
+                <option value="manual">Manual</option>
+                <option value="web">Web</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="email">Email</option>
+              </select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -358,6 +386,7 @@ export default function ClientesPage() {
                   <TableHead>Ciudad</TableHead>
                   <TableHead>Distancia</TableHead>
                   <TableHead>Pago</TableHead>
+                  <TableHead>Origen</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -401,6 +430,19 @@ export default function ClientesPage() {
                       <Badge variant="default">
                         {PAYMENT_TERMS_LABELS[client.payment_terms as PaymentTerms]}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {client.source && SOURCE_CONFIG[client.source] ? (
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${SOURCE_CONFIG[client.source].color}`}>
+                          {SOURCE_CONFIG[client.source].icon}
+                          {SOURCE_CONFIG[client.source].label}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                          <UserPlus className="w-3 h-3" />
+                          Manual
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {client.is_recurring && (

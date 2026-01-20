@@ -14,18 +14,24 @@ import {
   X,
   CreditCard,
   Receipt,
+  DollarSign,
+  Globe,
+  UserPlus,
 } from 'lucide-react';
 import { useState } from 'react';
 import { AuthGuard, LogoutButton, useAuth } from '@/components/auth';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Dashboard', href: '/inicio', icon: LayoutDashboard },
   { name: 'Cotizaciones', href: '/cotizaciones', icon: FileText },
+  { name: 'Cot. Web', href: '/cotizaciones-web', icon: Globe },
+  { name: 'Leads Web', href: '/leads-web', icon: UserPlus },
   { name: 'Ordenes', href: '/ordenes', icon: ShoppingCart },
   { name: 'Clientes', href: '/clientes', icon: Users },
   { name: 'Pagos', href: '/pagos', icon: Receipt },
   { name: 'Cheques', href: '/cheques', icon: CreditCard },
   { name: 'Catalogo', href: '/catalogo', icon: Box },
+  { name: 'Costos', href: '/costos', icon: DollarSign },
   { name: 'Reportes', href: '/reportes', icon: BarChart3 },
   { name: 'Configuracion', href: '/configuracion', icon: Settings },
 ];

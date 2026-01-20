@@ -1,13 +1,24 @@
 /**
- * Funciones de autenticación del lado cliente
+ * Funciones de autenticacion del lado cliente
  */
 
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 
+// Cliente de Supabase con lock deshabilitado para evitar AbortError
 export function createAuthClient() {
-  return createBrowserClient(
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        lock: async <R,>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => {
+          // Bypass del lock - ejecutar directamente
+          return fn();
+        },
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    }
   );
 }
 
@@ -26,7 +37,7 @@ export async function signInWithEmail(email: string, password: string) {
     throw error;
   }
 
-  // Verificar si el usuario está autorizado
+  // Verificar si el usuario esta autorizado
   const isAuthorized = await checkUserAuthorized(email);
   if (!isAuthorized) {
     await supabase.auth.signOut();
@@ -45,7 +56,8 @@ export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/api/auth/callback`,
+      // Redirigir a la pagina de callback del cliente que maneja la sesion
+      redirectTo: `${window.location.origin}/auth/callback`,
     },
   });
 
@@ -57,7 +69,7 @@ export async function signInWithGoogle() {
 }
 
 /**
- * Cerrar sesión
+ * Cerrar sesion
  */
 export async function signOut() {
   const supabase = createAuthClient();
@@ -68,7 +80,7 @@ export async function signOut() {
 }
 
 /**
- * Obtener sesión actual
+ * Obtener sesion actual
  */
 export async function getSession() {
   const supabase = createAuthClient();
@@ -92,7 +104,7 @@ export async function getUser() {
 }
 
 /**
- * Verificar si el email está en la lista de usuarios autorizados
+ * Verificar si el email esta en la lista de usuarios autorizados
  */
 export async function checkUserAuthorized(email: string): Promise<boolean> {
   try {
@@ -114,7 +126,7 @@ export async function checkUserAuthorized(email: string): Promise<boolean> {
 }
 
 /**
- * Suscribirse a cambios de autenticación
+ * Suscribirse a cambios de autenticacion
  */
 export function onAuthStateChange(callback: (event: string, session: unknown) => void) {
   const supabase = createAuthClient();

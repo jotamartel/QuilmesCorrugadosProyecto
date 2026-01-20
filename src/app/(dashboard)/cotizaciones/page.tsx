@@ -5,68 +5,131 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { LoadingPage } from '@/components/ui/loading';
-import { Plus, Eye, Search } from 'lucide-react';
-import { formatCurrency, formatM2 } from '@/lib/utils/pricing';
+import {
+  Plus,
+  Eye,
+  Globe,
+  Users,
+  MessageCircle,
+  FileText,
+  TrendingUp,
+  Clock,
+  CheckCircle2,
+  ArrowRight,
+  BarChart3
+} from 'lucide-react';
+import { formatCurrency } from '@/lib/utils/pricing';
 import { formatDate } from '@/lib/utils/dates';
 import { QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from '@/lib/utils/format';
-import type { Quote, QuoteStatus } from '@/lib/types/database';
+import type { Quote, QuoteStatus, PublicQuote } from '@/lib/types/database';
 
-const statusOptions = [
-  { value: '', label: 'Todos los estados' },
-  { value: 'draft', label: 'Borrador' },
-  { value: 'sent', label: 'Enviada' },
-  { value: 'approved', label: 'Aprobada' },
-  { value: 'rejected', label: 'Rechazada' },
-  { value: 'expired', label: 'Expirada' },
-  { value: 'converted', label: 'Convertida' },
-];
+interface DashboardStats {
+  // Cotizaciones Backend
+  backendQuotes: {
+    total: number;
+    draft: number;
+    sent: number;
+    approved: number;
+    converted: number;
+    totalValue: number;
+  };
+  // Cotizaciones Web
+  webQuotes: {
+    total: number;
+    pending: number;
+    contacted: number;
+    converted: number;
+    totalValue: number;
+  };
+  // Leads Web
+  leads: {
+    total: number;
+    pending: number;
+    contacted: number;
+    converted: number;
+  };
+  // Recientes
+  recentBackend: Quote[];
+  recentWeb: (PublicQuote & { quote_number_formatted: string })[];
+}
 
-export default function CotizacionesPage() {
-  const [quotes, setQuotes] = useState<Quote[]>([]);
+export default function CotizacionesDashboard() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    fetchQuotes();
-  }, [statusFilter]);
+    fetchStats();
+  }, []);
 
-  async function fetchQuotes() {
+  async function fetchStats() {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (statusFilter) params.append('status', statusFilter);
+      // Fetch en paralelo
+      const [backendRes, webRes, leadsRes] = await Promise.all([
+        fetch('/api/quotes?limit=5'),
+        fetch('/api/public-quotes?requested_contact=true&limit=5'),
+        fetch('/api/public-quotes?requested_contact=false&limit=5'),
+      ]);
 
-      const res = await fetch(`/api/quotes?${params.toString()}`);
-      const data = await res.json();
-      setQuotes(data.data || []);
+      const [backendData, webData, leadsData] = await Promise.all([
+        backendRes.json(),
+        webRes.json(),
+        leadsRes.json(),
+      ]);
+
+      // Calcular estadísticas de cotizaciones backend
+      const allBackend = backendData.data || [];
+      const backendStats = {
+        total: allBackend.length,
+        draft: allBackend.filter((q: Quote) => q.status === 'draft').length,
+        sent: allBackend.filter((q: Quote) => q.status === 'sent').length,
+        approved: allBackend.filter((q: Quote) => q.status === 'approved').length,
+        converted: allBackend.filter((q: Quote) => q.status === 'converted').length,
+        totalValue: allBackend.reduce((sum: number, q: Quote) => sum + (q.total || 0), 0),
+      };
+
+      setStats({
+        backendQuotes: backendStats,
+        webQuotes: {
+          total: webData.counts?.total || 0,
+          pending: webData.counts?.pending || 0,
+          contacted: webData.counts?.contacted || 0,
+          converted: webData.counts?.converted || 0,
+          totalValue: (webData.quotes || []).reduce((sum: number, q: PublicQuote) => sum + (q.subtotal || 0), 0),
+        },
+        leads: {
+          total: leadsData.counts?.total || 0,
+          pending: leadsData.counts?.pending || 0,
+          contacted: leadsData.counts?.contacted || 0,
+          converted: leadsData.counts?.converted || 0,
+        },
+        recentBackend: allBackend.slice(0, 5),
+        recentWeb: webData.quotes?.slice(0, 5) || [],
+      });
     } catch (error) {
-      console.error('Error fetching quotes:', error);
+      console.error('Error fetching stats:', error);
     } finally {
       setLoading(false);
     }
   }
 
-  const filteredQuotes = quotes.filter(quote => {
-    if (!searchQuery) return true;
-    const search = searchQuery.toLowerCase();
-    return (
-      quote.quote_number.toLowerCase().includes(search) ||
-      (quote.client as { name?: string; company?: string } | null)?.name?.toLowerCase().includes(search) ||
-      (quote.client as { name?: string; company?: string } | null)?.company?.toLowerCase().includes(search)
-    );
-  });
+  if (loading) {
+    return <LoadingPage />;
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Cotizaciones</h1>
-          <p className="text-gray-500">Gestiona las cotizaciones de clientes</p>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <BarChart3 className="w-6 h-6" />
+            Centro de Cotizaciones
+          </h1>
+          <p className="text-gray-500">
+            Resumen de cotizaciones, leads y solicitudes web
+          </p>
         </div>
         <Link href="/cotizaciones/nueva">
           <Button>
@@ -76,103 +139,246 @@ export default function CotizacionesPage() {
         </Link>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar por número o cliente..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div className="w-full sm:w-48">
-              <Select
-                options={statusOptions}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                placeholder="Filtrar por estado"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Cards de Acceso Rápido */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Cotizaciones Web */}
+        <Link href="/cotizaciones-web">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-blue-500">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Cotizaciones Web</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats?.webQuotes.total || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {stats?.webQuotes.pending || 0} pendientes
+                  </p>
+                </div>
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <Globe className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
-      {/* Table */}
+        {/* Leads Web */}
+        <Link href="/leads-web">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-amber-500">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Leads Web</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats?.leads.total || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {stats?.leads.pending || 0} sin contactar
+                  </p>
+                </div>
+                <div className="p-3 bg-amber-100 rounded-full">
+                  <Users className="w-6 h-6 text-amber-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* WhatsApp (Próximamente) */}
+        <Card className="border-l-4 border-l-green-500 opacity-60">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">WhatsApp</p>
+                <p className="text-lg font-medium text-gray-400">Próximamente</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Integración en desarrollo
+                </p>
+              </div>
+              <div className="p-3 bg-green-100 rounded-full">
+                <MessageCircle className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Estadísticas Generales */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="flex items-center justify-center w-10 h-10 bg-purple-100 rounded-full mx-auto mb-2">
+              <FileText className="w-5 h-5 text-purple-600" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{stats?.backendQuotes.total || 0}</p>
+            <p className="text-xs text-gray-500">Cotizaciones Backend</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full mx-auto mb-2">
+              <Clock className="w-5 h-5 text-blue-600" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900">
+              {(stats?.webQuotes.pending || 0) + (stats?.leads.pending || 0)}
+            </p>
+            <p className="text-xs text-gray-500">Pendientes Total</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-full mx-auto mb-2">
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900">
+              {(stats?.backendQuotes.converted || 0) + (stats?.webQuotes.converted || 0)}
+            </p>
+            <p className="text-xs text-gray-500">Convertidas Total</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-full mx-auto mb-2">
+              <TrendingUp className="w-5 h-5 text-emerald-600" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900">
+              {formatCurrency((stats?.backendQuotes.totalValue || 0) + (stats?.webQuotes.totalValue || 0))}
+            </p>
+            <p className="text-xs text-gray-500">Valor Total</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tablas de Recientes */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Cotizaciones Backend Recientes */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Cotizaciones Recientes
+              </CardTitle>
+              <Link href="/cotizaciones/lista" className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                Ver todas <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {stats?.recentBackend && stats.recentBackend.length > 0 ? (
+              <div className="divide-y">
+                {stats.recentBackend.map((quote) => (
+                  <Link key={quote.id} href={`/cotizaciones/${quote.id}`}>
+                    <div className="px-4 py-3 hover:bg-gray-50 flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{quote.quote_number}</p>
+                        <p className="text-xs text-gray-500">
+                          {(quote.client as { name?: string } | null)?.name || 'Sin cliente'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-sm">{formatCurrency(quote.total)}</p>
+                        <Badge className={`text-xs ${QUOTE_STATUS_COLORS[quote.status as QuoteStatus]}`}>
+                          {QUOTE_STATUS_LABELS[quote.status as QuoteStatus]}
+                        </Badge>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 text-center text-gray-500 text-sm">
+                No hay cotizaciones recientes
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Cotizaciones Web Recientes */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Globe className="w-4 h-4" />
+                Solicitudes Web Recientes
+              </CardTitle>
+              <Link href="/cotizaciones-web" className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                Ver todas <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {stats?.recentWeb && stats.recentWeb.length > 0 ? (
+              <div className="divide-y">
+                {stats.recentWeb.map((quote) => (
+                  <Link key={quote.id} href={`/cotizaciones-web/${quote.id}`}>
+                    <div className="px-4 py-3 hover:bg-gray-50 flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{quote.quote_number_formatted}</p>
+                        <p className="text-xs text-gray-500">
+                          {quote.requester_company || quote.requester_name}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-sm">{formatCurrency(quote.subtotal)}</p>
+                        <Badge
+                          variant={
+                            quote.status === 'pending' ? 'warning' :
+                            quote.status === 'converted' ? 'success' :
+                            quote.status === 'contacted' ? 'info' : 'error'
+                          }
+                          className="text-xs"
+                        >
+                          {quote.status === 'pending' ? 'Pendiente' :
+                           quote.status === 'converted' ? 'Convertido' :
+                           quote.status === 'contacted' ? 'Contactado' : 'Rechazado'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 text-center text-gray-500 text-sm">
+                No hay solicitudes web recientes
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Acciones Rápidas */}
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Cotizaciones ({filteredQuotes.length})</CardTitle>
+          <CardTitle className="text-base">Acciones Rápidas</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <LoadingPage />
-          ) : filteredQuotes.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              No se encontraron cotizaciones
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Número</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>m2</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Vence</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredQuotes.map((quote) => (
-                  <TableRow key={quote.id}>
-                    <TableCell className="font-medium">
-                      {quote.quote_number}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">
-                          {(quote.client as { name: string } | null)?.name || 'Sin cliente'}
-                        </p>
-                        {(quote.client as { company?: string } | null)?.company && (
-                          <p className="text-xs text-gray-500">
-                            {(quote.client as { company: string }).company}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{formatM2(quote.total_m2)}</TableCell>
-                    <TableCell className="font-medium">
-                      {formatCurrency(quote.total)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={QUOTE_STATUS_COLORS[quote.status as QuoteStatus]}>
-                        {QUOTE_STATUS_LABELS[quote.status as QuoteStatus]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-gray-500">
-                      {formatDate(quote.created_at)}
-                    </TableCell>
-                    <TableCell className="text-gray-500">
-                      {formatDate(quote.valid_until)}
-                    </TableCell>
-                    <TableCell>
-                      <Link href={`/cotizaciones/${quote.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Link href="/cotizaciones/nueva">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <Plus className="w-4 h-4" />
+                Nueva Cotización
+              </Button>
+            </Link>
+            <Link href="/cotizaciones/lista">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <FileText className="w-4 h-4" />
+                Ver Cotizaciones
+              </Button>
+            </Link>
+            <Link href="/cotizaciones-web">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <Globe className="w-4 h-4" />
+                Cot. Web
+              </Button>
+            </Link>
+            <Link href="/leads-web">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <Users className="w-4 h-4" />
+                Leads Web
+              </Button>
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

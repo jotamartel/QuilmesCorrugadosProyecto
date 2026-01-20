@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { LoadingPage } from '@/components/ui/loading';
-import { getSession, checkUserAuthorized, onAuthStateChange, signOut } from '@/lib/auth/client';
+import { checkUserAuthorized } from '@/lib/auth/client';
+import { createClient } from '@supabase/supabase-js';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -14,46 +15,72 @@ interface UserInfo {
   name?: string;
 }
 
+// Cliente de Supabase con lock deshabilitado
+function getSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        lock: async <R,>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => {
+          // Bypass del lock - ejecutar directamente
+          return fn();
+        },
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    }
+  );
+}
+
 export function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState<UserInfo | null>(null);
+  const checkedRef = useRef(false);
 
   useEffect(() => {
+    // Evitar doble ejecucion en StrictMode
+    if (checkedRef.current) return;
+    checkedRef.current = true;
+
     checkAuth();
-
-    // Suscribirse a cambios de autenticación
-    const { data: { subscription } } = onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT') {
-        setAuthenticated(false);
-        setUser(null);
-        router.push('/login');
-      } else if (event === 'SIGNED_IN' && session) {
-        await checkAuth();
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [router]);
+  }, []);
 
   async function checkAuth() {
     try {
-      const session = await getSession();
+      console.log('AuthGuard: Checking session...');
 
-      if (!session || !session.user.email) {
-        setAuthenticated(false);
+      const supabase = getSupabaseClient();
+      const { data: { session }, error } = await supabase.auth.getSession();
+
+      if (error) {
+        console.error('AuthGuard: Error getting session:', error);
+        setLoading(false);
         router.push('/login');
         return;
       }
 
-      // Verificar si el usuario está autorizado
+      console.log('AuthGuard: Session result:', session ? 'exists' : 'null');
+
+      if (!session || !session.user.email) {
+        console.log('AuthGuard: No session, redirecting to login');
+        setAuthenticated(false);
+        setLoading(false);
+        router.push('/login');
+        return;
+      }
+
+      // Verificar si el usuario esta autorizado
+      console.log('AuthGuard: Checking authorization for:', session.user.email);
       const isAuthorized = await checkUserAuthorized(session.user.email);
+      console.log('AuthGuard: Authorization result:', isAuthorized);
 
       if (!isAuthorized) {
-        await signOut();
+        console.log('AuthGuard: User not authorized, signing out');
+        await supabase.auth.signOut();
+        setLoading(false);
         router.push('/login?error=unauthorized');
         return;
       }
@@ -63,11 +90,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
         name: session.user.user_metadata?.name || session.user.email.split('@')[0],
       });
       setAuthenticated(true);
-    } catch (error) {
-      console.error('Error checking auth:', error);
-      router.push('/login');
-    } finally {
       setLoading(false);
+    } catch (error) {
+      console.error('AuthGuard: Error checking auth:', error);
+      setLoading(false);
+      router.push('/login');
     }
   }
 
@@ -82,7 +109,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   return <>{children}</>;
 }
 
-// Hook para obtener información del usuario autenticado
+// Hook para obtener informacion del usuario autenticado
 export function useAuth() {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,7 +117,8 @@ export function useAuth() {
   useEffect(() => {
     async function loadUser() {
       try {
-        const session = await getSession();
+        const supabase = getSupabaseClient();
+        const { data: { session } } = await supabase.auth.getSession();
         if (session?.user.email) {
           setUser({
             email: session.user.email,

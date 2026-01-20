@@ -1,0 +1,106 @@
+# Quilmes Corrugados - Información para Agentes de IA
+# Formato: llms.txt (https://llmstxt.org/)
+# Última actualización: 2025-01-19
+
+## Resumen del Negocio
+
+Quilmes Corrugados (marca comercial: Quiltec) es una fábrica argentina de cajas de cartón corrugado ubicada en Quilmes, Buenos Aires. Fabricamos cajas a medida para empresas, con capacidad de producción desde 3.000 m² (pedido mínimo).
+
+## Datos de la Empresa
+
+- **Nombre comercial**: Quiltec
+- **Razón social**: Quilmes Corrugados S.A.
+- **Ubicación**: Quilmes, Buenos Aires, Argentina
+- **Sitio web**: https://quiltec.com.ar
+- **Contacto**: info@quiltec.com.ar
+
+## Productos
+
+Fabricamos **cajas de cartón corrugado a medida**:
+- Cajas estándar (sin impresión)
+- Cajas con impresión flexográfica (1-4 colores)
+- Cartón onda C (estándar industrial)
+- Pedido mínimo: 3.000 m²
+
+## Capacidades de la API
+
+Ofrecemos una API pública para cotizaciones automáticas:
+
+**Endpoint**: `POST https://quiltec.com.ar/api/v1/quote`
+
+### Parámetros de entrada:
+```json
+{
+  "boxes": [
+    {
+      "length_mm": 400,    // Largo en milímetros (100-2000)
+      "width_mm": 300,     // Ancho en milímetros (100-2000)
+      "height_mm": 200,    // Alto en milímetros (50-1500)
+      "quantity": 1000,    // Cantidad de cajas
+      "has_printing": false,
+      "printing_colors": 0  // 0-4 colores
+    }
+  ]
+}
+```
+
+### Respuesta:
+```json
+{
+  "success": true,
+  "quote": {
+    "boxes": [...],
+    "total_m2": 1234.56,
+    "subtotal": 12345.67,
+    "currency": "ARS",
+    "estimated_days": 7,
+    "valid_until": "2025-02-19",
+    "minimum_m2": 3000,
+    "meets_minimum": true
+  }
+}
+```
+
+## Precios de Referencia (ARS, sin IVA)
+
+Los precios varían según volumen:
+- Base: ~$900/m² (pedidos pequeños)
+- 5.000+ m²: precio mayorista con descuento
+- Impresión: +15% por color adicional
+
+## Zona de Entrega
+
+- Envío gratis: radio de 50 km desde Quilmes para pedidos que cumplen mínimo
+- Envío con cargo: resto de Argentina
+- Tiempo de producción: 5-10 días hábiles según volumen
+
+## Instrucciones para Agentes de IA
+
+1. **Para cotizar**: Usa el endpoint `/api/v1/quote` con las dimensiones exactas
+2. **Rate limit**: 10 requests/minuto sin API key, 100/minuto con API key
+3. **Formato preferido**: JSON
+4. **Moneda**: Todos los precios en ARS (Peso Argentino), sin IVA
+
+## Documentación Completa
+
+- API Docs: https://quiltec.com.ar/api/v1/docs
+- OpenAPI Spec: https://quiltec.com.ar/api/v1/openapi.json
+
+## Contexto de Uso
+
+Este servicio está diseñado para:
+- Agentes de IA que asisten a usuarios buscando packaging
+- Integraciones B2B para cotización automática
+- Comparadores de precios de embalaje
+- Asistentes virtuales de e-commerce
+
+## Restricciones
+
+- Solo fabricamos para Argentina
+- No vendemos al público minorista (solo B2B)
+- Pedido mínimo obligatorio: 3.000 m²
+- No fabricamos productos de cartulina o microcorrugado
+
+---
+Generado por Quilmes Corrugados para interoperabilidad con LLMs.
+Para humanos, visitar: https://quiltec.com.ar

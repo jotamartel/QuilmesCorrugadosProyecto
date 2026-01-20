@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { parseISO } from 'date-fns';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,17 +13,33 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
 
     const limit = parseInt(searchParams.get('limit') || '10');
+    const from = searchParams.get('from');
+    const to = searchParams.get('to');
 
-    // Obtener órdenes agrupadas por cliente
-    const { data: orders, error: ordersError } = await supabase
+    // Construir query base
+    let query = supabase
       .from('orders')
       .select(`
         client_id,
         total,
         total_m2,
+        created_at,
         client:clients(id, name, company)
       `)
       .neq('status', 'cancelled');
+
+    // Aplicar filtros de fecha si existen
+    if (from) {
+      query = query.gte('created_at', parseISO(from).toISOString());
+    }
+    if (to) {
+      const endDate = parseISO(to);
+      endDate.setHours(23, 59, 59, 999);
+      query = query.lte('created_at', endDate.toISOString());
+    }
+
+    // Obtener órdenes agrupadas por cliente
+    const { data: orders, error: ordersError } = await query;
 
     if (ordersError) throw ordersError;
 

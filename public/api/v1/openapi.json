@@ -1,0 +1,406 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Quiltec Quote API",
+    "description": "API pública para cotización de cajas de cartón corrugado. Diseñada para integración con LLMs, agentes de IA y sistemas B2B.\n\n## Información del Negocio\n\nQuilmes Corrugados (marca comercial: Quiltec) es una fábrica argentina de cajas de cartón corrugado ubicada en Quilmes, Buenos Aires.\n\n## Restricciones\n\n- Pedido mínimo: 3.000 m²\n- Solo fabricamos para Argentina\n- Precios en ARS (Peso Argentino) sin IVA\n\n## Rate Limiting\n\n- Sin API key: 10 requests/minuto\n- Con API key: 100 requests/minuto",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Quiltec - Soporte API",
+      "email": "info@quiltec.com.ar",
+      "url": "https://quiltec.com.ar"
+    },
+    "license": {
+      "name": "Propietario",
+      "url": "https://quiltec.com.ar/terms"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://quiltec.com.ar/api/v1",
+      "description": "Producción"
+    }
+  ],
+  "paths": {
+    "/quote": {
+      "post": {
+        "summary": "Calcular cotización",
+        "description": "Calcula el precio de cajas de cartón corrugado según dimensiones, cantidad y opciones de impresión.",
+        "operationId": "createQuote",
+        "tags": ["Cotización"],
+        "security": [
+          {},
+          { "ApiKeyAuth": [] }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteRequest"
+              },
+              "examples": {
+                "simple": {
+                  "summary": "Caja simple sin impresión",
+                  "value": {
+                    "boxes": [
+                      {
+                        "length_mm": 400,
+                        "width_mm": 300,
+                        "height_mm": 200,
+                        "quantity": 1000
+                      }
+                    ]
+                  }
+                },
+                "withPrinting": {
+                  "summary": "Caja con impresión a 2 colores",
+                  "value": {
+                    "boxes": [
+                      {
+                        "length_mm": 500,
+                        "width_mm": 400,
+                        "height_mm": 300,
+                        "quantity": 5000,
+                        "has_printing": true,
+                        "printing_colors": 2
+                      }
+                    ]
+                  }
+                },
+                "multiple": {
+                  "summary": "Múltiples tipos de cajas",
+                  "value": {
+                    "boxes": [
+                      {
+                        "length_mm": 400,
+                        "width_mm": 300,
+                        "height_mm": 200,
+                        "quantity": 2000
+                      },
+                      {
+                        "length_mm": 600,
+                        "width_mm": 400,
+                        "height_mm": 400,
+                        "quantity": 1000,
+                        "has_printing": true,
+                        "printing_colors": 1
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cotización calculada exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-RateLimit-Limit": {
+                "schema": { "type": "integer" },
+                "description": "Límite de requests por minuto"
+              },
+              "X-RateLimit-Remaining": {
+                "schema": { "type": "integer" },
+                "description": "Requests restantes en la ventana actual"
+              },
+              "X-RateLimit-Reset": {
+                "schema": { "type": "string", "format": "date-time" },
+                "description": "Fecha/hora de reset del rate limit"
+              }
+            }
+          },
+          "400": {
+            "description": "Error de validación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "error": "Validation failed",
+                  "errors": [
+                    "boxes[0].length_mm must be between 100 and 2000"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit excedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "error": "Rate limit exceeded. Please wait before making more requests.",
+                  "rate_limit": {
+                    "remaining": 0,
+                    "reset_at": "2025-01-19T12:01:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Información del endpoint",
+        "description": "Devuelve información sobre la API y enlaces a documentación.",
+        "operationId": "getQuoteInfo",
+        "tags": ["Información"],
+        "responses": {
+          "200": {
+            "description": "Información de la API",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "api": { "type": "string" },
+                    "version": { "type": "string" },
+                    "documentation": { "type": "string", "format": "uri" },
+                    "openapi": { "type": "string", "format": "uri" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key para rate limit extendido (100 req/min)"
+      }
+    },
+    "schemas": {
+      "QuoteRequest": {
+        "type": "object",
+        "required": ["boxes"],
+        "properties": {
+          "boxes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "description": "Lista de cajas a cotizar (máximo 10)",
+            "items": {
+              "$ref": "#/components/schemas/BoxInput"
+            }
+          }
+        }
+      },
+      "BoxInput": {
+        "type": "object",
+        "required": ["length_mm", "width_mm", "height_mm", "quantity"],
+        "properties": {
+          "length_mm": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 2000,
+            "description": "Largo de la caja en milímetros"
+          },
+          "width_mm": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 2000,
+            "description": "Ancho de la caja en milímetros"
+          },
+          "height_mm": {
+            "type": "integer",
+            "minimum": 50,
+            "maximum": 1500,
+            "description": "Alto de la caja en milímetros"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Cantidad de cajas"
+          },
+          "has_printing": {
+            "type": "boolean",
+            "default": false,
+            "description": "Si la caja tiene impresión"
+          },
+          "printing_colors": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4,
+            "default": 0,
+            "description": "Cantidad de colores de impresión (0-4)"
+          }
+        }
+      },
+      "QuoteResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "quote": {
+            "$ref": "#/components/schemas/Quote"
+          },
+          "rate_limit": {
+            "$ref": "#/components/schemas/RateLimitInfo"
+          }
+        }
+      },
+      "Quote": {
+        "type": "object",
+        "properties": {
+          "boxes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoxResult"
+            }
+          },
+          "total_m2": {
+            "type": "number",
+            "description": "Total de metros cuadrados de cartón"
+          },
+          "subtotal": {
+            "type": "number",
+            "description": "Precio total sin IVA en ARS"
+          },
+          "currency": {
+            "type": "string",
+            "enum": ["ARS"],
+            "description": "Moneda (siempre ARS)"
+          },
+          "estimated_days": {
+            "type": "integer",
+            "description": "Días hábiles de producción estimados"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date",
+            "description": "Fecha hasta la cual el precio es válido"
+          },
+          "minimum_m2": {
+            "type": "integer",
+            "example": 3000,
+            "description": "Mínimo de m² requerido para procesar el pedido"
+          },
+          "meets_minimum": {
+            "type": "boolean",
+            "description": "Si el pedido cumple con el mínimo requerido"
+          }
+        }
+      },
+      "BoxResult": {
+        "type": "object",
+        "properties": {
+          "length_mm": { "type": "integer" },
+          "width_mm": { "type": "integer" },
+          "height_mm": { "type": "integer" },
+          "quantity": { "type": "integer" },
+          "has_printing": { "type": "boolean" },
+          "printing_colors": { "type": "integer" },
+          "sheet_width_mm": {
+            "type": "integer",
+            "description": "Ancho de la plancha desplegada en mm"
+          },
+          "sheet_length_mm": {
+            "type": "integer",
+            "description": "Largo de la plancha desplegada en mm"
+          },
+          "sqm_per_box": {
+            "type": "number",
+            "description": "Metros cuadrados por caja"
+          },
+          "total_sqm": {
+            "type": "number",
+            "description": "Total m² para esta caja × cantidad"
+          },
+          "price_per_m2": {
+            "type": "number",
+            "description": "Precio por m² aplicado"
+          },
+          "unit_price": {
+            "type": "number",
+            "description": "Precio unitario por caja"
+          },
+          "subtotal": {
+            "type": "number",
+            "description": "Subtotal para este tipo de caja"
+          }
+        }
+      },
+      "RateLimitInfo": {
+        "type": "object",
+        "properties": {
+          "remaining": {
+            "type": "integer",
+            "description": "Requests restantes en la ventana actual"
+          },
+          "reset_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Fecha/hora de reset del rate limit"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "description": "Mensaje de error principal"
+          },
+          "errors": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Lista detallada de errores de validación"
+          },
+          "rate_limit": {
+            "$ref": "#/components/schemas/RateLimitInfo"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Cotización",
+      "description": "Endpoints para calcular cotizaciones de cajas"
+    },
+    {
+      "name": "Información",
+      "description": "Información sobre la API"
+    }
+  ],
+  "externalDocs": {
+    "description": "Documentación completa",
+    "url": "https://quiltec.com.ar/api/v1/docs"
+  }
+}

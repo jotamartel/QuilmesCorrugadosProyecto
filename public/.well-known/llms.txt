@@ -1,18 +1,17 @@
 # Quilmes Corrugados - Información para Agentes de IA
 # Formato: llms.txt (https://llmstxt.org/)
-# Última actualización: 2025-01-19
+# Última actualización: 2025-01-20
 
 ## Resumen del Negocio
 
-Quilmes Corrugados (marca comercial: Quiltec) es una fábrica argentina de cajas de cartón corrugado ubicada en Quilmes, Buenos Aires. Fabricamos cajas a medida para empresas, con capacidad de producción desde 3.000 m² (pedido mínimo).
+Quilmes Corrugados es una fábrica argentina de cajas de cartón corrugado ubicada en Quilmes, Buenos Aires. Fabricamos cajas a medida para empresas, con capacidad de producción desde 3.000 m² (pedido mínimo).
 
 ## Datos de la Empresa
 
-- **Nombre comercial**: Quiltec
-- **Razón social**: Quilmes Corrugados S.A.
+- **Nombre**: Quilmes Corrugados S.A.
 - **Ubicación**: Quilmes, Buenos Aires, Argentina
-- **Sitio web**: https://quiltec.com.ar
-- **Contacto**: info@quiltec.com.ar
+- **Sitio web**: https://quilmes-corrugados.vercel.app
+- **Contacto**: info@quilmescorrugados.com.ar
 
 ## Productos
 
@@ -26,7 +25,7 @@ Fabricamos **cajas de cartón corrugado a medida**:
 
 Ofrecemos una API pública para cotizaciones automáticas:
 
-**Endpoint**: `POST https://quiltec.com.ar/api/v1/quote`
+**Endpoint**: `POST https://quilmes-corrugados.vercel.app/api/v1/quote`
 
 ### Parámetros de entrada:
 ```json
@@ -64,7 +63,7 @@ Ofrecemos una API pública para cotizaciones automáticas:
 ## Precios de Referencia (ARS, sin IVA)
 
 Los precios varían según volumen:
-- Base: ~$900/m² (pedidos pequeños)
+- Base: ~$700/m² (pedidos pequeños)
 - 5.000+ m²: precio mayorista con descuento
 - Impresión: +15% por color adicional
 
@@ -83,8 +82,8 @@ Los precios varían según volumen:
 
 ## Documentación Completa
 
-- API Docs: https://quiltec.com.ar/api/v1/docs
-- OpenAPI Spec: https://quiltec.com.ar/api/v1/openapi.json
+- API Docs: https://quilmes-corrugados.vercel.app/api/v1/docs
+- OpenAPI Spec: https://quilmes-corrugados.vercel.app/api/v1/openapi.json
 
 ## Contexto de Uso
 
@@ -103,4 +102,4 @@ Este servicio está diseñado para:
 
 ---
 Generado por Quilmes Corrugados para interoperabilidad con LLMs.
-Para humanos, visitar: https://quiltec.com.ar
+Para humanos, visitar: https://quilmes-corrugados.vercel.app

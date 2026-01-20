@@ -59,14 +59,14 @@ export default function ApiDocsPage() {
   }
 }`;
 
-  const curlExample = `curl -X POST https://quiltec.com.ar/api/v1/quote \\
+  const curlExample = `curl -X POST https://quilmes-corrugados.vercel.app/api/v1/quote \\
   -H "Content-Type: application/json" \\
   -d '${exampleRequest.replace(/\n/g, '').replace(/  /g, '')}'`;
 
   const pythonExample = `import requests
 
 response = requests.post(
-    "https://quiltec.com.ar/api/v1/quote",
+    "https://quilmes-corrugados.vercel.app/api/v1/quote",
     json={
         "boxes": [{
             "length_mm": 400,
@@ -80,7 +80,7 @@ response = requests.post(
 quote = response.json()
 print(f"Total: ARS {quote['quote']['subtotal']:,.2f}")`;
 
-  const jsExample = `const response = await fetch('https://quiltec.com.ar/api/v1/quote', {
+  const jsExample = `const response = await fetch('https://quilmes-corrugados.vercel.app/api/v1/quote', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -102,7 +102,7 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
       <header className="bg-[#002E55] text-white py-12">
         <div className="max-w-4xl mx-auto px-6">
           <div className="flex items-center gap-2 text-blue-200 text-sm mb-4">
-            <a href="https://quiltec.com.ar" className="hover:text-white">Quiltec</a>
+            <a href="https://quilmes-corrugados.vercel.app" className="hover:text-white">Quilmes Corrugados</a>
             <span>/</span>
             <span>API v1</span>
           </div>
@@ -202,7 +202,7 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
                   POST
                 </span>
                 <code className="text-gray-900 font-mono">
-                  https://quiltec.com.ar/api/v1/quote
+                  https://quilmes-corrugados.vercel.app/api/v1/quote
                 </code>
               </div>
             </div>
@@ -462,7 +462,7 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
             Si necesitás un rate limit mayor para tu integración, contactanos para obtener una API key personalizada.
           </p>
           <a
-            href="mailto:info@quiltec.com.ar?subject=Solicitud%20de%20API%20Key"
+            href="mailto:info@quilmescorrugados.com.ar?subject=Solicitud%20de%20API%20Key"
             className="inline-flex items-center gap-2 px-4 py-2 bg-white text-[#002E55] rounded-lg font-medium hover:bg-gray-100 transition-colors"
           >
             Solicitar API Key
@@ -476,7 +476,7 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
         <div className="max-w-4xl mx-auto px-6 text-center text-sm text-gray-500">
           <p>© {new Date().getFullYear()} Quilmes Corrugados S.A. Todos los derechos reservados.</p>
           <p className="mt-2">
-            <a href="https://quiltec.com.ar" className="hover:text-gray-700">quiltec.com.ar</a>
+            <a href="https://quilmes-corrugados.vercel.app" className="hover:text-gray-700">quilmes-corrugados.vercel.app</a>
             {' · '}
             <a href="/llms.txt" className="hover:text-gray-700">llms.txt</a>
             {' · '}

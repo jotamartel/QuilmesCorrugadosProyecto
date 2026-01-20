@@ -13,15 +13,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Quiltec | Fábrica de Cajas de Cartón Corrugado a Medida",
+  title: "Quilmes Corrugados | Fábrica de Cajas de Cartón Corrugado a Medida",
   description: "Fabricamos cajas de cartón corrugado a medida para empresas. Cotizá online al instante. Envío gratis en zona sur de Buenos Aires. Pedido mínimo 3.000 m².",
   keywords: ["cajas de cartón", "cartón corrugado", "embalaje", "packaging", "cajas a medida", "Quilmes", "Buenos Aires", "Argentina"],
   authors: [{ name: "Quilmes Corrugados S.A." }],
   openGraph: {
-    title: "Quiltec | Fábrica de Cajas de Cartón Corrugado",
+    title: "Quilmes Corrugados | Fábrica de Cajas de Cartón Corrugado",
     description: "Fabricamos cajas de cartón corrugado a medida para empresas. Cotizá online al instante.",
-    url: "https://quiltec.com.ar",
-    siteName: "Quiltec",
+    url: "https://quilmes-corrugados.vercel.app",
+    siteName: "Quilmes Corrugados",
     locale: "es_AR",
     type: "website",
   },
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     follow: true,
   },
   alternates: {
-    canonical: "https://quiltec.com.ar",
+    canonical: "https://quilmes-corrugados.vercel.app",
   },
 };
 
@@ -38,14 +38,14 @@ export const metadata: Metadata = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
-  "@id": "https://quiltec.com.ar",
-  name: "Quiltec - Quilmes Corrugados",
+  "@id": "https://quilmes-corrugados.vercel.app",
+  name: "Quilmes Corrugados",
   description: "Fábrica de cajas de cartón corrugado a medida para empresas en Argentina. Producción desde 3.000 m² con entrega en todo el país.",
-  url: "https://quiltec.com.ar",
-  logo: "https://quiltec.com.ar/logo.png",
-  image: "https://quiltec.com.ar/og-image.jpg",
+  url: "https://quilmes-corrugados.vercel.app",
+  logo: "https://quilmes-corrugados.vercel.app/logo.png",
+  image: "https://quilmes-corrugados.vercel.app/og-image.jpg",
   telephone: "+54-11-XXXX-XXXX",
-  email: "info@quiltec.com.ar",
+  email: "info@quilmescorrugados.com.ar",
   address: {
     "@type": "PostalAddress",
     streetAddress: "Calle Industrial 123",
@@ -92,7 +92,7 @@ const jsonLd = {
     "@type": "QuoteAction",
     target: {
       "@type": "EntryPoint",
-      urlTemplate: "https://quiltec.com.ar/cotizar",
+      urlTemplate: "https://quilmes-corrugados.vercel.app/cotizar",
       actionPlatform: [
         "http://schema.org/DesktopWebPlatform",
         "http://schema.org/MobileWebPlatform",

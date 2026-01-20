@@ -6,8 +6,8 @@
  * - Sin API key: 10 requests/minuto
  * - Con API key: 100 requests/minuto (según configuración)
  *
- * Documentación: https://quiltec.com.ar/api/v1/docs
- * OpenAPI Spec: https://quiltec.com.ar/api/v1/openapi.json
+ * Documentación: https://quilmes-corrugados.vercel.app/api/v1/docs
+ * OpenAPI Spec: https://quilmes-corrugados.vercel.app/api/v1/openapi.json
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -414,10 +414,10 @@ export async function OPTIONS() {
 // Handler para GET (documentación)
 export async function GET() {
   return NextResponse.json({
-    api: 'Quiltec Quote API',
+    api: 'Quilmes Corrugados Quote API',
     version: '1.0',
-    documentation: 'https://quiltec.com.ar/api/v1/docs',
-    openapi: 'https://quiltec.com.ar/api/v1/openapi.json',
+    documentation: 'https://quilmes-corrugados.vercel.app/api/v1/docs',
+    openapi: 'https://quilmes-corrugados.vercel.app/api/v1/openapi.json',
     endpoints: {
       'POST /api/v1/quote': 'Calculate quote for cardboard boxes',
     },
@@ -425,6 +425,6 @@ export async function GET() {
       anonymous: `${RATE_LIMIT_ANONYMOUS} requests/minute`,
       with_api_key: `${RATE_LIMIT_WITH_KEY} requests/minute`,
     },
-    contact: 'info@quiltec.com.ar',
+    contact: 'info@quilmescorrugados.com.ar',
   });
 }

@@ -55,7 +55,7 @@ Allow: /llms.txt
 Crawl-delay: 1
 
 # Sitemap
-Sitemap: https://quiltec.com.ar/sitemap.xml
+Sitemap: https://quilmes-corrugados.vercel.app/sitemap.xml
 
 # LLMs.txt (estándar emergente para instrucciones de IA)
 # Ver: https://llmstxt.org/

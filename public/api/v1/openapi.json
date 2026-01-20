@@ -1,22 +1,22 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Quiltec Quote API",
-    "description": "API pública para cotización de cajas de cartón corrugado. Diseñada para integración con LLMs, agentes de IA y sistemas B2B.\n\n## Información del Negocio\n\nQuilmes Corrugados (marca comercial: Quiltec) es una fábrica argentina de cajas de cartón corrugado ubicada en Quilmes, Buenos Aires.\n\n## Restricciones\n\n- Pedido mínimo: 3.000 m²\n- Solo fabricamos para Argentina\n- Precios en ARS (Peso Argentino) sin IVA\n\n## Rate Limiting\n\n- Sin API key: 10 requests/minuto\n- Con API key: 100 requests/minuto",
+    "title": "Quilmes Corrugados Quote API",
+    "description": "API pública para cotización de cajas de cartón corrugado. Diseñada para integración con LLMs, agentes de IA y sistemas B2B.\n\n## Información del Negocio\n\nQuilmes Corrugados  es una fábrica argentina de cajas de cartón corrugado ubicada en Quilmes, Buenos Aires.\n\n## Restricciones\n\n- Pedido mínimo: 3.000 m²\n- Solo fabricamos para Argentina\n- Precios en ARS (Peso Argentino) sin IVA\n\n## Rate Limiting\n\n- Sin API key: 10 requests/minuto\n- Con API key: 100 requests/minuto",
     "version": "1.0.0",
     "contact": {
-      "name": "Quiltec - Soporte API",
-      "email": "info@quiltec.com.ar",
-      "url": "https://quiltec.com.ar"
+      "name": "Quilmes Corrugados - Soporte API",
+      "email": "info@quilmes-corrugados.vercel.app",
+      "url": "https://quilmes-corrugados.vercel.app"
     },
     "license": {
       "name": "Propietario",
-      "url": "https://quiltec.com.ar/terms"
+      "url": "https://quilmes-corrugados.vercel.app/terms"
     }
   },
   "servers": [
     {
-      "url": "https://quiltec.com.ar/api/v1",
+      "url": "https://quilmes-corrugados.vercel.app/api/v1",
       "description": "Producción"
     }
   ],
@@ -401,6 +401,6 @@
   ],
   "externalDocs": {
     "description": "Documentación completa",
-    "url": "https://quiltec.com.ar/api/v1/docs"
+    "url": "https://quilmes-corrugados.vercel.app/api/v1/docs"
   }
 }

@@ -19,6 +19,7 @@ import {
   UserPlus,
   Activity,
   Key,
+  MessageCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 import { AuthGuard, LogoutButton, useAuth } from '@/components/auth';
@@ -28,6 +29,7 @@ const navigation = [
   { name: 'Cotizaciones', href: '/cotizaciones', icon: FileText },
   { name: 'Cot. Web', href: '/cotizaciones-web', icon: Globe },
   { name: 'Leads Web', href: '/leads-web', icon: UserPlus },
+  { name: 'Cot. Wpp', href: '/whatsapp', icon: MessageCircle },
   { name: 'Ordenes', href: '/ordenes', icon: ShoppingCart },
   { name: 'Clientes', href: '/clientes', icon: Users },
   { name: 'Pagos', href: '/pagos', icon: Receipt },

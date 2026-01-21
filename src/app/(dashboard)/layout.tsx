@@ -17,6 +17,8 @@ import {
   DollarSign,
   Globe,
   UserPlus,
+  Activity,
+  Key,
 } from 'lucide-react';
 import { useState } from 'react';
 import { AuthGuard, LogoutButton, useAuth } from '@/components/auth';
@@ -33,6 +35,8 @@ const navigation = [
   { name: 'Catalogo', href: '/catalogo', icon: Box },
   { name: 'Costos', href: '/costos', icon: DollarSign },
   { name: 'Reportes', href: '/reportes', icon: BarChart3 },
+  { name: 'API Stats', href: '/api-stats', icon: Activity },
+  { name: 'API Keys', href: '/api-keys', icon: Key },
   { name: 'Configuracion', href: '/configuracion', icon: Settings },
 ];
 

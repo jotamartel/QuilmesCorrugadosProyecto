@@ -156,11 +156,17 @@ export async function generateBoxTemplate(dimensions: BoxDimensions): Promise<Ui
   // 1. DIBUJAR FONDO (áreas de impresión)
   // ═══════════════════════════════════════════════════════════
 
-  // Cara FRONTAL - área principal de impresión
+  // Cara FRONTAL - área de impresión
   drawRect(xFront, yBody, L, H, { fill: greenLight });
 
-  // Cara TRASERA - área secundaria de impresión
+  // Cara TRASERA - área de impresión
   drawRect(xBack, yBody, L, H, { fill: greenLight });
+
+  // LATERAL 1 - área de impresión
+  drawRect(xSide1, yBody, A, H, { fill: greenLight });
+
+  // LATERAL 2 - área de impresión
+  drawRect(xSide2, yBody, A, H, { fill: greenLight });
 
   // ═══════════════════════════════════════════════════════════
   // 2. DIBUJAR LÍNEAS DE CORTE (contorno exterior)

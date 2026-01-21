@@ -14,7 +14,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { getPricePerM2, calculateSubtotal, getProductionDays } from '@/lib/utils/pricing';
+import { sendNotification } from '@/lib/notifications';
 import type { PricingConfig } from '@/lib/types/database';
+import crypto from 'crypto';
+
+// Umbral para notificacion de alto valor
+const HIGH_VALUE_THRESHOLD = 500000; // $500.000 ARS
 
 // Tipos para la API
 interface BoxInput {
@@ -26,8 +31,18 @@ interface BoxInput {
   printing_colors?: number;
 }
 
+interface ContactInfo {
+  name?: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+  notes?: string;
+}
+
 interface QuoteRequest {
   boxes: BoxInput[];
+  contact?: ContactInfo;
+  origin?: string; // Identificador del origen (ej: "mi-ecommerce", "chatbot")
 }
 
 interface BoxResult {
@@ -72,12 +87,84 @@ interface ApiResponse {
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minuto
 const RATE_LIMIT_ANONYMOUS = 10;
-const RATE_LIMIT_WITH_KEY = 100;
+const RATE_LIMIT_DEFAULT_WITH_KEY = 100;
+
+// Cache de API keys validadas (5 minutos TTL)
+const apiKeyCache = new Map<string, { keyData: ApiKeyData | null; cachedAt: number }>();
+const API_KEY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
+interface ApiKeyData {
+  id: string;
+  key_prefix: string;
+  name: string;
+  rate_limit_per_minute: number;
+  rate_limit_per_day: number;
+  is_active: boolean;
+  expires_at: string | null;
+}
+
+// Hash SHA-256 del API key
+function hashApiKey(key: string): string {
+  return crypto.createHash('sha256').update(key).digest('hex');
+}
+
+// Validar API key contra la base de datos (con cache)
+async function validateApiKey(apiKey: string, supabase: ReturnType<typeof createAdminClient>): Promise<ApiKeyData | null> {
+  const keyHash = hashApiKey(apiKey);
+
+  // Verificar cache
+  const cached = apiKeyCache.get(keyHash);
+  if (cached && Date.now() - cached.cachedAt < API_KEY_CACHE_TTL_MS) {
+    return cached.keyData;
+  }
+
+  // Buscar en la base de datos
+  const { data, error } = await supabase
+    .from('api_keys')
+    .select('id, key_prefix, name, rate_limit_per_minute, rate_limit_per_day, is_active, expires_at')
+    .eq('key_hash', keyHash)
+    .single();
+
+  if (error || !data) {
+    // Guardar en cache que la key no existe
+    apiKeyCache.set(keyHash, { keyData: null, cachedAt: Date.now() });
+    return null;
+  }
+
+  // Verificar si está activa y no expirada
+  const keyData = data as ApiKeyData;
+  if (!keyData.is_active) {
+    apiKeyCache.set(keyHash, { keyData: null, cachedAt: Date.now() });
+    return null;
+  }
+
+  if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
+    apiKeyCache.set(keyHash, { keyData: null, cachedAt: Date.now() });
+    return null;
+  }
+
+  // Guardar en cache y actualizar last_used_at
+  apiKeyCache.set(keyHash, { keyData, cachedAt: Date.now() });
+
+  // Actualizar last_used_at de forma asíncrona (no bloqueante)
+  (async () => {
+    try {
+      await supabase
+        .from('api_keys')
+        .update({ last_used_at: new Date().toISOString() })
+        .eq('id', keyData.id);
+    } catch (err) {
+      console.error('Error updating last_used_at:', err);
+    }
+  })();
+
+  return keyData;
+}
 
 function getRateLimitKey(request: NextRequest): string {
   const apiKey = request.headers.get('x-api-key');
   if (apiKey) {
-    return `key:${apiKey}`;
+    return `key:${hashApiKey(apiKey)}`;
   }
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
              request.headers.get('x-real-ip') ||
@@ -144,8 +231,23 @@ export async function POST(request: NextRequest) {
   const apiKey = request.headers.get('x-api-key');
   const rateLimitKey = getRateLimitKey(request);
 
-  // Determinar límite de rate
-  const rateLimit = apiKey ? RATE_LIMIT_WITH_KEY : RATE_LIMIT_ANONYMOUS;
+  // Validar API key si se proporciona
+  let validatedApiKey: ApiKeyData | null = null;
+  if (apiKey) {
+    validatedApiKey = await validateApiKey(apiKey, supabase);
+  }
+
+  // Determinar límite de rate (personalizado si hay API key válida)
+  let rateLimit: number;
+  if (validatedApiKey) {
+    rateLimit = validatedApiKey.rate_limit_per_minute;
+  } else if (apiKey) {
+    // API key proporcionada pero inválida - usar límite anónimo
+    rateLimit = RATE_LIMIT_ANONYMOUS;
+  } else {
+    rateLimit = RATE_LIMIT_ANONYMOUS;
+  }
+
   const rateLimitCheck = checkRateLimit(rateLimitKey, rateLimit);
 
   // Headers de rate limit
@@ -196,13 +298,24 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Advertencia si API key es inválida
+  if (apiKey && !validatedApiKey) {
+    // API key proporcionada pero no válida - continuar con límite anónimo pero advertir
+    console.warn(`Invalid API key attempted: ${apiKey.substring(0, 12)}...`);
+  }
+
   // Rate limit check
   if (!rateLimitCheck.allowed) {
     await logRequest(429, undefined, undefined, undefined, true);
 
+    let errorMessage = 'Rate limit exceeded. Please wait before making more requests.';
+    if (apiKey && !validatedApiKey) {
+      errorMessage = 'Rate limit exceeded. The provided API key is invalid or inactive.';
+    }
+
     const response: ApiResponse = {
       success: false,
-      error: 'Rate limit exceeded. Please wait before making more requests.',
+      error: errorMessage,
       rate_limit: {
         remaining: 0,
         reset_at: rateLimitCheck.resetAt.toISOString(),
@@ -377,6 +490,52 @@ export async function POST(request: NextRequest) {
     // Log exitoso
     await logRequest(200, totalM2, totalSubtotal, boxResults.length);
 
+    // Obtener IP para notificaciones
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+                     request.headers.get('x-real-ip') ||
+                     'unknown';
+
+    // Determinar origen
+    const detectedOrigin = body.origin ||
+                          (detectLLM(userAgent) ? `LLM (${detectLLM(userAgent)})` : null) ||
+                          (validatedApiKey ? `API (${validatedApiKey.name})` : null) ||
+                          'Web API';
+
+    // Usar la primera caja para las notificaciones (simplificacion)
+    const firstBox = boxResults[0];
+
+    // Notificar si hay datos de contacto (lead calificado)
+    if (body.contact && (body.contact.email || body.contact.phone)) {
+      // No bloquear la respuesta esperando la notificacion
+      sendNotification({
+        type: 'lead_with_contact',
+        origin: detectedOrigin,
+        box: {
+          length: firstBox.length_mm,
+          width: firstBox.width_mm,
+          height: firstBox.height_mm,
+        },
+        quantity: firstBox.quantity,
+        totalArs: totalSubtotal,
+        contact: body.contact,
+      }).catch(err => console.error('Error sending lead notification:', err));
+    }
+    // Notificar si es cotizacion de alto valor (sin datos de contacto)
+    else if (totalSubtotal >= HIGH_VALUE_THRESHOLD) {
+      sendNotification({
+        type: 'high_value_quote',
+        origin: detectedOrigin,
+        box: {
+          length: firstBox.length_mm,
+          width: firstBox.width_mm,
+          height: firstBox.height_mm,
+        },
+        quantity: firstBox.quantity,
+        totalArs: totalSubtotal,
+        ip: clientIp,
+      }).catch(err => console.error('Error sending high value notification:', err));
+    }
+
     const response: ApiResponse = {
       success: true,
       quote,
@@ -423,7 +582,11 @@ export async function GET() {
     },
     rate_limits: {
       anonymous: `${RATE_LIMIT_ANONYMOUS} requests/minute`,
-      with_api_key: `${RATE_LIMIT_WITH_KEY} requests/minute`,
+      with_api_key: `${RATE_LIMIT_DEFAULT_WITH_KEY} requests/minute (configurable)`,
+    },
+    authentication: {
+      header: 'X-API-Key',
+      description: 'Contact us for an API key with higher rate limits',
     },
     contact: 'info@quilmescorrugados.com.ar',
   });

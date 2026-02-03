@@ -66,6 +66,7 @@ const createNewBox = (): BoxItemData => ({
   printing_colors: 1,
   design_file_url: '',
   design_file_name: '',
+  design_preview_url: '',
 });
 
 const PRODUCTION_DAYS_STANDARD = 7;
@@ -264,6 +265,9 @@ export function QuoterForm() {
           quantity: box.quantity,
           has_printing: box.has_printing,
           printing_colors: box.has_printing ? box.printing_colors : 0,
+          design_file_url: box.design_file_url || undefined,
+          design_file_name: box.design_file_name || undefined,
+          design_preview_url: box.design_preview_url || undefined,
         })),
       };
 
@@ -320,6 +324,7 @@ export function QuoterForm() {
         printing_colors: boxes[0].has_printing ? boxes[0].printing_colors : 0,
         design_file_url: boxes[0].design_file_url || undefined,
         design_file_name: boxes[0].design_file_name || undefined,
+        design_preview_url: boxes[0].design_preview_url || undefined,
         // Cajas adicionales
         additional_boxes: boxes.length > 1 ? boxes.slice(1).map(box => ({
           length_mm: box.length_mm,
@@ -330,6 +335,7 @@ export function QuoterForm() {
           printing_colors: box.has_printing ? box.printing_colors : 0,
           design_file_url: box.design_file_url || undefined,
           design_file_name: box.design_file_name || undefined,
+          design_preview_url: box.design_preview_url || undefined,
         })) : undefined,
       };
 
@@ -847,6 +853,7 @@ export function QuoterForm() {
           width={selectedBox.width_mm}
           height={selectedBox.height_mm}
           autoRotate={true}
+          designUrl={selectedBox.design_preview_url || undefined}
         />
 
         {/* Resumen de precio - solo muestra precios cuando se reveló */}

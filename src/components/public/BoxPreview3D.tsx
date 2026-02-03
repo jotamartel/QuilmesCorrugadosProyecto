@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Suspense, useRef, useMemo, useEffect, useState } from 'react';
+import { Canvas, useFrame, useLoader } from '@react-three/fiber';
 import { OrbitControls, Text, Html } from '@react-three/drei';
 import * as THREE from 'three';
 
@@ -10,11 +10,46 @@ interface BoxPreview3DProps {
   width: number;  // mm
   height: number; // mm
   autoRotate?: boolean;
+  designUrl?: string; // URL del diseño a mostrar en la cara frontal
 }
 
-function Box3D({ length, width, height, autoRotate = true }: BoxPreview3DProps) {
+// Componente para cargar y aplicar textura de diseño
+function useDesignTexture(designUrl?: string) {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+
+  useEffect(() => {
+    if (!designUrl) {
+      setTexture(null);
+      return;
+    }
+
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      designUrl,
+      (loadedTexture) => {
+        loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
+        loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
+        loadedTexture.minFilter = THREE.LinearFilter;
+        loadedTexture.magFilter = THREE.LinearFilter;
+        setTexture(loadedTexture);
+      },
+      undefined,
+      (error) => {
+        console.log('Could not load texture:', error);
+        setTexture(null);
+      }
+    );
+  }, [designUrl]);
+
+  return texture;
+}
+
+function Box3D({ length, width, height, autoRotate = true, designUrl }: BoxPreview3DProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const edgesRef = useRef<THREE.LineSegments>(null);
+
+  // Cargar textura del diseño si existe
+  const designTexture = useDesignTexture(designUrl);
 
   // Normalizar dimensiones para que quepan bien en la vista
   // Escalar todo a un rango de 0-3 unidades
@@ -36,16 +71,41 @@ function Box3D({ length, width, height, autoRotate = true }: BoxPreview3DProps) 
   // Color kraft marrón
   const kraftColor = new THREE.Color('#C4A77D');
 
+  // Crear materiales para cada cara de la caja
+  // Orden de caras en BoxGeometry: right, left, top, bottom, front, back
+  const materials = useMemo(() => {
+    const baseMaterial = new THREE.MeshStandardMaterial({
+      color: kraftColor,
+      roughness: 0.8,
+      metalness: 0.1,
+    });
+
+    // Si hay textura de diseño, aplicarla a la cara frontal (índice 4)
+    if (designTexture) {
+      const frontMaterial = new THREE.MeshStandardMaterial({
+        map: designTexture,
+        roughness: 0.7,
+        metalness: 0.05,
+      });
+
+      return [
+        baseMaterial, // right
+        baseMaterial, // left
+        baseMaterial, // top
+        baseMaterial, // bottom
+        frontMaterial, // front - aquí va el diseño
+        baseMaterial, // back
+      ];
+    }
+
+    return [baseMaterial, baseMaterial, baseMaterial, baseMaterial, baseMaterial, baseMaterial];
+  }, [designTexture, kraftColor]);
+
   return (
     <group>
-      {/* Caja principal */}
-      <mesh ref={meshRef} castShadow receiveShadow>
+      {/* Caja principal con materiales por cara */}
+      <mesh ref={meshRef} castShadow receiveShadow material={materials}>
         <boxGeometry args={[scaledL, scaledH, scaledW]} />
-        <meshStandardMaterial
-          color={kraftColor}
-          roughness={0.8}
-          metalness={0.1}
-        />
       </mesh>
 
       {/* Bordes de la caja */}
@@ -62,6 +122,9 @@ function Box3D({ length, width, height, autoRotate = true }: BoxPreview3DProps) 
       >
         <div className="text-xs bg-white/90 px-2 py-1 rounded shadow text-gray-700 whitespace-nowrap">
           {length} x {width} x {height} mm
+          {designUrl && (
+            <span className="ml-1 text-green-600">✓ Diseño</span>
+          )}
         </div>
       </Html>
     </group>
@@ -76,7 +139,7 @@ function LoadingFallback() {
   );
 }
 
-export function BoxPreview3D({ length, width, height, autoRotate = true }: BoxPreview3DProps) {
+export function BoxPreview3D({ length, width, height, autoRotate = true, designUrl }: BoxPreview3DProps) {
   // Validar dimensiones mínimas
   if (length < 100 || width < 100 || height < 50) {
     return (
@@ -110,6 +173,7 @@ export function BoxPreview3D({ length, width, height, autoRotate = true }: BoxPr
             width={width}
             height={height}
             autoRotate={autoRotate}
+            designUrl={designUrl}
           />
 
           {/* Controles */}

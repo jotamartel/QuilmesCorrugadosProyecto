@@ -17,6 +17,9 @@ interface BoxData {
   quantity: number;
   has_printing: boolean;
   printing_colors: number;
+  design_file_url?: string;
+  design_file_name?: string;
+  design_preview_url?: string;
 }
 
 interface LeadRequest {
@@ -104,6 +107,9 @@ export async function POST(request: NextRequest) {
       totalSqmAll += totalSqm;
       return {
         ...box,
+        design_file_url: box.design_file_url || null,
+        design_file_name: box.design_file_name || null,
+        design_preview_url: box.design_preview_url || null,
         sheetWidth: unfolded.unfoldedWidth,
         sheetLength: unfolded.unfoldedLength,
         sqmPerBox: unfolded.m2,
@@ -153,6 +159,10 @@ export async function POST(request: NextRequest) {
         quantity: firstBox.quantity,
         has_printing: firstBox.has_printing,
         printing_colors: firstBox.printing_colors || 0,
+        // Guardar diseño si existe
+        design_file_url: firstBox.design_file_url || null,
+        design_file_name: firstBox.design_file_name || null,
+        design_preview_url: firstBox.design_preview_url || null,
         sheet_width_mm: firstBox.sheetWidth,
         sheet_length_mm: firstBox.sheetLength,
         sqm_per_box: firstBox.sqmPerBox,

@@ -53,13 +53,28 @@ export function LandingFooter() {
             <h3 className="font-semibold text-white mb-4">Enlaces</h3>
             <ul className="space-y-2">
               <li>
-                <a href="#cotizador" className="hover:text-white">
+                <a href="/productos" className="hover:text-white">
+                  Productos
+                </a>
+              </li>
+              <li>
+                <a href="/#cotizador" className="hover:text-white">
                   Cotizar online
                 </a>
               </li>
               <li>
-                <a href="#nosotros" className="hover:text-white">
+                <a href="/nosotros" className="hover:text-white">
                   Sobre nosotros
+                </a>
+              </li>
+              <li>
+                <a href="/faq" className="hover:text-white">
+                  Preguntas frecuentes
+                </a>
+              </li>
+              <li>
+                <a href="/contacto" className="hover:text-white">
+                  Contacto
                 </a>
               </li>
               <li>

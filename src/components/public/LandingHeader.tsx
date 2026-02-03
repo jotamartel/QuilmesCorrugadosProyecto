@@ -6,10 +6,12 @@ import Image from 'next/image';
 import { Menu, X } from 'lucide-react';
 
 const navItems = [
-  { name: 'Inicio', href: '#' },
-  { name: 'Cotizar', href: '#cotizador' },
-  { name: 'Nosotros', href: '#nosotros' },
-  { name: 'Contacto', href: '#contacto' },
+  { name: 'Inicio', href: '/' },
+  { name: 'Productos', href: '/productos' },
+  { name: 'Cotizar', href: '/#cotizador' },
+  { name: 'Nosotros', href: '/nosotros' },
+  { name: 'FAQ', href: '/faq' },
+  { name: 'Contacto', href: '/contacto' },
 ];
 
 export function LandingHeader() {

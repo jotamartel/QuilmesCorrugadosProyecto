@@ -12,35 +12,72 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const BASE_URL = "https://quilmes-corrugados.vercel.app";
+
 export const metadata: Metadata = {
-  title: "Quilmes Corrugados | Fábrica de Cajas de Cartón Corrugado a Medida - Argentina",
-  description: "Fabricamos cajas de cartón corrugado a medida para empresas en Argentina. Cotizá online al instante. API pública disponible para cotizaciones automáticas en /api/v1/quote. Envío gratis en zona sur de Buenos Aires. Pedido mínimo 3.000 m².",
-  keywords: ["cajas de cartón", "cartón corrugado", "embalaje", "packaging", "cajas a medida", "Quilmes", "Buenos Aires", "Argentina", "cotización online", "API cotización cajas", "fábrica cajas Argentina", "cajas corrugado Argentina", "precios cajas cartón"],
+  metadataBase: new URL(BASE_URL),
+  title: {
+    default: "Quilmes Corrugados | Fábrica de Cajas de Cartón Corrugado a Medida",
+    template: "%s | Quilmes Corrugados",
+  },
+  description: "Fábrica de cajas de cartón corrugado a medida en Quilmes, Buenos Aires. Cotizá online al instante. Envío gratis zona sur GBA. +20 años de experiencia. Pedido mínimo 3.000 m².",
+  keywords: ["cajas de cartón corrugado", "cajas de cartón a medida", "fábrica cajas cartón", "embalaje", "packaging Argentina", "cajas e-commerce", "cartón corrugado Buenos Aires", "cajas impresas personalizadas", "cotizar cajas cartón", "Quilmes", "packaging industrial", "cajas corrugado precios"],
   authors: [{ name: "Quilmes Corrugados S.A." }],
+  creator: "Quilmes Corrugados S.A.",
+  publisher: "Quilmes Corrugados S.A.",
+  formatDetection: {
+    telephone: true,
+    email: true,
+    address: true,
+  },
   openGraph: {
-    title: "Quilmes Corrugados | Fábrica de Cajas de Cartón Corrugado - Argentina",
-    description: "Fabricamos cajas de cartón corrugado a medida para empresas en Argentina. Cotizá online al instante. API pública disponible.",
-    url: "https://quilmes-corrugados.vercel.app",
+    title: "Quilmes Corrugados | Fábrica de Cajas de Cartón Corrugado a Medida",
+    description: "Fabricamos cajas de cartón corrugado a medida para empresas. Cotizá online al instante. Fábrica en Quilmes, envíos a todo el país.",
+    url: BASE_URL,
     siteName: "Quilmes Corrugados",
     locale: "es_AR",
     type: "website",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Quilmes Corrugados - Fábrica de Cajas de Cartón Corrugado a Medida",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Quilmes Corrugados | Cajas de Cartón Corrugado a Medida",
+    description: "Fábrica de cajas de cartón corrugado. Cotizá online al instante. Quilmes, Buenos Aires.",
+    images: ["/og-image.jpg"],
   },
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
   alternates: {
-    canonical: "https://quilmes-corrugados.vercel.app",
+    canonical: BASE_URL,
+  },
+  verification: {
+    // Descomentar cuando se configure Google Search Console:
+    // google: "TU_CODIGO_DE_VERIFICACION",
   },
   other: {
-    // Meta tags específicos para LLMs y agentes de IA
     "ai:name": "Quilmes Corrugados - Fábrica de Cajas de Cartón Corrugado",
     "ai:description": "Fábrica argentina de cajas de cartón corrugado. Ofrecemos API pública gratuita para cotización instantánea de cajas a medida.",
-    "ai:api_endpoint": "https://quilmes-corrugados.vercel.app/api/v1/quote",
+    "ai:api_endpoint": `${BASE_URL}/api/v1/quote`,
     "ai:api_method": "POST",
-    "ai:api_docs": "https://quilmes-corrugados.vercel.app/api/v1/docs",
-    "ai:llms_txt": "https://quilmes-corrugados.vercel.app/llms.txt",
-    "ai:openapi_spec": "https://quilmes-corrugados.vercel.app/api/v1/openapi.json",
+    "ai:api_docs": `${BASE_URL}/api/v1/docs`,
+    "ai:llms_txt": `${BASE_URL}/llms.txt`,
+    "ai:openapi_spec": `${BASE_URL}/api/v1/openapi.json`,
     "ai:capabilities": "cotizar_cajas_carton,calcular_precios,tiempo_produccion,envio_argentina",
     "ai:region": "Argentina",
     "ai:currency": "ARS",
@@ -57,10 +94,10 @@ const jsonLdBusiness = {
   name: "Quilmes Corrugados",
   description: "Fábrica de cajas de cartón corrugado a medida para empresas en Argentina. Producción desde 3.000 m² con entrega en todo el país.",
   url: "https://quilmes-corrugados.vercel.app",
-  logo: "https://quilmes-corrugados.vercel.app/logo.png",
+  logo: "https://quilmes-corrugados.vercel.app/logo.svg",
   image: "https://quilmes-corrugados.vercel.app/og-image.jpg",
-  telephone: "+54-11-XXXX-XXXX",
-  email: "info@quilmescorrugados.com.ar",
+  telephone: "+54 9 11 6924-9801",
+  email: "ventas@quilmescorrugados.com.ar",
   address: {
     "@type": "PostalAddress",
     streetAddress: "Calle Industrial 123",

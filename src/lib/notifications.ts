@@ -40,7 +40,17 @@ interface VolumeAlertNotification {
   topQuotes: Array<{ box: string; quantity: number; total: number }>;
 }
 
-export type NotificationData = LeadNotification | HighValueNotification | VolumeAlertNotification;
+interface AdvisorRequestNotification {
+  type: 'advisor_request';
+  origin: string;
+  contact: {
+    phone?: string;
+    email?: string;
+    name?: string;
+  };
+}
+
+export type NotificationData = LeadNotification | HighValueNotification | VolumeAlertNotification | AdvisorRequestNotification;
 
 /**
  * Envía una notificación por email al equipo de ventas
@@ -70,6 +80,11 @@ export async function sendNotification(data: NotificationData): Promise<boolean>
       case 'volume_alert':
         subject = `IP con ${data.requestsToday} consultas hoy - Posible integrador`;
         html = buildVolumeAlertEmail(data);
+        break;
+
+      case 'advisor_request':
+        subject = `URGENTE: Cliente solicita hablar con asesor (${data.origin})`;
+        html = buildAdvisorRequestEmail(data);
         break;
     }
 
@@ -196,6 +211,43 @@ function buildVolumeAlertEmail(data: VolumeAlertNotification): string {
       <p style="color: #6b7280; font-size: 14px; margin-top: 16px;">
         Esta IP podria ser una empresa evaluando integrarse.
         Considera contactarlos para ofrecerles una API key y soporte.
+      </p>
+    </div>
+  `;
+}
+
+function buildAdvisorRequestEmail(data: AdvisorRequestNotification): string {
+  const { origin, contact } = data;
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #dc2626;">Cliente Solicita Hablar con Asesor</h2>
+
+      <div style="background: #fef2f2; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #dc2626;">
+        <p style="font-size: 18px; font-weight: bold; margin: 0;">
+          Un cliente necesita atencion inmediata
+        </p>
+        <p style="margin: 8px 0 0 0; color: #6b7280;">
+          Origen: ${origin}
+        </p>
+      </div>
+
+      <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+        <h3 style="margin-top: 0;">Datos de Contacto</h3>
+        ${contact.name ? `<p><strong>Nombre:</strong> ${contact.name}</p>` : ''}
+        ${contact.phone ? `<p><strong>Telefono:</strong> <a href="https://wa.me/${contact.phone.replace(/\D/g, '')}">${contact.phone}</a></p>` : ''}
+        ${contact.email ? `<p><strong>Email:</strong> <a href="mailto:${contact.email}">${contact.email}</a></p>` : ''}
+      </div>
+
+      ${contact.phone ? `
+        <a href="https://wa.me/${contact.phone.replace(/\D/g, '')}?text=Hola! Te escribo de Quilmes Corrugados. Vi que solicitaste hablar con un asesor, en que puedo ayudarte?"
+           style="display: inline-block; background: #25d366; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+          Contactar AHORA por WhatsApp
+        </a>
+      ` : ''}
+
+      <p style="color: #6b7280; font-size: 14px; margin-top: 16px;">
+        Este cliente solicito hablar con un asesor humano. Contactalo lo antes posible.
       </p>
     </div>
   `;

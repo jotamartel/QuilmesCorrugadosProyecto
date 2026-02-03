@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
           // Diseño
           design_file_url: body.design_file_url || null,
           design_file_name: body.design_file_name || null,
+          design_preview_url: (body as { design_preview_url?: string }).design_preview_url || null,
         })
         .eq('id', existingLead.id)
         .select()
@@ -186,6 +187,7 @@ export async function POST(request: NextRequest) {
           // Diseño
           design_file_url: body.design_file_url || null,
           design_file_name: body.design_file_name || null,
+          design_preview_url: (body as { design_preview_url?: string }).design_preview_url || null,
 
           // Cálculos
           sheet_width_mm: unfolded.unfoldedWidth,

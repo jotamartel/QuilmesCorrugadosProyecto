@@ -2,12 +2,12 @@
 
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, X, FileText, Loader2 } from 'lucide-react';
+import { Upload, X, FileText, Loader2, Image as ImageIcon } from 'lucide-react';
 
 interface DesignUploaderProps {
-  onUpload: (url: string, fileName: string) => void;
+  onUpload: (url: string, fileName: string, previewUrl?: string) => void;
   onRemove: () => void;
-  currentFile?: { url: string; name: string } | null;
+  currentFile?: { url: string; name: string; previewUrl?: string } | null;
 }
 
 const ACCEPTED_TYPES = {
@@ -19,9 +19,58 @@ const ACCEPTED_TYPES = {
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
+// Función para convertir PDF a imagen usando pdfjs-dist
+async function pdfToImage(file: File): Promise<Blob | null> {
+  try {
+    // Importar dinámicamente pdfjs-dist
+    const pdfjsLib = await import('pdfjs-dist');
+
+    // Configurar el worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+    // Leer el archivo como ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer();
+
+    // Cargar el PDF
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    // Obtener la primera página
+    const page = await pdf.getPage(1);
+
+    // Escalar para buena resolución
+    const scale = 2;
+    const viewport = page.getViewport({ scale });
+
+    // Crear canvas
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    // Renderizar la página en el canvas
+    await page.render({
+      canvasContext: context,
+      viewport: viewport,
+    }).promise;
+
+    // Convertir a blob
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        resolve(blob);
+      }, 'image/png', 0.9);
+    });
+  } catch (error) {
+    console.error('Error converting PDF to image:', error);
+    return null;
+  }
+}
+
 export function DesignUploader({ onUpload, onRemove, currentFile }: DesignUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string>('');
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -29,8 +78,10 @@ export function DesignUploader({ onUpload, onRemove, currentFile }: DesignUpload
 
     setUploading(true);
     setError(null);
+    setUploadStatus('Subiendo archivo...');
 
     try {
+      // Subir el archivo original
       const formData = new FormData();
       formData.append('file', file);
       formData.append('folder', 'public-designs');
@@ -46,11 +97,41 @@ export function DesignUploader({ onUpload, onRemove, currentFile }: DesignUpload
       }
 
       const data = await response.json();
-      onUpload(data.url, file.name);
+      let previewUrl: string | undefined;
+
+      // Si es un PDF, generar imagen de preview
+      if (file.type === 'application/pdf') {
+        setUploadStatus('Generando preview...');
+        const previewBlob = await pdfToImage(file);
+
+        if (previewBlob) {
+          // Subir la imagen de preview
+          const previewFormData = new FormData();
+          const previewFile = new File([previewBlob], `${file.name.replace('.pdf', '')}_preview.png`, { type: 'image/png' });
+          previewFormData.append('file', previewFile);
+          previewFormData.append('folder', 'public-designs/previews');
+
+          const previewResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: previewFormData,
+          });
+
+          if (previewResponse.ok) {
+            const previewData = await previewResponse.json();
+            previewUrl = previewData.url;
+          }
+        }
+      } else if (file.type.startsWith('image/')) {
+        // Si ya es una imagen, usar la misma URL como preview
+        previewUrl = data.url;
+      }
+
+      onUpload(data.url, file.name, previewUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al subir el archivo');
     } finally {
       setUploading(false);
+      setUploadStatus('');
     }
   }, [onUpload]);
 
@@ -108,7 +189,7 @@ export function DesignUploader({ onUpload, onRemove, currentFile }: DesignUpload
         {uploading ? (
           <div className="flex flex-col items-center gap-2">
             <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
-            <p className="text-sm text-gray-600">Subiendo archivo...</p>
+            <p className="text-sm text-gray-600">{uploadStatus || 'Subiendo archivo...'}</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">

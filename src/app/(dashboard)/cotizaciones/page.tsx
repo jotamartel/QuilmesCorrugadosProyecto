@@ -49,6 +49,13 @@ interface DashboardStats {
     contacted: number;
     converted: number;
   };
+  // WhatsApp
+  whatsapp: {
+    total: number;
+    pending: number;
+    contacted: number;
+    converted: number;
+  };
   // Recientes
   recentBackend: Quote[];
   recentWeb: (PublicQuote & { quote_number_formatted: string })[];
@@ -66,16 +73,18 @@ export default function CotizacionesDashboard() {
     setLoading(true);
     try {
       // Fetch en paralelo
-      const [backendRes, webRes, leadsRes] = await Promise.all([
+      const [backendRes, webRes, leadsRes, whatsappRes] = await Promise.all([
         fetch('/api/quotes?limit=5'),
-        fetch('/api/public-quotes?requested_contact=true&limit=5'),
-        fetch('/api/public-quotes?requested_contact=false&limit=5'),
+        fetch('/api/public-quotes?requested_contact=true&source=web&limit=5'),
+        fetch('/api/public-quotes?requested_contact=false&source=web&limit=5'),
+        fetch('/api/public-quotes?source=whatsapp&limit=5'),
       ]);
 
-      const [backendData, webData, leadsData] = await Promise.all([
+      const [backendData, webData, leadsData, whatsappData] = await Promise.all([
         backendRes.json(),
         webRes.json(),
         leadsRes.json(),
+        whatsappRes.json(),
       ]);
 
       // Calcular estadísticas de cotizaciones backend
@@ -103,6 +112,12 @@ export default function CotizacionesDashboard() {
           pending: leadsData.counts?.pending || 0,
           contacted: leadsData.counts?.contacted || 0,
           converted: leadsData.counts?.converted || 0,
+        },
+        whatsapp: {
+          total: whatsappData.counts?.whatsapp_total || whatsappData.counts?.total || 0,
+          pending: whatsappData.counts?.whatsapp_pending || whatsappData.counts?.pending || 0,
+          contacted: whatsappData.counts?.whatsapp_contacted || whatsappData.counts?.contacted || 0,
+          converted: whatsappData.counts?.whatsapp_converted || whatsappData.counts?.converted || 0,
         },
         recentBackend: allBackend.slice(0, 5),
         recentWeb: webData.quotes?.slice(0, 5) || [],
@@ -181,23 +196,25 @@ export default function CotizacionesDashboard() {
           </Card>
         </Link>
 
-        {/* WhatsApp (Próximamente) */}
-        <Card className="border-l-4 border-l-green-500 opacity-60">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">WhatsApp</p>
-                <p className="text-lg font-medium text-gray-400">Próximamente</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Integración en desarrollo
-                </p>
+        {/* WhatsApp */}
+        <Link href="/whatsapp">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-green-500">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">WhatsApp</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats?.whatsapp.total || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {stats?.whatsapp.pending || 0} sin contactar
+                  </p>
+                </div>
+                <div className="p-3 bg-green-100 rounded-full">
+                  <MessageCircle className="w-6 h-6 text-green-600" />
+                </div>
               </div>
-              <div className="p-3 bg-green-100 rounded-full">
-                <MessageCircle className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Estadísticas Generales */}

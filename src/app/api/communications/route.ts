@@ -6,15 +6,20 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const channel = searchParams.get('channel');
+    const phone = searchParams.get('phone');
 
     let query = supabase
       .from('communications')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
       .limit(500);
 
     if (channel) {
       query = query.eq('channel', channel);
+    }
+
+    if (phone) {
+      query = query.eq('metadata->>phone', phone);
     }
 
     const { data, error } = await query;

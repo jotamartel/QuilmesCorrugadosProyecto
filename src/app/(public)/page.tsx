@@ -57,6 +57,7 @@ export default function LandingPage() {
       {/* Benefits Section */}
       <section className="py-12 px-4 bg-white border-b border-gray-100">
         <div className="max-w-7xl mx-auto">
+          <h2 className="sr-only">Por qué elegir Quilmes Corrugados</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {benefits.map((benefit) => (
               <div key={benefit.title} className="text-center">

@@ -15,6 +15,7 @@ export interface BoxItemData {
   printing_colors: number;
   design_file_url: string;
   design_file_name: string;
+  design_preview_url: string; // URL de imagen para vista 3D (generada desde PDF o la imagen original)
 }
 
 export interface BoxCalculations {
@@ -320,17 +321,20 @@ export function BoxItemForm({
                   Subir diseño (opcional)
                 </label>
                 <DesignUploader
-                  onUpload={(url, name) => {
+                  onUpload={(url, name, previewUrl) => {
                     handleFieldUpdate('design_file_url', url);
                     handleFieldUpdate('design_file_name', name);
+                    handleFieldUpdate('design_preview_url', previewUrl || url);
                   }}
                   onRemove={() => {
                     handleFieldUpdate('design_file_url', '');
                     handleFieldUpdate('design_file_name', '');
+                    handleFieldUpdate('design_preview_url', '');
                   }}
                   currentFile={box.design_file_url ? {
                     url: box.design_file_url,
                     name: box.design_file_name,
+                    previewUrl: box.design_preview_url,
                   } : null}
                 />
               </div>

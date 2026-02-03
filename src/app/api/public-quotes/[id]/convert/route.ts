@@ -65,19 +65,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // Usar cliente existente
       clientId = existingClient.id;
     } else {
+      // Determinar source basado en el origen del lead
+      const clientSource = publicQuote.source === 'whatsapp' ? 'whatsapp' : 'web';
+
       // Crear nuevo cliente
       const clientData = {
         name: body.name || publicQuote.requester_name,
         company: body.company || publicQuote.requester_company,
         cuit: (body.cuit || publicQuote.requester_cuit)?.replace(/\D/g, '') || null,
         tax_condition: body.tax_condition || publicQuote.requester_tax_condition || 'consumidor_final',
-        email: (body.email || publicQuote.requester_email)?.toLowerCase(),
+        email: (body.email || publicQuote.requester_email)?.toLowerCase() || null,
         phone: (body.phone || publicQuote.requester_phone)?.replace(/\D/g, ''),
         address: body.address || publicQuote.address,
         city: body.city || publicQuote.city,
         province: body.province || publicQuote.province || 'Buenos Aires',
         postal_code: body.postal_code || publicQuote.postal_code,
-        source: 'web',
+        source: clientSource,
         source_quote_id: id,
         created_from_ip: publicQuote.source_ip,
       };

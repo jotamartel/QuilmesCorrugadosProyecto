@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Quilmes Corrugados - Cajas de cartón a medida',
-  description: 'Fábrica de cajas de cartón corrugado. Cotizá online en segundos. Entregas en todo AMBA.',
+  title: 'Fábrica de Cajas de Cartón Corrugado a Medida | Quilmes, Buenos Aires',
+  description: 'Fabricamos cajas de cartón corrugado a medida para empresas en Argentina. Cotizá online al instante con precio en tiempo real. Fábrica propia en Quilmes. Envío gratis zona sur GBA. Pedido mínimo 3.000 m². +20 años de experiencia.',
+  alternates: {
+    canonical: 'https://quilmes-corrugados.vercel.app',
+  },
 };
 
 export default function PublicLayout({

@@ -16,6 +16,9 @@ const BASE_URL = "https://quilmes-corrugados.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
+  icons: {
+    icon: "/favicon.ico",
+  },
   title: {
     default: "Quilmes Corrugados | Fábrica de Cajas de Cartón Corrugado a Medida",
     template: "%s | Quilmes Corrugados",

@@ -100,10 +100,10 @@ const jsonLdBusiness = {
   email: "ventas@quilmescorrugados.com.ar",
   address: {
     "@type": "PostalAddress",
-    streetAddress: "Calle Industrial 123",
+    streetAddress: "Lugones 219",
     addressLocality: "Quilmes",
     addressRegion: "Buenos Aires",
-    postalCode: "1878",
+    postalCode: "B1878",
     addressCountry: "AR",
   },
   geo: {

@@ -53,6 +53,7 @@ async function pdfToImage(file: File): Promise<Blob | null> {
     await page.render({
       canvasContext: context,
       viewport: viewport,
+      canvas: canvas,
     }).promise;
 
     // Convertir a blob

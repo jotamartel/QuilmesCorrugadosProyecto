@@ -58,9 +58,15 @@ function getBaseUrl(): string {
     return process.env.NEXT_PUBLIC_SITE_URL;
   }
   
-  // En el cliente, usar window.location.origin
+  // En el cliente, verificar si estamos en producción antes de usar window.location.origin
   if (typeof window !== 'undefined') {
-    return window.location.origin;
+    const origin = window.location.origin;
+    // Si estamos en localhost pero deberíamos estar en producción, usar fallback
+    if (origin.includes('localhost') && (process.env.NODE_ENV === 'production' || window.location.hostname !== 'localhost')) {
+      // Fallback a URL de producción si detectamos localhost en producción
+      return 'https://quilmescorrugados.com.ar';
+    }
+    return origin;
   }
   
   // En el servidor, usar VERCEL_URL si está disponible
@@ -68,8 +74,8 @@ function getBaseUrl(): string {
     return `https://${process.env.VERCEL_URL}`;
   }
   
-  // Fallback por defecto
-  return 'https://quilmes-corrugados.vercel.app';
+  // Fallback por defecto para producción
+  return 'https://quilmescorrugados.com.ar';
 }
 
 /**

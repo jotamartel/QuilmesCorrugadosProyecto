@@ -89,7 +89,27 @@ function getBaseUrl(): string {
  */
 export async function signInWithGoogle() {
   const supabase = createAuthClient();
-  const baseUrl = getBaseUrl().trim();
+  
+  // Determinar la URL base correcta
+  let baseUrl: string;
+  
+  if (typeof window !== 'undefined') {
+    // En el cliente, verificar si estamos en producción
+    const hostname = window.location.hostname;
+    
+    // Si estamos en producción (no localhost), usar la URL de producción
+    if (!hostname.includes('localhost') && !hostname.includes('127.0.0.1')) {
+      // Usar NEXT_PUBLIC_SITE_URL si está disponible, sino usar el origin actual
+      baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || window.location.origin.trim();
+    } else {
+      // En desarrollo (localhost), usar localhost
+      baseUrl = window.location.origin.trim();
+    }
+  } else {
+    // En el servidor, usar NEXT_PUBLIC_SITE_URL o fallback
+    baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || 'https://quilmescorrugados.com.ar';
+  }
+  
   // Limpiar la URL de cualquier espacio o salto de línea
   const redirectUrl = `${baseUrl}/auth/callback`.replace(/\s+/g, '').trim();
 
@@ -98,6 +118,10 @@ export async function signInWithGoogle() {
     options: {
       // Redirigir a la pagina de callback del cliente que maneja la sesion
       redirectTo: redirectUrl,
+      // Forzar que Supabase use esta URL en lugar del Site URL configurado
+      queryParams: {
+        redirect_to: redirectUrl,
+      },
     },
   });
 

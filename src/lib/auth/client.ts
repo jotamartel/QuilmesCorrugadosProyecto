@@ -48,16 +48,45 @@ export async function signInWithEmail(email: string, password: string) {
 }
 
 /**
+ * Obtiene la URL base correcta para redirects
+ * En producción usa la variable de entorno, en desarrollo usa window.location.origin
+ */
+function getBaseUrl(): string {
+  // NEXT_PUBLIC_SITE_URL está disponible en el cliente porque tiene el prefijo NEXT_PUBLIC_
+  // Tiene prioridad absoluta si está configurada
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL;
+  }
+  
+  // En el cliente, usar window.location.origin
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  
+  // En el servidor, usar VERCEL_URL si está disponible
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  
+  // Fallback por defecto
+  return 'https://quilmes-corrugados.vercel.app';
+}
+
+/**
  * Login con Google
  */
 export async function signInWithGoogle() {
   const supabase = createAuthClient();
+  const baseUrl = getBaseUrl();
+  const redirectUrl = `${baseUrl}/auth/callback`;
+
+  console.log('[Auth] Google OAuth redirect:', redirectUrl);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
       // Redirigir a la pagina de callback del cliente que maneja la sesion
-      redirectTo: `${window.location.origin}/auth/callback`,
+      redirectTo: redirectUrl,
     },
   });
 

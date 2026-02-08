@@ -80,7 +80,10 @@ export async function signInWithGoogle() {
   const baseUrl = getBaseUrl();
   const redirectUrl = `${baseUrl}/auth/callback`;
 
+  // Debug: Log para verificar qué URL se está usando
   console.log('[Auth] Google OAuth redirect:', redirectUrl);
+  console.log('[Auth] NEXT_PUBLIC_SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL);
+  console.log('[Auth] window.location.origin:', typeof window !== 'undefined' ? window.location.origin : 'N/A (server)');
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',

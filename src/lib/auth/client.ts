@@ -59,15 +59,20 @@ function getBaseUrl(): string {
     return siteUrl;
   }
   
-  // En el cliente, usar window.location.origin
+  // En el cliente, detectar si estamos en producción
   if (typeof window !== 'undefined') {
     const origin = window.location.origin.trim();
-    // Si estamos en localhost pero deberíamos estar en producción, usar fallback
-    if (origin.includes('localhost')) {
-      // En producción, nunca usar localhost
-      return 'https://quilmescorrugados.com.ar';
+    const hostname = window.location.hostname;
+    
+    // Si estamos en producción (no localhost), usar el origin actual
+    if (!hostname.includes('localhost') && !hostname.includes('127.0.0.1')) {
+      return origin;
     }
-    return origin;
+    
+    // Si estamos en localhost, usar localhost (para desarrollo)
+    if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+      return origin;
+    }
   }
   
   // En el servidor, usar VERCEL_URL si está disponible

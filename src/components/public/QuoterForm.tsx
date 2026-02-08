@@ -131,12 +131,11 @@ export function QuoterForm() {
 
     if (hasValidBox && !quoteStartedTracked.current) {
       trackEvent('quote_started', { 
-        boxCount: boxes.length,
-        totalSqm: totals.totalSqm 
+        boxCount: boxes.length
       });
       quoteStartedTracked.current = true;
     }
-  }, [boxes, totals.totalSqm]);
+  }, [boxes]);
 
   // Cargar ciudades cuando la provincia es Buenos Aires o CABA
   useEffect(() => {

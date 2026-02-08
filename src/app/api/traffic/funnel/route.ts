@@ -39,9 +39,15 @@ export async function GET(request: NextRequest) {
       .limit(30);
 
     // Obtener funnel usando la función
-    const { data: funnelSteps, error: stepsError } = await supabase
-      .rpc('get_conversion_funnel', { days_back: parseInt(period) })
-      .catch(() => ({ data: null, error: null }));
+    let funnelSteps = null;
+    let stepsError = null;
+    try {
+      const result = await supabase.rpc('get_conversion_funnel', { days_back: parseInt(period) });
+      funnelSteps = result.data;
+      stepsError = result.error;
+    } catch (err) {
+      stepsError = err;
+    }
 
     if (summaryError || dailyError || dropoffError || contactError) {
       console.error('Error fetching funnel data:', {

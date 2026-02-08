@@ -18,7 +18,7 @@ import {
   Activity,
   BarChart3,
 } from 'lucide-react';
-import { formatDate } from '@/lib/utils/dates';
+import { formatDate, formatDateTime } from '@/lib/utils/dates';
 
 interface TrafficStats {
   live: {
@@ -211,7 +211,7 @@ export default function TraficoPage() {
           <CardContent>
             <div className="text-sm font-bold">
               {stats.live.last_activity
-                ? formatDate(new Date(stats.live.last_activity), { time: true })
+                ? formatDateTime(new Date(stats.live.last_activity))
                 : 'N/A'}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -257,9 +257,9 @@ export default function TraficoPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-500">
-                        {formatDate(new Date(session.last_seen_at), { time: true })}
+                        {formatDateTime(new Date(session.last_seen_at))}
                       </p>
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="default" className="text-xs">
                         {session.page_count} páginas
                       </Badge>
                     </div>
@@ -409,7 +409,7 @@ export default function TraficoPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-gray-500">
-                      {formatDate(new Date(event.created_at), { time: true })}
+                      {formatDateTime(new Date(event.created_at))}
                     </p>
                   </div>
                 </div>

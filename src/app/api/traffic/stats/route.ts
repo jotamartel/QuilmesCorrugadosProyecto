@@ -54,9 +54,15 @@ export async function GET(request: NextRequest) {
       .limit(10);
 
     // Visitas por hora (últimas 24 horas)
-    const { data: hourlyData, error: hourlyError } = await supabase
-      .rpc('get_hourly_visits', { hours_back: 24 })
-      .catch(() => ({ data: null, error: null })); // Si la función no existe, ignorar
+    let hourlyData = null;
+    let hourlyError = null;
+    try {
+      const result = await supabase.rpc('get_hourly_visits', { hours_back: 24 });
+      hourlyData = result.data;
+      hourlyError = result.error;
+    } catch (err) {
+      hourlyError = err;
+    }
 
     // Eventos recientes (cotizaciones iniciadas, completadas, etc.)
     const { data: recentEvents, error: eventsError } = await supabase

@@ -90,20 +90,24 @@ function getBaseUrl(): string {
 export async function signInWithGoogle() {
   const supabase = createAuthClient();
   
-  // Determinar la URL base correcta
+  // Determinar la URL base correcta - FORZAR URL DE PRODUCCIÓN si no es localhost
   let baseUrl: string;
   
   if (typeof window !== 'undefined') {
-    // En el cliente, verificar si estamos en producción
     const hostname = window.location.hostname;
+    const origin = window.location.origin;
     
-    // Si estamos en producción (no localhost), usar la URL de producción
-    if (!hostname.includes('localhost') && !hostname.includes('127.0.0.1')) {
-      // Usar NEXT_PUBLIC_SITE_URL si está disponible, sino usar el origin actual
-      baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || window.location.origin.trim();
-    } else {
-      // En desarrollo (localhost), usar localhost
-      baseUrl = window.location.origin.trim();
+    // SIEMPRE usar NEXT_PUBLIC_SITE_URL si está disponible (tiene prioridad absoluta)
+    if (process.env.NEXT_PUBLIC_SITE_URL?.trim()) {
+      baseUrl = process.env.NEXT_PUBLIC_SITE_URL.trim();
+    }
+    // Si estamos en localhost, usar localhost
+    else if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+      baseUrl = origin.trim();
+    }
+    // Si estamos en producción (cualquier otro dominio), usar el origin actual
+    else {
+      baseUrl = origin.trim();
     }
   } else {
     // En el servidor, usar NEXT_PUBLIC_SITE_URL o fallback
@@ -114,17 +118,21 @@ export async function signInWithGoogle() {
   const redirectUrl = `${baseUrl}/auth/callback`.replace(/\s+/g, '').trim();
 
   // Log para debug (siempre activo para troubleshooting)
+  console.log('[Auth Debug] ========================================');
   console.log('[Auth Debug] Redirect URL:', redirectUrl);
   console.log('[Auth Debug] Hostname:', typeof window !== 'undefined' ? window.location.hostname : 'server');
   console.log('[Auth Debug] Origin:', typeof window !== 'undefined' ? window.location.origin : 'server');
   console.log('[Auth Debug] NEXT_PUBLIC_SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL);
   console.log('[Auth Debug] NODE_ENV:', process.env.NODE_ENV);
+  console.log('[Auth Debug] ========================================');
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
       // Redirigir a la pagina de callback del cliente que maneja la sesion
       redirectTo: redirectUrl,
+      // Forzar que Supabase use esta URL explícitamente
+      skipBrowserRedirect: false,
     },
   });
 

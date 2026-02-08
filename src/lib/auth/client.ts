@@ -54,16 +54,17 @@ export async function signInWithEmail(email: string, password: string) {
 function getBaseUrl(): string {
   // NEXT_PUBLIC_SITE_URL está disponible en el cliente porque tiene el prefijo NEXT_PUBLIC_
   // Tiene prioridad absoluta si está configurada
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (siteUrl) {
+    return siteUrl;
   }
   
-  // En el cliente, verificar si estamos en producción antes de usar window.location.origin
+  // En el cliente, usar window.location.origin
   if (typeof window !== 'undefined') {
-    const origin = window.location.origin;
+    const origin = window.location.origin.trim();
     // Si estamos en localhost pero deberíamos estar en producción, usar fallback
-    if (origin.includes('localhost') && (process.env.NODE_ENV === 'production' || window.location.hostname !== 'localhost')) {
-      // Fallback a URL de producción si detectamos localhost en producción
+    if (origin.includes('localhost')) {
+      // En producción, nunca usar localhost
       return 'https://quilmescorrugados.com.ar';
     }
     return origin;
@@ -71,7 +72,7 @@ function getBaseUrl(): string {
   
   // En el servidor, usar VERCEL_URL si está disponible
   if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
+    return `https://${process.env.VERCEL_URL}`.trim();
   }
   
   // Fallback por defecto para producción
@@ -83,13 +84,9 @@ function getBaseUrl(): string {
  */
 export async function signInWithGoogle() {
   const supabase = createAuthClient();
-  const baseUrl = getBaseUrl();
-  const redirectUrl = `${baseUrl}/auth/callback`;
-
-  // Debug: Log para verificar qué URL se está usando
-  console.log('[Auth] Google OAuth redirect:', redirectUrl);
-  console.log('[Auth] NEXT_PUBLIC_SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL);
-  console.log('[Auth] window.location.origin:', typeof window !== 'undefined' ? window.location.origin : 'N/A (server)');
+  const baseUrl = getBaseUrl().trim();
+  // Limpiar la URL de cualquier espacio o salto de línea
+  const redirectUrl = `${baseUrl}/auth/callback`.replace(/\s+/g, '').trim();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',

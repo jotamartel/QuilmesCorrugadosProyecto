@@ -113,12 +113,12 @@ export async function signInWithGoogle() {
   // Limpiar la URL de cualquier espacio o salto de línea
   const redirectUrl = `${baseUrl}/auth/callback`.replace(/\s+/g, '').trim();
 
-  // Log para debug (solo en desarrollo)
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[Auth Debug] Redirect URL:', redirectUrl);
-    console.log('[Auth Debug] Hostname:', typeof window !== 'undefined' ? window.location.hostname : 'server');
-    console.log('[Auth Debug] NEXT_PUBLIC_SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL);
-  }
+  // Log para debug (siempre activo para troubleshooting)
+  console.log('[Auth Debug] Redirect URL:', redirectUrl);
+  console.log('[Auth Debug] Hostname:', typeof window !== 'undefined' ? window.location.hostname : 'server');
+  console.log('[Auth Debug] Origin:', typeof window !== 'undefined' ? window.location.origin : 'server');
+  console.log('[Auth Debug] NEXT_PUBLIC_SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL);
+  console.log('[Auth Debug] NODE_ENV:', process.env.NODE_ENV);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',

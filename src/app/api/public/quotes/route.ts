@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { getPricePerM2, calculateSubtotal, getProductionDays } from '@/lib/utils/pricing';
+import { sendNotification } from '@/lib/notifications';
 import type { CreatePublicQuoteRequest, PricingConfig } from '@/lib/types/database';
 
 export async function POST(request: NextRequest) {
@@ -221,6 +222,47 @@ export async function POST(request: NextRequest) {
         { error: 'Error al guardar la cotización' },
         { status: 500 }
       );
+    }
+
+    // Enviar notificación por email (cotización completa con solicitud de contacto)
+    await sendNotification({
+      type: 'lead_with_contact',
+      origin: 'Web',
+      box: {
+        length: body.length_mm,
+        width: body.width_mm,
+        height: body.height_mm,
+      },
+      quantity: body.quantity,
+      totalArs: subtotal,
+      contact: {
+        name: body.requester_name,
+        email: body.requester_email,
+        phone: body.requester_phone,
+        company: body.requester_company,
+        notes: body.message,
+      },
+    }).catch(err => {
+      console.error('Error sending quote notification:', err);
+      // No fallar la request si falla el email
+    });
+
+    // Si es de alto valor, enviar notificación adicional
+    if (subtotal >= 500000) {
+      await sendNotification({
+        type: 'high_value_quote',
+        origin: 'Web',
+        box: {
+          length: body.length_mm,
+          width: body.width_mm,
+          height: body.height_mm,
+        },
+        quantity: body.quantity,
+        totalArs: subtotal,
+        ip: sourceIp,
+      }).catch(err => {
+        console.error('Error sending high value notification:', err);
+      });
     }
 
     return NextResponse.json(quote, { status: 201 });

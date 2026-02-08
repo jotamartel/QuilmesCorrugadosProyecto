@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { getPricePerM2, calculateSubtotal } from '@/lib/utils/pricing';
+import { sendNotification } from '@/lib/notifications';
 import type { PricingConfig } from '@/lib/types/database';
 
 interface BoxData {
@@ -186,6 +187,30 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Enviar notificación por email (lead que vio precio)
+    const leadBox = body.boxes[0];
+    await sendNotification({
+      type: 'lead_with_contact',
+      origin: 'Web',
+      box: {
+        length: leadBox.length_mm,
+        width: leadBox.width_mm,
+        height: leadBox.height_mm,
+      },
+      quantity: leadBox.quantity,
+      totalArs: totalSubtotal,
+      contact: {
+        name: body.requester_name,
+        email: body.requester_email,
+        phone: body.requester_phone,
+        company: body.requester_company,
+        notes: body.message,
+      },
+    }).catch(err => {
+      console.error('Error sending lead notification:', err);
+      // No fallar la request si falla el email
+    });
 
     // Devolver los cálculos para mostrar en el frontend
     return NextResponse.json({

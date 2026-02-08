@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect } from 'react';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { WhatsAppButton } from '@/components/public/WhatsAppButton';
 import { QuoterForm } from '@/components/public/QuoterForm';
 import { Factory, Truck, Ruler, Palette, ArrowDown } from 'lucide-react';
+import { trackEvent } from '@/lib/utils/tracking';
 
 const benefits = [
   {
@@ -30,6 +32,11 @@ const benefits = [
 ];
 
 export default function LandingPage() {
+  // Trackear vista de landing page
+  useEffect(() => {
+    trackEvent('landing_page_view');
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       <LandingHeader />

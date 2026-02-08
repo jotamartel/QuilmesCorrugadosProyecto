@@ -1,23 +1,14 @@
-import type { Metadata } from 'next';
+'use client';
+
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { BreadcrumbSchema, ProductSchema } from '@/components/public/SchemaMarkup';
 import { Package, Palette, ShoppingBag, Truck, ArrowRight } from 'lucide-react';
+import { trackEvent } from '@/lib/utils/tracking';
 
-export const metadata: Metadata = {
-  title: 'Cajas de Cartón Corrugado | Productos y Soluciones de Packaging',
-  description: 'Cajas de cartón corrugado a medida: estándar, impresas, para e-commerce y packaging industrial. Fabricación propia en Quilmes, Buenos Aires. Cotizá online al instante.',
-  alternates: {
-    canonical: 'https://quilmes-corrugados.vercel.app/productos',
-  },
-  openGraph: {
-    title: 'Productos | Cajas de Cartón Corrugado a Medida',
-    description: 'Soluciones de packaging en cartón corrugado para empresas. Cajas estándar, impresas, e-commerce e industriales.',
-    url: 'https://quilmes-corrugados.vercel.app/productos',
-    type: 'website',
-  },
-};
+// Metadata movida - usar generateMetadata si es necesario
 
 const products = [
   {
@@ -51,6 +42,10 @@ const products = [
 ];
 
 export default function ProductosPage() {
+  useEffect(() => {
+    trackEvent('product_page_view');
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       <LandingHeader />

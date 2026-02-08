@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { ArrowLeft, ArrowRight, Loader2, Plus, Eye } from 'lucide-react';
@@ -8,6 +8,7 @@ import { PriceSummary } from './PriceSummary';
 import { BoxItemForm, BoxItemData, BoxCalculations, calculateBoxItem } from './BoxItemForm';
 import type { TaxCondition, BuenosAiresCity } from '@/lib/types/database';
 import { ARGENTINE_PROVINCES, FREE_SHIPPING_MAX_KM } from '@/lib/types/database';
+import { trackEvent } from '@/lib/utils/tracking';
 
 // Importar BoxPreview3D dinámicamente para evitar SSR issues con Three.js
 const BoxPreview3D = dynamic(
@@ -89,6 +90,53 @@ export function QuoterForm() {
   const [priceRevealed, setPriceRevealed] = useState(false);
   const [revealingPrice, setRevealingPrice] = useState(false);
   const [leadId, setLeadId] = useState<string | null>(null);
+  const quoteStartedTracked = useRef(false);
+  const quoterViewedTracked = useRef(false);
+
+  // Trackear cuando el usuario ve el cotizador (scroll hasta #cotizador)
+  useEffect(() => {
+    if (quoterViewedTracked.current) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !quoterViewedTracked.current) {
+            trackEvent('quoter_viewed');
+            quoterViewedTracked.current = true;
+            observer.disconnect();
+          }
+        });
+      },
+      { threshold: 0.3 }
+    );
+
+    const quoterSection = document.getElementById('cotizador');
+    if (quoterSection) {
+      observer.observe(quoterSection);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Trackear cuando el usuario empieza a llenar el formulario (quote_started)
+  useEffect(() => {
+    if (quoteStartedTracked.current) return;
+    
+    const hasValidBox = boxes.some(box => 
+      box.length_mm >= 200 && 
+      box.width_mm >= 200 && 
+      box.height_mm >= 100 && 
+      box.quantity > 0
+    );
+
+    if (hasValidBox && !quoteStartedTracked.current) {
+      trackEvent('quote_started', { 
+        boxCount: boxes.length,
+        totalSqm: totals.totalSqm 
+      });
+      quoteStartedTracked.current = true;
+    }
+  }, [boxes, totals.totalSqm]);
 
   // Cargar ciudades cuando la provincia es Buenos Aires o CABA
   useEffect(() => {
@@ -194,6 +242,12 @@ export function QuoterForm() {
       return newSet;
     });
     setSelectedBoxIndex(boxes.length);
+    
+    // Trackear evento
+    trackEvent('box_added', { 
+      totalBoxes: boxes.length + 1,
+      totalSqm: totals.totalSqm 
+    });
   };
 
   const handleUpdateBox = (id: string, field: keyof BoxItemData, value: BoxItemData[keyof BoxItemData]) => {
@@ -285,6 +339,16 @@ export function QuoterForm() {
       const result = await response.json();
       setLeadId(result.id);
       setPriceRevealed(true);
+      
+      // Trackear evento
+      trackEvent('price_revealed', {
+        leadId: result.id,
+        boxCount: boxes.length,
+        totalSqm: totals.totalSqm,
+        totalAmount: totals.totalSubtotal,
+        hasPrinting: totals.hasPrinting,
+        clientType: clientData.client_type
+      });
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al procesar la solicitud');
@@ -351,6 +415,20 @@ export function QuoterForm() {
       }
 
       const quote = await response.json();
+
+      // Trackear evento de conversión completa
+      trackEvent('quote_submitted', {
+        quoteId: quote.id,
+        leadId: leadId,
+        boxCount: boxes.length,
+        totalSqm: totals.totalSqm,
+        totalAmount: totals.totalSubtotal,
+        hasPrinting: totals.hasPrinting,
+        clientType: clientData.client_type,
+        province: clientData.province,
+        distanceKm: clientData.distance_km
+      });
+
       router.push(`/cotizacion/${quote.id}`);
 
     } catch (err) {
@@ -433,6 +511,12 @@ export function QuoterForm() {
               type="button"
               onClick={() => {
                 setStep(2);
+                // Trackear evento
+                trackEvent('quote_step_2', {
+                  boxCount: boxes.length,
+                  totalSqm: totals.totalSqm,
+                  hasPrinting: totals.hasPrinting
+                });
                 // Scroll al indicador de progreso en mobile
                 setTimeout(() => {
                   document.getElementById('quoter-progress')?.scrollIntoView({ behavior: 'smooth', block: 'start' });

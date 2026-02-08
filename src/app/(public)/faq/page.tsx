@@ -1,23 +1,14 @@
-import type { Metadata } from 'next';
+'use client';
+
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { FAQSchema, BreadcrumbSchema } from '@/components/public/SchemaMarkup';
 import { ChevronDown } from 'lucide-react';
+import { trackEvent } from '@/lib/utils/tracking';
 
-export const metadata: Metadata = {
-  title: 'Preguntas Frecuentes sobre Cajas de Cartón Corrugado',
-  description: 'Respuestas a las preguntas más frecuentes sobre cajas de cartón corrugado a medida: pedido mínimo, envíos, impresión, tipos de cartón, tiempos de entrega y más.',
-  alternates: {
-    canonical: 'https://quilmes-corrugados.vercel.app/faq',
-  },
-  openGraph: {
-    title: 'Preguntas Frecuentes | Quilmes Corrugados',
-    description: 'Todo lo que necesitás saber sobre cajas de cartón corrugado a medida: pedidos, envíos, impresión y más.',
-    url: 'https://quilmes-corrugados.vercel.app/faq',
-    type: 'website',
-  },
-};
+// Metadata movida - usar generateMetadata si es necesario
 
 const faqs = [
   {
@@ -71,6 +62,10 @@ const faqs = [
 ];
 
 export default function FAQPage() {
+  useEffect(() => {
+    trackEvent('faq_viewed');
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       <LandingHeader />

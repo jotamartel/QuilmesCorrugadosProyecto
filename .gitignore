@@ -47,3 +47,4 @@ nul
 
 # Temp files
 tmpclaude-*
+.env*.local

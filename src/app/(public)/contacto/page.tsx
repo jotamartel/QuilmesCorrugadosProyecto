@@ -1,28 +1,22 @@
-import type { Metadata } from 'next';
+'use client';
+
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { BreadcrumbSchema } from '@/components/public/SchemaMarkup';
 import { Phone, Mail, MapPin, Clock, MessageCircle, ArrowRight } from 'lucide-react';
-
-export const metadata: Metadata = {
-  title: 'Contacto | Quilmes Corrugados - Fábrica de Cajas de Cartón',
-  description: 'Contactá a Quilmes Corrugados: fábrica de cajas de cartón corrugado en Quilmes, Buenos Aires. Tel: +54 9 11 6924-9801. Email: ventas@quilmescorrugados.com.ar. Lunes a viernes 8 a 17 hs.',
-  alternates: {
-    canonical: 'https://quilmes-corrugados.vercel.app/contacto',
-  },
-  openGraph: {
-    title: 'Contacto | Quilmes Corrugados',
-    description: 'Contactanos para cotizar cajas de cartón corrugado. Fábrica en Quilmes, Buenos Aires.',
-    url: 'https://quilmes-corrugados.vercel.app/contacto',
-    type: 'website',
-  },
-};
+import { trackEvent } from '@/lib/utils/tracking';
 
 const WHATSAPP_NUMBER = '5491169249801';
 
 export default function ContactoPage() {
   const whatsappMessage = 'Hola, me interesa cotizar cajas de cartón corrugado.';
+
+  // Trackear vista de página de contacto
+  useEffect(() => {
+    trackEvent('contact_form_submitted', { page: 'contacto' });
+  }, []);
 
   return (
     <div className="min-h-screen bg-white">
@@ -57,7 +51,11 @@ export default function ContactoPage() {
                   <Phone className="w-5 h-5 text-[#002E55] mt-0.5 shrink-0" />
                   <div>
                     <h3 className="font-semibold text-gray-900">Teléfono</h3>
-                    <a href="tel:+5491169249801" className="text-gray-600 hover:text-[#002E55]">
+                    <a 
+                      href="tel:+5491169249801" 
+                      onClick={() => trackEvent('phone_click')}
+                      className="text-gray-600 hover:text-[#002E55]"
+                    >
                       +54 9 11 6924-9801
                     </a>
                   </div>
@@ -67,7 +65,11 @@ export default function ContactoPage() {
                   <Mail className="w-5 h-5 text-[#002E55] mt-0.5 shrink-0" />
                   <div>
                     <h3 className="font-semibold text-gray-900">Email</h3>
-                    <a href="mailto:ventas@quilmescorrugados.com.ar" className="text-gray-600 hover:text-[#002E55]">
+                    <a 
+                      href="mailto:ventas@quilmescorrugados.com.ar" 
+                      onClick={() => trackEvent('email_click')}
+                      className="text-gray-600 hover:text-[#002E55]"
+                    >
                       ventas@quilmescorrugados.com.ar
                     </a>
                   </div>
@@ -100,6 +102,7 @@ export default function ContactoPage() {
                   href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(whatsappMessage)}`}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => trackEvent('whatsapp_click', { source: 'contacto_page' })}
                   className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
                 >
                   <MessageCircle className="w-6 h-6 text-green-600 shrink-0" />
@@ -111,6 +114,7 @@ export default function ContactoPage() {
 
                 <a
                   href="mailto:ventas@quilmescorrugados.com.ar?subject=Consulta%20cajas%20de%20cart%C3%B3n"
+                  onClick={() => trackEvent('email_click', { source: 'contacto_page' })}
                   className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
                 >
                   <Mail className="w-6 h-6 text-blue-600 shrink-0" />

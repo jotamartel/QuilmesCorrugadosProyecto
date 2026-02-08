@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { TrafficTracker } from '@/components/tracking/TrafficTracker';
 
 export const metadata: Metadata = {
   title: 'Fábrica de Cajas de Cartón Corrugado a Medida | Quilmes, Buenos Aires',
@@ -13,5 +14,10 @@ export default function PublicLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return (
+    <>
+      <TrafficTracker />
+      {children}
+    </>
+  );
 }

@@ -188,29 +188,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Enviar notificación por email (lead que vio precio)
-    const leadBox = body.boxes[0];
-    await sendNotification({
-      type: 'lead_with_contact',
-      origin: 'Web',
-      box: {
-        length: leadBox.length_mm,
-        width: leadBox.width_mm,
-        height: leadBox.height_mm,
-      },
-      quantity: leadBox.quantity,
-      totalArs: totalSubtotal,
-      contact: {
-        name: body.requester_name,
-        email: body.requester_email,
-        phone: body.requester_phone,
-        company: body.requester_company,
-        notes: body.message,
-      },
-    }).catch(err => {
-      console.error('Error sending lead notification:', err);
-      // No fallar la request si falla el email
-    });
+    // NO enviar email aquí - el usuario solo vio el precio, aún no pidió contacto
+    // El email se enviará cuando el usuario haga clic en "Quiero que me contacten"
+    // (en /api/public/quotes cuando requested_contact = true)
 
     // Devolver los cálculos para mostrar en el frontend
     return NextResponse.json({

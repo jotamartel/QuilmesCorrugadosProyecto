@@ -224,33 +224,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Enviar notificación por email (cotización completa con solicitud de contacto)
-    await sendNotification({
-      type: 'lead_with_contact',
-      origin: 'Web',
-      box: {
-        length: body.length_mm,
-        width: body.width_mm,
-        height: body.height_mm,
-      },
-      quantity: body.quantity,
-      totalArs: subtotal,
-      contact: {
-        name: body.requester_name,
-        email: body.requester_email,
-        phone: body.requester_phone,
-        company: body.requester_company,
-        notes: body.message,
-      },
-    }).catch(err => {
-      console.error('Error sending quote notification:', err);
-      // No fallar la request si falla el email
-    });
-
-    // Si es de alto valor, enviar notificación adicional
-    if (subtotal >= 500000) {
+    // Solo enviar notificación si es un lead NUEVO (no actualizado)
+    // Si es un lead existente que se actualizó, ya se envió el email cuando vio el precio
+    if (!existingLead) {
+      // Enviar notificación por email (cotización completa con solicitud de contacto)
       await sendNotification({
-        type: 'high_value_quote',
+        type: 'lead_with_contact',
         origin: 'Web',
         box: {
           length: body.length_mm,
@@ -259,10 +238,35 @@ export async function POST(request: NextRequest) {
         },
         quantity: body.quantity,
         totalArs: subtotal,
-        ip: sourceIp,
+        contact: {
+          name: body.requester_name,
+          email: body.requester_email,
+          phone: body.requester_phone,
+          company: body.requester_company,
+          notes: body.message,
+        },
       }).catch(err => {
-        console.error('Error sending high value notification:', err);
+        console.error('Error sending quote notification:', err);
+        // No fallar la request si falla el email
       });
+
+      // Si es de alto valor, enviar notificación adicional
+      if (subtotal >= 500000) {
+        await sendNotification({
+          type: 'high_value_quote',
+          origin: 'Web',
+          box: {
+            length: body.length_mm,
+            width: body.width_mm,
+            height: body.height_mm,
+          },
+          quantity: body.quantity,
+          totalArs: subtotal,
+          ip: sourceIp,
+        }).catch(err => {
+          console.error('Error sending high value notification:', err);
+        });
+      }
     }
 
     return NextResponse.json(quote, { status: 201 });

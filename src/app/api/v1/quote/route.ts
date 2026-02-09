@@ -19,7 +19,7 @@ import type { PricingConfig } from '@/lib/types/database';
 import crypto from 'crypto';
 
 // Umbral para notificacion de alto valor
-const HIGH_VALUE_THRESHOLD = 500000; // $500.000 ARS
+const HIGH_VALUE_THRESHOLD = 3000000; // $3.000.000 ARS
 
 // Tipos para la API
 interface BoxInput {

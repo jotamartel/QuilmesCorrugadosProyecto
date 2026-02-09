@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Si es de alto valor, enviar notificación adicional
-      if (subtotal >= 500000) {
+      if (subtotal >= 3000000) {
         await sendNotification({
           type: 'high_value_quote',
           origin: 'Web',

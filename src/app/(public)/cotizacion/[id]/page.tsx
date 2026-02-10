@@ -217,17 +217,6 @@ export default function QuoteConfirmationPage() {
                     <Clock className="w-4 h-4 text-gray-400" />
                     <span>Entrega estimada: <strong>{quote.estimated_days} días hábiles</strong></span>
                   </div>
-
-                  {/* Botón para pedidos menores al mínimo */}
-                  {quote.total_sqm >= 3000 && pricingConfig && (
-                    <button
-                      onClick={() => setShowBelowMinimumModal(true)}
-                      className="w-full mt-4 px-4 py-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg hover:bg-yellow-100 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
-                    >
-                      <AlertCircle className="w-4 h-4" />
-                      ¿Necesitas menos m²?
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
@@ -288,6 +277,17 @@ export default function QuoteConfirmationPage() {
                 <MessageCircle className="w-5 h-5" />
                 ¿Urgente? Escribinos al WhatsApp
               </a>
+
+              {/* Botón para pedidos menores al mínimo */}
+              {quote.total_sqm >= 3000 && pricingConfig && (
+                <button
+                  onClick={() => setShowBelowMinimumModal(true)}
+                  className="w-full px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"
+                >
+                  <AlertCircle className="w-5 h-5" />
+                  ¿Necesitas menos m²?
+                </button>
+              )}
 
               {/* Back to home */}
               <Link

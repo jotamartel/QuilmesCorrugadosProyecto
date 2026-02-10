@@ -145,14 +145,19 @@ export function PriceSummary({
           </div>
           {/* Botón para solicitar contacto si se puede fabricar en hueco de producción - solo en paso 2 (después de revelar precio) */}
           {onBelowMinimum && showPrice && (
-            <button
-              type="button"
-              onClick={onBelowMinimum}
-              className="w-full px-4 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors shadow-md"
-            >
-              <AlertCircle className="w-4 h-4" />
-              ¿Necesitas menos m²? Solicitar contacto
-            </button>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={onBelowMinimum}
+                className="w-full px-4 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors shadow-md"
+              >
+                <AlertCircle className="w-4 h-4" />
+                Solicitar que me contacten cuando se pueda producir
+              </button>
+              <p className="text-xs text-gray-600 text-center px-2">
+                Estaremos teniendo en cuenta tu solicitud al momento de programar las producciones de las próximas semanas y te contactaremos para coordinar el pago de la seña y ultimar detalles
+              </p>
+            </div>
           )}
         </div>
       ) : !showPrice ? (
@@ -169,9 +174,9 @@ export function PriceSummary({
         <>
           {/* Total */}
           <div className="border-t border-gray-100 pt-4">
-            <div className="flex justify-between text-xl font-bold text-gray-900">
-              <span>Total estimado:</span>
-              <span className="text-[#002E55]">{formatCurrency(totalSubtotal)}</span>
+            <div className="flex justify-between items-center">
+              <span className="text-lg font-semibold text-gray-700">Total estimado:</span>
+              <span className="text-3xl font-bold text-[#002E55]">{formatCurrency(totalSubtotal)}</span>
             </div>
           </div>
 
@@ -209,14 +214,19 @@ export function PriceSummary({
 
           {/* Botón para pedidos menores al mínimo */}
           {onBelowMinimum && totalSqm < minM2PerModel && totalSqm >= 1000 && (
-            <button
-              type="button"
-              onClick={onBelowMinimum}
-              className="w-full px-4 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors mt-3 shadow-md"
-            >
-              <AlertCircle className="w-4 h-4" />
-              ¿Necesitas menos m²?
-            </button>
+            <div className="space-y-2 mt-3">
+              <button
+                type="button"
+                onClick={onBelowMinimum}
+                className="w-full px-4 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors shadow-md"
+              >
+                <AlertCircle className="w-4 h-4" />
+                Solicitar que me contacten cuando se pueda producir
+              </button>
+              <p className="text-xs text-gray-600 text-center px-2">
+                Estaremos teniendo en cuenta tu solicitud al momento de programar las producciones de las próximas semanas y te contactaremos para coordinar el pago de la seña y ultimar detalles
+              </p>
+            </div>
           )}
         </>
       )}

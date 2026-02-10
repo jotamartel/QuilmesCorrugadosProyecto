@@ -152,6 +152,9 @@ export default function BelowMinimumLeadsPage() {
                       Contacto
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Dirección de entrega
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Fecha
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -218,6 +221,35 @@ export default function BelowMinimumLeadsPage() {
                             <div className="text-xs text-gray-500">
                               {quote.requester_phone}
                             </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="space-y-1 max-w-xs">
+                            {quote.address ? (
+                              <>
+                                <div className="text-sm text-gray-900 font-medium">
+                                  {quote.address}
+                                </div>
+                                <div className="text-xs text-gray-600">
+                                  {quote.city && quote.province && (
+                                    <>
+                                      {quote.city}, {quote.province}
+                                      {quote.postal_code && ` (CP: ${quote.postal_code})`}
+                                    </>
+                                  )}
+                                  {!quote.city && quote.province && quote.province}
+                                </div>
+                                {quote.distance_km !== null && (
+                                  <div className="text-xs text-blue-600 font-medium">
+                                    📍 {quote.distance_km} km desde Quilmes
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="text-xs text-gray-400 italic">
+                                Sin dirección
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

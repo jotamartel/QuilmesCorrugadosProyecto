@@ -5,15 +5,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getPricePerM2, getProductionDays, getActivePricingConfig } from '@/lib/utils/pricing';
 import type { CotizarParams, CotizarResponse } from '@/types/retell';
+import type { PricingConfig } from '@/lib/types/database';
 import { RETELL_CONSTANTS } from '@/types/retell';
 
 const {
-  PRECIO_BASE_M2,
   ANCHO_LAMINA_MAX_MM,
   SOLAPA_MM,
-  DESCUENTOS,
-  TIEMPOS_PRODUCCION,
   MEDIDAS,
 } = RETELL_CONSTANTS;
 
@@ -69,18 +68,31 @@ export async function POST(request: NextRequest) {
     const areaM2Unitario = (anchoLaminaMm * largoLaminaMm) / 1_000_000;
     const areaM2Total = areaM2Unitario * cantidad;
 
-    // Calcular descuento
-    const descuento = getDescuento(areaM2Total);
-    const descuentoPorcentaje = descuento.porcentaje * 100;
+    // Obtener configuración de precios activa
+    const pricingConfig = await getActivePricingConfig();
+    if (!pricingConfig) {
+      return NextResponse.json({
+        response: 'Disculpá, hay un problema técnico con los precios. ' +
+          '¿Querés que te pase con un asesor?',
+      } as CotizarResponse);
+    }
 
-    // Calcular precios
-    const precioBase = areaM2Total * PRECIO_BASE_M2;
-    const precioConDescuento = precioBase * (1 - descuento.porcentaje);
-    const precioTotal = Math.round(precioConDescuento);
+    // Usar la función centralizada para obtener el precio por m²
+    const pricePerM2 = getPricePerM2(areaM2Total, pricingConfig);
+
+    // Calcular precios usando la configuración activa
+    const precioTotal = Math.round(areaM2Total * pricePerM2);
     const precioUnitario = Math.round(precioTotal / cantidad);
 
-    // Obtener tiempo de producción
-    const tiempoProduccion = getTiempoProduccion(areaM2Total);
+    // Calcular descuento basado en el precio aplicado vs precio estándar
+    const precioEstándar = areaM2Total * pricingConfig.price_per_m2_standard;
+    const descuentoPorcentaje = precioEstándar > 0
+      ? Math.round(((precioEstándar - precioTotal) / precioEstándar) * 100)
+      : 0;
+
+    // Obtener tiempo de producción usando la configuración activa
+    const productionDays = getProductionDays(false, pricingConfig);
+    const tiempoProduccion = `${productionDays} días hábiles`;
 
     // Guardar cotización en Supabase
     const supabase = createAdminClient();
@@ -106,10 +118,10 @@ export async function POST(request: NextRequest) {
           sheet_length_mm: largoLaminaMm,
           sqm_per_box: areaM2Unitario,
           total_sqm: areaM2Total,
-          price_per_m2: PRECIO_BASE_M2 * (1 - descuento.porcentaje),
+          price_per_m2: pricePerM2,
           unit_price: precioUnitario,
           subtotal: precioTotal,
-          estimated_days: parseInt(tiempoProduccion.split(' ')[0]) || 5,
+          estimated_days: productionDays,
           // Metadata
           canal: 'telefono',
           call_id: params.call_id || null,
@@ -246,29 +258,6 @@ function validateParams(params: CotizarParams): { valid: boolean; message?: stri
   return { valid: true };
 }
 
-/**
- * Obtener descuento según volumen
- */
-function getDescuento(areaM2: number): { porcentaje: number; nombre: string } {
-  for (const d of DESCUENTOS) {
-    if (areaM2 >= d.minM2) {
-      return { porcentaje: d.descuento, nombre: d.nombre };
-    }
-  }
-  return { porcentaje: 0, nombre: 'sin descuento' };
-}
-
-/**
- * Obtener tiempo de producción según volumen
- */
-function getTiempoProduccion(areaM2: number): string {
-  for (const t of TIEMPOS_PRODUCCION) {
-    if (areaM2 <= t.maxM2) {
-      return t.tiempo;
-    }
-  }
-  return TIEMPOS_PRODUCCION[TIEMPOS_PRODUCCION.length - 1].tiempo;
-}
 
 /**
  * Formatear precio en pesos argentinos

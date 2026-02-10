@@ -25,46 +25,38 @@ import {
 } from '@/lib/whatsapp';
 import { sendNotification } from '@/lib/notifications';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
+import { getPricePerM2, getProductionDays, getActivePricingConfig } from '@/lib/utils/pricing';
 import { createClient } from '@/lib/supabase/server';
 import { classifyIntent, isGroqEnabled } from '@/lib/groq';
+import type { PricingConfig } from '@/lib/types/database';
 
-// Precios hardcodeados para el bot (consistente con el sistema)
-const PRICING = {
-  standardPricePerM2: 700,
-  volumePricePerM2: 670,
-  volumeThreshold: 5000,
-  printingIncrement: 0.15,
-};
-
-const PRODUCTION_DAYS = {
-  standard: 7,
-  withPrinting: 14,
-};
+const PRINTING_INCREMENT = 0.15; // +15% por cada color de impresión
 
 /**
  * Calcula cotizacion simple para el bot de WhatsApp
+ * Usa la configuración de precios activa desde la base de datos
  */
-function calculateQuote(
+async function calculateQuote(
   length: number,
   width: number,
   height: number,
   quantity: number,
-  hasPrinting: boolean
-): { total: number; totalM2: number; deliveryDays: number } {
+  hasPrinting: boolean,
+  config: PricingConfig
+): Promise<{ total: number; totalM2: number; deliveryDays: number }> {
   const { m2 } = calculateUnfolded(length, width, height);
   const totalM2 = calculateTotalM2(m2, quantity);
 
-  const pricePerM2 = totalM2 >= PRICING.volumeThreshold
-    ? PRICING.volumePricePerM2
-    : PRICING.standardPricePerM2;
+  // Usar la función centralizada para obtener el precio por m²
+  const pricePerM2 = getPricePerM2(totalM2, config);
 
   let total = totalM2 * pricePerM2;
 
   if (hasPrinting) {
-    total *= (1 + PRICING.printingIncrement);
+    total *= (1 + PRINTING_INCREMENT);
   }
 
-  const deliveryDays = hasPrinting ? PRODUCTION_DAYS.withPrinting : PRODUCTION_DAYS.standard;
+  const deliveryDays = getProductionDays(hasPrinting, config);
 
   return {
     total: Math.round(total),
@@ -405,23 +397,30 @@ Ejemplo: 500`;
           await clearConversationState(phoneNumber);
           responseMessage = 'Hubo un error. Escribe "cotizar" para empezar de nuevo.';
         } else {
-          const quote = calculateQuote(
-            dimensions.length,
-            dimensions.width,
-            dimensions.height,
-            quantity,
-            hasPrinting
-          );
+          // Obtener configuración de precios activa
+          const pricingConfig = await getActivePricingConfig();
+          if (!pricingConfig) {
+            responseMessage = 'Disculpá, hay un problema técnico con los precios. Por favor contactá con un asesor.';
+          } else {
+            const quote = await calculateQuote(
+              dimensions.length,
+              dimensions.width,
+              dimensions.height,
+              quantity,
+              hasPrinting,
+              pricingConfig
+            );
 
-          await updateConversationState(phoneNumber, {
-            step: 'quoted',
-            hasPrinting,
-            lastQuoteTotal: quote.total,
-            lastQuoteM2: quote.totalM2,
-          });
+            await updateConversationState(phoneNumber, {
+              step: 'quoted',
+              hasPrinting,
+              lastQuoteTotal: quote.total,
+              lastQuoteM2: quote.totalM2,
+            });
 
-          responseMessage = getQuoteMessage(dimensions, quantity, hasPrinting, quote);
-          quoteData = { total: quote.total, totalM2: quote.totalM2 };
+            responseMessage = getQuoteMessage(dimensions, quantity, hasPrinting, quote);
+            quoteData = { total: quote.total, totalM2: quote.totalM2 };
+          }
 
           // Crear lead en public_quotes
           await createWhatsAppLead({

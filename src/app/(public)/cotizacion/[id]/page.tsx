@@ -78,10 +78,13 @@ export default function QuoteConfirmationPage() {
 
         if (pricingRes.ok) {
           const pricingData = await pricingRes.json();
-          setPricingConfig({
-            price_per_m2_below_minimum: pricingData.price_per_m2_below_minimum || (pricingData.price_per_m2_standard || 700) * 1.20,
-            min_m2_per_model: pricingData.min_m2_per_model || 3000,
-          });
+          // Usar valores directamente de la configuración activa (sin fallbacks hardcodeados)
+          if (pricingData.price_per_m2_below_minimum && pricingData.min_m2_per_model) {
+            setPricingConfig({
+              price_per_m2_below_minimum: pricingData.price_per_m2_below_minimum,
+              min_m2_per_model: pricingData.min_m2_per_model,
+            });
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error al cargar la cotización');

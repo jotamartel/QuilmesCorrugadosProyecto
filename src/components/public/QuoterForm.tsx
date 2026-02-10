@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowRight, Loader2, Plus, Eye } from 'lucide-react';
 import { PriceSummary } from './PriceSummary';
 import { BoxItemForm, BoxItemData, BoxCalculations, calculateBoxItem } from './BoxItemForm';
 import { BelowMinimumModal } from './BelowMinimumModal';
-import type { TaxCondition, BuenosAiresCity } from '@/lib/types/database';
+import type { TaxCondition, BuenosAiresCity, PricingConfig } from '@/lib/types/database';
 import { ARGENTINE_PROVINCES, FREE_SHIPPING_MAX_KM } from '@/lib/types/database';
 import { trackEvent } from '@/lib/utils/tracking';
 
@@ -92,7 +92,7 @@ export function QuoterForm() {
   const [revealingPrice, setRevealingPrice] = useState(false);
   const [leadId, setLeadId] = useState<string | null>(null);
   const [showBelowMinimumModal, setShowBelowMinimumModal] = useState(false);
-  const [pricingConfig, setPricingConfig] = useState<{ price_per_m2_below_minimum: number; min_m2_per_model: number } | null>(null);
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
   const quoteStartedTracked = useRef(false);
   const quoterViewedTracked = useRef(false);
 
@@ -140,18 +140,22 @@ export function QuoterForm() {
     }
   }, [boxes]);
 
-  // Cargar configuración de precios
+  // Cargar configuración completa de precios desde la base de datos
   useEffect(() => {
     const fetchPricingConfig = async () => {
       try {
         const response = await fetch('/api/config/pricing');
         if (response.ok) {
           const data = await response.json();
-          if (data.price_per_m2_below_minimum && data.min_m2_per_model) {
-            setPricingConfig({
-              price_per_m2_below_minimum: data.price_per_m2_below_minimum,
-              min_m2_per_model: data.min_m2_per_model,
-            });
+          // Validar que tenemos todos los campos necesarios
+          if (data.price_per_m2_standard && 
+              data.price_per_m2_volume && 
+              data.price_per_m2_below_minimum && 
+              data.min_m2_per_model &&
+              data.volume_threshold_m2) {
+            setPricingConfig(data as PricingConfig);
+          } else {
+            console.error('Configuración de precios incompleta:', data);
           }
         }
       } catch (err) {
@@ -200,10 +204,17 @@ export function QuoterForm() {
     return clientData.distance_km <= FREE_SHIPPING_MAX_KM;
   }, [clientData.province, clientData.distance_km]);
 
-  // Cálculos para cada caja
+  // Cálculos para cada caja (requiere configuración completa desde la base de datos)
   const boxCalculations = useMemo(() => {
-    return boxes.map(box => calculateBoxItem(box));
-  }, [boxes]);
+    // REQUERIDO: La configuración completa debe venir desde la base de datos
+    // No usar valores parciales o hardcodeados
+    if (!pricingConfig) {
+      return boxes.map(() => null);
+    }
+    
+    // Usar la configuración completa obtenida desde la API
+    return boxes.map(box => calculateBoxItem(box, pricingConfig));
+  }, [boxes, pricingConfig]);
 
   // Totales combinados
   const totals = useMemo(() => {
@@ -988,7 +999,7 @@ export function QuoterForm() {
             }
           } : undefined}
           submitting={submitting}
-          minM2PerModel={pricingConfig?.min_m2_per_model || 3000}
+          minM2PerModel={pricingConfig?.min_m2_per_model ?? 3000}
         />
       </div>
       </div>

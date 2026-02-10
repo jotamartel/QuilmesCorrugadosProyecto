@@ -8,47 +8,38 @@ import {
 } from '@/lib/email-parser';
 import { sendNotification } from '@/lib/notifications';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
+import { getPricePerM2, getProductionDays, getActivePricingConfig } from '@/lib/utils/pricing';
 import { createClient } from '@/lib/supabase/server';
+import type { PricingConfig } from '@/lib/types/database';
 
 // Cliente Resend para enviar respuestas
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-// Precios hardcodeados (consistente con el sistema)
-const PRICING = {
-  standardPricePerM2: 700,
-  volumePricePerM2: 670,
-  volumeThreshold: 5000,
-  printingIncrement: 0.15,
-};
-
-const PRODUCTION_DAYS = {
-  standard: 7,
-  withPrinting: 14,
-};
+const PRINTING_INCREMENT = 0.15; // +15% por cada color de impresión
 
 /**
- * Calcula cotizacion
+ * Calcula cotizacion usando la configuración de precios activa
  */
-function calculateQuote(
+async function calculateQuote(
   length: number,
   width: number,
   height: number,
   quantity: number,
-  hasPrinting: boolean
-): { total: number; m2_total: number; unit_price: number; delivery_days: number } {
+  hasPrinting: boolean,
+  config: PricingConfig
+): Promise<{ total: number; m2_total: number; unit_price: number; delivery_days: number }> {
   const { m2 } = calculateUnfolded(length, width, height);
   const m2_total = calculateTotalM2(m2, quantity);
 
-  const pricePerM2 = m2_total >= PRICING.volumeThreshold
-    ? PRICING.volumePricePerM2
-    : PRICING.standardPricePerM2;
+  // Usar la función centralizada para obtener el precio por m²
+  const pricePerM2 = getPricePerM2(m2_total, config);
 
   let total = m2_total * pricePerM2;
 
   if (hasPrinting) {
-    total *= (1 + PRICING.printingIncrement);
+    total *= (1 + PRINTING_INCREMENT);
   }
 
   total = Math.round(total);
@@ -57,7 +48,7 @@ function calculateQuote(
     total,
     m2_total,
     unit_price: Math.round(total / quantity),
-    delivery_days: hasPrinting ? PRODUCTION_DAYS.withPrinting : PRODUCTION_DAYS.standard,
+    delivery_days: getProductionDays(hasPrinting, config),
   };
 }
 
@@ -93,13 +84,18 @@ export async function POST(request: NextRequest) {
 
     // Si tenemos suficientes datos, calcular cotizacion
     if (parsed.dimensions && parsed.quantity) {
-      quote = calculateQuote(
-        parsed.dimensions.length,
-        parsed.dimensions.width,
-        parsed.dimensions.height,
-        parsed.quantity,
-        parsed.hasPrinting || false
-      );
+      // Obtener configuración de precios activa
+      const pricingConfig = await getActivePricingConfig();
+      if (pricingConfig) {
+        quote = await calculateQuote(
+          parsed.dimensions.length,
+          parsed.dimensions.width,
+          parsed.dimensions.height,
+          parsed.quantity,
+          parsed.hasPrinting || false,
+          pricingConfig
+        );
+      }
     }
 
     // Generar respuesta

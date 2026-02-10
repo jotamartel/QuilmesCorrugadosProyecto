@@ -4,16 +4,60 @@
  */
 
 import type { PricingConfig } from '@/lib/types/database';
+import { createAdminClient } from '@/lib/supabase/admin';
+
+/**
+ * Obtiene la configuración de precios activa desde la base de datos
+ * Esta función debe usarse en el servidor (API routes, server components)
+ */
+export async function getActivePricingConfig(): Promise<PricingConfig | null> {
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from('pricing_config')
+      .select('*')
+      .eq('is_active', true)
+      .order('valid_from', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error || !data) {
+      console.error('Error fetching active pricing config:', error);
+      return null;
+    }
+
+    return data as PricingConfig;
+  } catch (error) {
+    console.error('Error in getActivePricingConfig:', error);
+    return null;
+  }
+}
 
 /**
  * Obtiene el precio por m² según el volumen total
- * - Hasta 5.000 m²: precio estándar ($700)
- * - Más de 5.000 m²: precio por volumen ($670)
+ * - Menos de 1.000 m²: no aplica (error)
+ * - Entre 1.000 y min_m2_per_model: precio con recargo (price_per_m2_below_minimum)
+ * - Entre min_m2_per_model y volume_threshold_m2: precio estándar
+ * - Más de volume_threshold_m2: precio por volumen
  */
 export function getPricePerM2(totalM2: number, config: PricingConfig): number {
-  return totalM2 >= config.volume_threshold_m2
-    ? config.price_per_m2_volume
-    : config.price_per_m2_standard;
+  // Pedidos menores a 1.000 m² no se permiten
+  if (totalM2 < 1000) {
+    return config.price_per_m2_standard; // Fallback, pero no debería llegar aquí
+  }
+  
+  // Pedidos entre 1.000 y min_m2_per_model: precio con recargo
+  if (totalM2 >= 1000 && totalM2 < config.min_m2_per_model) {
+    return config.price_per_m2_below_minimum || config.price_per_m2_standard * 1.20;
+  }
+  
+  // Pedidos >= volume_threshold_m2: precio por volumen
+  if (totalM2 >= config.volume_threshold_m2) {
+    return config.price_per_m2_volume;
+  }
+  
+  // Pedidos >= min_m2_per_model pero < volume_threshold_m2: precio estándar
+  return config.price_per_m2_standard;
 }
 
 /**

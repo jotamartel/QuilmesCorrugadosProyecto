@@ -4,6 +4,8 @@ import { Trash2, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { BoxTemplateDownload } from './BoxTemplateDownload';
 import { DesignUploader } from './DesignUploader';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
+import { getPricePerM2 } from '@/lib/utils/pricing';
+import type { PricingConfig } from '@/lib/types/database';
 
 export interface BoxItemData {
   id: string;
@@ -41,13 +43,13 @@ interface BoxItemFormProps {
   calculations: BoxCalculations | null;
 }
 
-const DEFAULT_PRICE_STANDARD = 700;
-const DEFAULT_PRICE_VOLUME = 670;
-const VOLUME_THRESHOLD = 5000;
-const MIN_TOTAL_SQM = 3000;
 const MAX_LENGTH_PLUS_WIDTH = 1200;
 
-export function calculateBoxItem(box: BoxItemData): BoxCalculations | null {
+// NOTA: Esta función NO debe usar valores por defecto hardcodeados.
+// Si no hay configuración disponible, debe retornar null y el componente
+// debe manejar el caso mostrando un mensaje de error o cargando.
+
+export function calculateBoxItem(box: BoxItemData, pricingConfig?: PricingConfig | null): BoxCalculations | null {
   const { length_mm, width_mm, height_mm, quantity } = box;
 
   // Validar dimensiones mínimas
@@ -67,10 +69,18 @@ export function calculateBoxItem(box: BoxItemData): BoxCalculations | null {
 
   const unfolded = calculateUnfolded(length_mm, width_mm, height_mm);
   const totalSqm = calculateTotalM2(unfolded.m2, quantity);
-  const pricePerM2 = totalSqm >= VOLUME_THRESHOLD ? DEFAULT_PRICE_VOLUME : DEFAULT_PRICE_STANDARD;
+  
+  // REQUERIDO: La configuración de precios debe venir siempre desde la base de datos
+  // No usar valores por defecto hardcodeados
+  if (!pricingConfig) {
+    return null; // No calcular si no hay configuración
+  }
+  
+  const pricePerM2 = getPricePerM2(totalSqm, pricingConfig);
+  
   const subtotal = Math.round(totalSqm * pricePerM2 * 100) / 100;
   const unitPrice = quantity > 0 ? Math.round((subtotal / quantity) * 100) / 100 : 0;
-  const minQuantityFor3000m2 = Math.ceil(MIN_TOTAL_SQM / unfolded.m2);
+  const minQuantityFor3000m2 = Math.ceil(pricingConfig.min_m2_per_model / unfolded.m2);
 
   return {
     sheetWidth: unfolded.unfoldedWidth,
@@ -81,7 +91,7 @@ export function calculateBoxItem(box: BoxItemData): BoxCalculations | null {
     unitPrice,
     subtotal,
     minQuantityFor3000m2,
-    meetsMinimum: totalSqm >= MIN_TOTAL_SQM,
+    meetsMinimum: totalSqm >= pricingConfig.min_m2_per_model,
   };
 }
 

@@ -420,35 +420,35 @@ Ejemplo: 500`;
 
             responseMessage = getQuoteMessage(dimensions, quantity, hasPrinting, quote);
             quoteData = { total: quote.total, totalM2: quote.totalM2 };
+
+            // Crear lead en public_quotes
+            await createWhatsAppLead({
+              phoneNumber,
+              clientName: state.clientName,
+              companyName: state.companyName,
+              clientEmail: state.clientEmail,
+              clientType: state.clientType,
+              dimensions,
+              quantity,
+              hasPrinting,
+              quote,
+            });
+
+            // Notificar al equipo con datos del cliente
+            await sendNotification({
+              type: 'lead_with_contact',
+              origin: 'WhatsApp',
+              box: dimensions,
+              quantity,
+              totalArs: quote.total,
+              contact: {
+                phone: phoneNumber,
+                name: state.clientName,
+                email: state.clientEmail,
+                company: state.companyName,
+              },
+            });
           }
-
-          // Crear lead en public_quotes
-          await createWhatsAppLead({
-            phoneNumber,
-            clientName: state.clientName,
-            companyName: state.companyName,
-            clientEmail: state.clientEmail,
-            clientType: state.clientType,
-            dimensions,
-            quantity,
-            hasPrinting,
-            quote,
-          });
-
-          // Notificar al equipo con datos del cliente
-          await sendNotification({
-            type: 'lead_with_contact',
-            origin: 'WhatsApp',
-            box: dimensions,
-            quantity,
-            totalArs: quote.total,
-            contact: {
-              phone: phoneNumber,
-              name: state.clientName,
-              email: state.clientEmail,
-              company: state.companyName,
-            },
-          });
         }
       }
       // Ya cotizado, esperando confirmacion

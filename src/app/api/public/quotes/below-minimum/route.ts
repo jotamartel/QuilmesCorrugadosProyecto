@@ -12,6 +12,12 @@ import type { PricingConfig } from '@/lib/types/database';
 interface BelowMinimumRequest {
   quote_id: string;
   requested_quantity: number;
+  // Datos de entrega (requeridos)
+  address: string;
+  city: string;
+  province: string;
+  postal_code?: string | null;
+  distance_km?: number | null;
 }
 
 export async function POST(request: NextRequest) {
@@ -26,6 +32,14 @@ export async function POST(request: NextRequest) {
 
     if (!body.requested_quantity || body.requested_quantity < 1) {
       return NextResponse.json({ error: 'La cantidad debe ser mayor a 0' }, { status: 400 });
+    }
+
+    // Validar datos de entrega requeridos
+    if (!body.address || !body.city || !body.province) {
+      return NextResponse.json(
+        { error: 'Los datos de entrega son requeridos (dirección, ciudad y provincia)' },
+        { status: 400 }
+      );
     }
 
     // Obtener la cotización original
@@ -106,6 +120,12 @@ export async function POST(request: NextRequest) {
         accepted_below_minimum_terms: true,
         requested_contact: true,
         status: 'pending',
+        // Actualizar datos de entrega
+        address: body.address.trim(),
+        city: body.city.trim(),
+        province: body.province,
+        postal_code: body.postal_code?.trim() || null,
+        distance_km: body.distance_km || null,
       })
       .eq('id', body.quote_id)
       .select()
@@ -135,7 +155,7 @@ export async function POST(request: NextRequest) {
         email: originalQuote.requester_email,
         phone: originalQuote.requester_phone,
         company: originalQuote.requester_company,
-        notes: `⚠️ PEDIDO MENOR AL MÍNIMO (${totalSqm.toFixed(2)}m²)\n\nCantidad solicitada: ${body.requested_quantity} cajas\nPrecio con recargo aplicado: ${pricePerM2BelowMinimum.toLocaleString('es-AR')} $/m²\n\nEl cliente aceptó las condiciones especiales (sin envío gratis, coordinación de producción).`,
+        notes: `⚠️ PEDIDO MENOR AL MÍNIMO (${totalSqm.toFixed(2)}m²)\n\nCantidad solicitada: ${body.requested_quantity} cajas\nPrecio con recargo aplicado: ${pricePerM2BelowMinimum.toLocaleString('es-AR')} $/m²\n\nDirección de entrega:\n${body.address}\n${body.city}, ${body.province}${body.postal_code ? ` (CP: ${body.postal_code})` : ''}${body.distance_km ? `\nDistancia: ${body.distance_km} km` : ''}\n\nEl cliente aceptó las condiciones especiales (sin envío gratis, coordinación de producción).`,
       },
     }).catch(err => {
       console.error('Error sending below minimum notification:', err);

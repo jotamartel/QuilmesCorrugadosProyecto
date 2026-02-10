@@ -141,11 +141,10 @@ export function PriceSummary({
             </p>
             <p className="text-sm text-yellow-700 mt-1">
               Actualmente tenés {totalSqm.toLocaleString('es-AR', { minimumFractionDigits: 2 })} m².
-              Podés continuar con precio con recargo.
             </p>
           </div>
-          {/* Botón para solicitar contacto si se puede fabricar en hueco de producción */}
-          {onBelowMinimum && (
+          {/* Botón para solicitar contacto si se puede fabricar en hueco de producción - solo en paso 2 (después de revelar precio) */}
+          {onBelowMinimum && showPrice && (
             <button
               type="button"
               onClick={onBelowMinimum}

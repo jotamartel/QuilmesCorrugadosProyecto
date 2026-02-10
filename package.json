@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "migration:show": "tsx scripts/show-migration.ts",
-    "migration:apply": "tsx scripts/apply-migration.ts"
+    "migration:apply": "tsx scripts/apply-migration.ts",
+    "migration:verify": "tsx scripts/verify-migrations-vercel.ts",
+    "migration:verify:local": "tsx scripts/verify-migrations-env.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
@@ -38,6 +40,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.182.0",
+    "dotenv": "^17.2.4",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "pg": "^8.17.0",

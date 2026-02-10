@@ -364,7 +364,7 @@ export function BoxItemForm({
                 <strong>{calculations.minQuantityFor3000m2.toLocaleString('es-AR')}</strong> unidades.
               </p>
               <p className="text-xs text-yellow-700 mt-1">
-                Podés cotizar desde 1.000 m² con precio con recargo. Verás la opción al completar tus datos.
+                Podés cotizar desde 1.000 m², la producción estará sujeta a disponibilidad.
               </p>
             </div>
           )}

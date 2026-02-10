@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, AlertCircle, Loader2, Send } from 'lucide-react';
+import { X, AlertCircle, Loader2, Send, CheckCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 
@@ -35,6 +35,7 @@ export function BelowMinimumModal({
   const [quantity, setQuantity] = useState<number>(originalQuantity);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   // Calcular m2 por caja
   const unfolded = calculateUnfolded(boxDimensions.length_mm, boxDimensions.width_mm, boxDimensions.height_mm);
@@ -54,6 +55,7 @@ export function BelowMinimumModal({
     if (isOpen) {
       setQuantity(originalQuantity);
       setError(null);
+      setSuccess(false);
     }
   }, [isOpen, originalQuantity]);
 
@@ -87,8 +89,14 @@ export function BelowMinimumModal({
         throw new Error(data.error || 'Error al procesar la solicitud');
       }
 
-      onSuccess();
-      onClose();
+      // Mostrar estado de éxito
+      setSuccess(true);
+      
+      // Llamar a onSuccess después de un breve delay
+      setTimeout(() => {
+        onSuccess();
+        onClose();
+      }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al procesar la solicitud');
     } finally {
@@ -130,8 +138,26 @@ export function BelowMinimumModal({
           </div>
 
           {/* Content */}
-          <form onSubmit={handleSubmit}>
-            <div className="px-6 py-4 space-y-4">
+          {success ? (
+            /* Estado de éxito */
+            <div className="px-6 py-8 text-center">
+              <div className="flex flex-col items-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle className="w-10 h-10 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    ¡Solicitud enviada con éxito!
+                  </h3>
+                  <p className="text-sm text-gray-600 max-w-md">
+                    Hemos recibido tu solicitud. Estaremos teniendo en cuenta tu pedido al momento de programar las producciones de las próximas semanas y te contactaremos para coordinar el pago de la seña y ultimar detalles.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit}>
+              <div className="px-6 py-4 space-y-4">
               {/* Información de la caja */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm font-medium text-gray-700 mb-2">Medidas de la caja</p>
@@ -206,37 +232,38 @@ export function BelowMinimumModal({
                   <p className="text-sm text-red-600">{error}</p>
                 </div>
               )}
-            </div>
+              </div>
 
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                disabled={loading}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={!isValid || loading}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#002E55] rounded-lg hover:bg-[#001a33] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Enviando...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    Quiero que me contacten
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={loading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!isValid || loading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-[#002E55] rounded-lg hover:bg-[#001a33] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      Quiero que me contacten
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     </div>

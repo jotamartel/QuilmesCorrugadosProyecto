@@ -100,9 +100,9 @@ export function BelowMinimumModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Overlay */}
+      {/* Overlay con blur */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-white/80 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
@@ -176,10 +176,6 @@ export function BelowMinimumModal({
                     <span className="font-medium">{totalSqm.toFixed(2)} m²</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Precio por m²:</span>
-                    <span className="font-medium">{formatCurrency(pricePerM2BelowMinimum)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Precio unitario:</span>
                     <span className="font-medium">{formatCurrency(unitPrice)}</span>
                   </div>
@@ -197,7 +193,6 @@ export function BelowMinimumModal({
                   <div className="text-sm text-yellow-800">
                     <p className="font-medium mb-1">Condiciones especiales:</p>
                     <ul className="list-disc list-inside space-y-1 text-yellow-700">
-                      <li>Este pedido tiene un precio con recargo por ser menor al mínimo</li>
                       <li>No aplica envío gratis - deberás abonar el envío o coordinar retiro en fábrica</li>
                       <li>Te contactaremos si encontramos un hueco en la producción para tomar tu pedido</li>
                     </ul>

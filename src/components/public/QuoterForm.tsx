@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { ArrowLeft, ArrowRight, Loader2, Plus, Eye } from 'lucide-react';
 import { PriceSummary } from './PriceSummary';
 import { BoxItemForm, BoxItemData, BoxCalculations, calculateBoxItem } from './BoxItemForm';
+import { BelowMinimumModal } from './BelowMinimumModal';
 import type { TaxCondition, BuenosAiresCity } from '@/lib/types/database';
 import { ARGENTINE_PROVINCES, FREE_SHIPPING_MAX_KM } from '@/lib/types/database';
 import { trackEvent } from '@/lib/utils/tracking';
@@ -90,6 +91,8 @@ export function QuoterForm() {
   const [priceRevealed, setPriceRevealed] = useState(false);
   const [revealingPrice, setRevealingPrice] = useState(false);
   const [leadId, setLeadId] = useState<string | null>(null);
+  const [showBelowMinimumModal, setShowBelowMinimumModal] = useState(false);
+  const [pricingConfig, setPricingConfig] = useState<{ price_per_m2_below_minimum: number; min_m2_per_model: number } | null>(null);
   const quoteStartedTracked = useRef(false);
   const quoterViewedTracked = useRef(false);
 
@@ -136,6 +139,27 @@ export function QuoterForm() {
       quoteStartedTracked.current = true;
     }
   }, [boxes]);
+
+  // Cargar configuración de precios
+  useEffect(() => {
+    const fetchPricingConfig = async () => {
+      try {
+        const response = await fetch('/api/config/pricing');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.price_per_m2_below_minimum && data.min_m2_per_model) {
+            setPricingConfig({
+              price_per_m2_below_minimum: data.price_per_m2_below_minimum,
+              min_m2_per_model: data.min_m2_per_model,
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error loading pricing config:', err);
+      }
+    };
+    fetchPricingConfig();
+  }, []);
 
   // Cargar ciudades cuando la provincia es Buenos Aires o CABA
   useEffect(() => {
@@ -211,10 +235,10 @@ export function QuoterForm() {
     };
   }, [boxCalculations, boxes]);
 
-  // Validación del paso 1 - todas las cajas deben cumplir el mínimo
+  // Validación del paso 1 - debe cumplir mínimo de 1000 m² (3000 m² recomendado)
   const isStep1Valid = useMemo(() => {
-    return totals.allMeetMinimum && boxes.length > 0;
-  }, [totals.allMeetMinimum, boxes.length]);
+    return totals.totalSqm >= 1000 && boxes.length > 0;
+  }, [totals.totalSqm, boxes.length]);
 
   // Validación del paso 2 - datos requeridos para ver cotización
   const isStep2DataComplete = useMemo(() => {
@@ -291,7 +315,7 @@ export function QuoterForm() {
 
   // Revelar precio y registrar lead
   const handleRevealPrice = async () => {
-    if (!isStep2DataComplete || !totals.allMeetMinimum) return;
+    if (!isStep2DataComplete || totals.totalSqm < 1000) return;
 
     setRevealingPrice(true);
     setError(null);
@@ -357,7 +381,7 @@ export function QuoterForm() {
   };
 
   const handleSubmit = async () => {
-    if (!isStep2Valid || !totals.allMeetMinimum) return;
+    if (!isStep2Valid || totals.totalSqm < 1000) return;
 
     setSubmitting(true);
     setError(null);
@@ -525,7 +549,7 @@ export function QuoterForm() {
               className="w-full px-4 py-3 bg-[#002E55] hover:bg-[#001a33] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
             >
               {!isStep1Valid ? (
-                'Completá todas las cajas con el mínimo requerido'
+                totals.totalSqm > 0 && totals.totalSqm < 1000 ? 'Mínimo requerido: 1.000 m²' : 'Completá todas las cajas'
               ) : (
                 <>
                   Continuar
@@ -948,10 +972,34 @@ export function QuoterForm() {
           distanceKm={clientData.distance_km}
           showPrice={priceRevealed}
           onRequestContact={priceRevealed ? handleSubmit : undefined}
+          onBelowMinimum={priceRevealed && totals.totalSqm < (pricingConfig?.min_m2_per_model || 3000) && totals.totalSqm >= 1000 ? () => setShowBelowMinimumModal(true) : undefined}
           submitting={submitting}
+          minM2PerModel={pricingConfig?.min_m2_per_model || 3000}
         />
       </div>
       </div>
+
+      {/* Modal para pedidos menores al mínimo */}
+      {leadId && pricingConfig && boxes.length > 0 && (
+        <BelowMinimumModal
+          isOpen={showBelowMinimumModal}
+          onClose={() => setShowBelowMinimumModal(false)}
+          quoteId={leadId}
+          boxDimensions={{
+            length_mm: boxes[0].length_mm,
+            width_mm: boxes[0].width_mm,
+            height_mm: boxes[0].height_mm,
+          }}
+          originalQuantity={boxes[0].quantity}
+          originalTotalSqm={totals.totalSqm}
+          pricePerM2BelowMinimum={pricingConfig.price_per_m2_below_minimum}
+          minM2PerModel={pricingConfig.min_m2_per_model}
+          onSuccess={() => {
+            // Recargar para mostrar la cotización actualizada
+            window.location.reload();
+          }}
+        />
+      )}
     </div>
   );
 }

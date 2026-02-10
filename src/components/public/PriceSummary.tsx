@@ -1,6 +1,6 @@
 'use client';
 
-import { Package, Clock, Truck, Send, Loader2 } from 'lucide-react';
+import { Package, Clock, Truck, Send, Loader2, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { BoxItemData, BoxCalculations } from './BoxItemForm';
 
@@ -12,7 +12,9 @@ interface PriceSummaryProps {
   distanceKm?: number | null;
   showPrice?: boolean; // Si es false, oculta los precios hasta completar datos
   onRequestContact?: () => void; // Callback para "Quiero que me contacten"
+  onBelowMinimum?: () => void; // Callback para "¿Necesitas menos m²?"
   submitting?: boolean; // Estado de envío
+  minM2PerModel?: number; // Mínimo m² por modelo para mostrar el botón
 }
 
 export function PriceSummary({
@@ -23,7 +25,9 @@ export function PriceSummary({
   distanceKm,
   showPrice = true,
   onRequestContact,
+  onBelowMinimum,
   submitting = false,
+  minM2PerModel = 3000,
 }: PriceSummaryProps) {
   // Calcular totales
   const validCalculations = boxCalculations.filter((c): c is BoxCalculations => c !== null);
@@ -118,15 +122,25 @@ export function PriceSummary({
         )}
       </div>
 
-      {/* Mensaje de mínimo obligatorio no alcanzado */}
-      {isBelowMinimum ? (
+      {/* Mensaje de mínimo no alcanzado */}
+      {isBelowMinimum && totalSqm < 1000 ? (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
           <p className="text-red-700 font-medium">
-            Pedido mínimo obligatorio: 3.000 m²
+            Pedido mínimo: 1.000 m²
           </p>
           <p className="text-sm text-red-600 mt-1">
             Actualmente tenés {totalSqm.toLocaleString('es-AR', { minimumFractionDigits: 2 })} m².
             Aumentá la cantidad de cajas para continuar.
+          </p>
+        </div>
+      ) : isBelowMinimum && totalSqm >= 1000 ? (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+          <p className="text-yellow-800 font-medium">
+            Pedido menor al mínimo recomendado: 3.000 m²
+          </p>
+          <p className="text-sm text-yellow-700 mt-1">
+            Actualmente tenés {totalSqm.toLocaleString('es-AR', { minimumFractionDigits: 2 })} m².
+            Podés continuar con precio con recargo.
           </p>
         </div>
       ) : !showPrice ? (
@@ -178,6 +192,18 @@ export function PriceSummary({
                   Quiero que me contacten
                 </>
               )}
+            </button>
+          )}
+
+          {/* Botón para pedidos menores al mínimo */}
+          {onBelowMinimum && totalSqm < minM2PerModel && totalSqm >= 1000 && (
+            <button
+              type="button"
+              onClick={onBelowMinimum}
+              className="w-full px-4 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors mt-3 shadow-md"
+            >
+              <AlertCircle className="w-4 h-4" />
+              ¿Necesitas menos m²?
             </button>
           )}
         </>

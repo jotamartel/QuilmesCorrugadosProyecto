@@ -269,12 +269,13 @@ export function BoxItemForm({
               }}
               placeholder={calculations ? `Mín. ${calculations.minQuantityFor3000m2.toLocaleString('es-AR')}` : ''}
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#4F6D87] focus:border-transparent text-base ${
-                calculations && !calculations.meetsMinimum ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                calculations && !calculations.meetsMinimum && calculations.totalSqm < 1000 ? 'border-red-400 bg-red-50' : calculations && !calculations.meetsMinimum ? 'border-yellow-400 bg-yellow-50' : 'border-gray-300'
               }`}
             />
             {calculations && (
-              <p className={`text-xs mt-1 ${calculations.meetsMinimum ? 'text-gray-400' : 'text-red-600 font-medium'}`}>
-                Mínimo obligatorio: {calculations.minQuantityFor3000m2.toLocaleString('es-AR')} uds para 3.000 m²
+              <p className={`text-xs mt-1 ${calculations.meetsMinimum ? 'text-gray-400' : 'text-yellow-600'}`}>
+                Recomendado: {calculations.minQuantityFor3000m2.toLocaleString('es-AR')} uds para 3.000 m²
+                {!calculations.meetsMinimum && calculations.totalSqm >= 1000 && ' (mínimo 1.000 m² con recargo)'}
               </p>
             )}
           </div>
@@ -357,11 +358,13 @@ export function BoxItemForm({
 
           {/* Mensaje de mínimo no alcanzado */}
           {calculations && !calculations.meetsMinimum && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-xs text-red-700">
-                <strong>Pedido mínimo obligatorio:</strong> Necesitás al menos{' '}
-                <strong>{calculations.minQuantityFor3000m2.toLocaleString('es-AR')}</strong> unidades
-                para alcanzar los 3.000 m² requeridos.
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-xs text-yellow-800">
+                <strong>Pedido menor al mínimo recomendado:</strong> Para alcanzar los 3.000 m² recomendados necesitás{' '}
+                <strong>{calculations.minQuantityFor3000m2.toLocaleString('es-AR')}</strong> unidades.
+              </p>
+              <p className="text-xs text-yellow-700 mt-1">
+                Podés cotizar desde 1.000 m² con precio con recargo. Verás la opción al completar tus datos.
               </p>
             </div>
           )}

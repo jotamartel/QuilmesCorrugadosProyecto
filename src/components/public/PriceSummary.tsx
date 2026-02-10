@@ -134,14 +134,27 @@ export function PriceSummary({
           </p>
         </div>
       ) : isBelowMinimum && totalSqm >= 1000 ? (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-          <p className="text-yellow-800 font-medium">
-            Pedido menor al mínimo recomendado: 3.000 m²
-          </p>
-          <p className="text-sm text-yellow-700 mt-1">
-            Actualmente tenés {totalSqm.toLocaleString('es-AR', { minimumFractionDigits: 2 })} m².
-            Podés continuar con precio con recargo.
-          </p>
+        <div className="space-y-3">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+            <p className="text-yellow-800 font-medium">
+              Pedido menor al mínimo recomendado: 3.000 m²
+            </p>
+            <p className="text-sm text-yellow-700 mt-1">
+              Actualmente tenés {totalSqm.toLocaleString('es-AR', { minimumFractionDigits: 2 })} m².
+              Podés continuar con precio con recargo.
+            </p>
+          </div>
+          {/* Botón para solicitar contacto si se puede fabricar en hueco de producción */}
+          {onBelowMinimum && (
+            <button
+              type="button"
+              onClick={onBelowMinimum}
+              className="w-full px-4 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors shadow-md"
+            >
+              <AlertCircle className="w-4 h-4" />
+              ¿Necesitas menos m²? Solicitar contacto
+            </button>
+          )}
         </div>
       ) : !showPrice ? (
         /* Mensaje cuando el precio está oculto (paso 1) */

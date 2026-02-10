@@ -373,8 +373,12 @@ export function QuoterForm() {
         clientType: clientData.client_type
       });
 
+      // Retornar el ID para poder usarlo después
+      return result.id;
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al procesar la solicitud');
+      return null;
     } finally {
       setRevealingPrice(false);
     }
@@ -972,7 +976,17 @@ export function QuoterForm() {
           distanceKm={clientData.distance_km}
           showPrice={priceRevealed}
           onRequestContact={priceRevealed ? handleSubmit : undefined}
-          onBelowMinimum={priceRevealed && totals.totalSqm < (pricingConfig?.min_m2_per_model || 3000) && totals.totalSqm >= 1000 ? () => setShowBelowMinimumModal(true) : undefined}
+          onBelowMinimum={totals.totalSqm < (pricingConfig?.min_m2_per_model || 3000) && totals.totalSqm >= 1000 ? async () => {
+            // Si el precio no está revelado, primero revelarlo
+            if (!priceRevealed && isStep2DataComplete) {
+              const newLeadId = await handleRevealPrice();
+              if (newLeadId) {
+                setShowBelowMinimumModal(true);
+              }
+            } else if (priceRevealed && leadId) {
+              setShowBelowMinimumModal(true);
+            }
+          } : undefined}
           submitting={submitting}
           minM2PerModel={pricingConfig?.min_m2_per_model || 3000}
         />

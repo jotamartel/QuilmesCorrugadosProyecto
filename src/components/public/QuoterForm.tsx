@@ -1005,7 +1005,7 @@ export function QuoterForm() {
       </div>
 
       {/* Modal para pedidos menores al mínimo */}
-      {leadId && pricingConfig && boxes.length > 0 && (
+      {leadId && pricingConfig && pricingConfig.price_per_m2_below_minimum !== null && boxes.length > 0 && (
         <BelowMinimumModal
           isOpen={showBelowMinimumModal}
           onClose={() => setShowBelowMinimumModal(false)}

@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { CheckCircle2, Package, Clock, MessageCircle, ArrowLeft, Loader2 } from 'lucide-react';
+import { CheckCircle2, Package, Clock, MessageCircle, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { WhatsAppButton } from '@/components/public/WhatsAppButton';
+import { BelowMinimumModal } from '@/components/public/BelowMinimumModal';
 import { formatCurrency } from '@/lib/utils/pricing';
 
 // Importar BoxPreview3D dinámicamente
@@ -58,16 +59,30 @@ export default function QuoteConfirmationPage() {
   const [quote, setQuote] = useState<PublicQuoteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showBelowMinimumModal, setShowBelowMinimumModal] = useState(false);
+  const [pricingConfig, setPricingConfig] = useState<{ price_per_m2_below_minimum: number; min_m2_per_model: number } | null>(null);
 
   useEffect(() => {
     async function fetchQuote() {
       try {
-        const response = await fetch(`/api/public/quotes/${id}`);
-        if (!response.ok) {
+        const [quoteRes, pricingRes] = await Promise.all([
+          fetch(`/api/public/quotes/${id}`),
+          fetch('/api/config/pricing'),
+        ]);
+
+        if (!quoteRes.ok) {
           throw new Error('Cotización no encontrada');
         }
-        const data = await response.json();
-        setQuote(data);
+        const quoteData = await quoteRes.json();
+        setQuote(quoteData);
+
+        if (pricingRes.ok) {
+          const pricingData = await pricingRes.json();
+          setPricingConfig({
+            price_per_m2_below_minimum: pricingData.price_per_m2_below_minimum || (pricingData.price_per_m2_standard || 700) * 1.20,
+            min_m2_per_model: pricingData.min_m2_per_model || 3000,
+          });
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error al cargar la cotización');
       } finally {
@@ -202,6 +217,17 @@ export default function QuoteConfirmationPage() {
                     <Clock className="w-4 h-4 text-gray-400" />
                     <span>Entrega estimada: <strong>{quote.estimated_days} días hábiles</strong></span>
                   </div>
+
+                  {/* Botón para pedidos menores al mínimo */}
+                  {quote.total_sqm >= 3000 && pricingConfig && (
+                    <button
+                      onClick={() => setShowBelowMinimumModal(true)}
+                      className="w-full mt-4 px-4 py-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg hover:bg-yellow-100 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                    >
+                      <AlertCircle className="w-4 h-4" />
+                      ¿Necesitas menos m²?
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -278,6 +304,28 @@ export default function QuoteConfirmationPage() {
 
       <LandingFooter />
       <WhatsAppButton />
+
+      {/* Modal para pedidos menores al mínimo */}
+      {quote && pricingConfig && (
+        <BelowMinimumModal
+          isOpen={showBelowMinimumModal}
+          onClose={() => setShowBelowMinimumModal(false)}
+          quoteId={quote.id}
+          boxDimensions={{
+            length_mm: quote.length_mm,
+            width_mm: quote.width_mm,
+            height_mm: quote.height_mm,
+          }}
+          originalQuantity={quote.quantity}
+          originalTotalSqm={quote.total_sqm}
+          pricePerM2BelowMinimum={pricingConfig.price_per_m2_below_minimum}
+          minM2PerModel={pricingConfig.min_m2_per_model}
+          onSuccess={() => {
+            // Recargar la cotización para ver el estado actualizado
+            window.location.reload();
+          }}
+        />
+      )}
     </div>
   );
 }

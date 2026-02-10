@@ -27,6 +27,7 @@ export interface PricingConfig {
   price_per_m2_volume: number;
   volume_threshold_m2: number;
   min_m2_per_model: number;
+  price_per_m2_below_minimum: number | null; // Precio con recargo para pedidos < 3000m2
   free_shipping_min_m2: number;
   free_shipping_max_km: number;
   production_days_standard: number;
@@ -926,6 +927,7 @@ export interface PublicQuote {
   // Diseño
   design_file_url: string | null;
   design_file_name: string | null;
+  design_preview_url: string | null;
 
   // Cálculos
   sheet_width_mm: number;
@@ -933,9 +935,15 @@ export interface PublicQuote {
   sqm_per_box: number;
   total_sqm: number;
   price_per_m2: number;
+  price_per_m2_applied: number | null; // Precio realmente aplicado (puede ser con recargo)
   unit_price: number;
   subtotal: number;
   estimated_days: number;
+
+  // Pedidos menores al mínimo
+  is_below_minimum: boolean;
+  requested_quantity_below_minimum: number | null;
+  accepted_below_minimum_terms: boolean;
 
   // Tracking
   source_ip: string | null;

@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
     // Parámetros de filtrado
     const status = searchParams.get('status');
     const requestedContact = searchParams.get('requested_contact');
+    const isBelowMinimum = searchParams.get('is_below_minimum');
     const source = searchParams.get('source'); // 'web' | 'whatsapp' | null (todos)
     const dateFrom = searchParams.get('date_from');
     const dateTo = searchParams.get('date_to');
@@ -42,6 +43,11 @@ export async function GET(request: NextRequest) {
         // Leads Web: requested_contact = false Y status != converted
         query = query.eq('requested_contact', false).neq('status', 'converted');
       }
+    }
+
+    // Filtrar por is_below_minimum si se especifica
+    if (isBelowMinimum !== null && isBelowMinimum !== undefined) {
+      query = query.eq('is_below_minimum', isBelowMinimum === 'true');
     }
 
     // Filtrar por source (origen: web o whatsapp)

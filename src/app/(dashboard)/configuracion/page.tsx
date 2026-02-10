@@ -43,6 +43,7 @@ export default function ConfiguracionPage() {
     price_per_m2_volume: 670,
     volume_threshold_m2: 5000,
     min_m2_per_model: 3000,
+    price_per_m2_below_minimum: 840, // Precio con recargo para pedidos < 3000m2
     free_shipping_min_m2: 4000,
     free_shipping_max_km: 60,
     production_days_standard: 7,
@@ -72,6 +73,7 @@ export default function ConfiguracionPage() {
           price_per_m2_volume: data.price_per_m2_volume,
           volume_threshold_m2: data.volume_threshold_m2,
           min_m2_per_model: data.min_m2_per_model,
+          price_per_m2_below_minimum: data.price_per_m2_below_minimum || (data.price_per_m2_standard * 1.20),
           free_shipping_min_m2: data.free_shipping_min_m2,
           free_shipping_max_km: data.free_shipping_max_km,
           production_days_standard: data.production_days_standard,
@@ -280,6 +282,14 @@ export default function ConfiguracionPage() {
                   onChange={(e) => setPricingFormData({ ...pricingFormData, min_m2_per_model: Number(e.target.value) })}
                   disabled={!editMode}
                   hint="m2 mínimos recomendados por modelo de caja"
+                />
+                <Input
+                  label="Precio menor al mínimo ($/m2)"
+                  type="number"
+                  value={pricingFormData.price_per_m2_below_minimum}
+                  onChange={(e) => setPricingFormData({ ...pricingFormData, price_per_m2_below_minimum: Number(e.target.value) })}
+                  disabled={!editMode}
+                  hint={`Actual: ${formatCurrency(pricingConfig?.price_per_m2_below_minimum || (pricingConfig?.price_per_m2_standard || 700) * 1.20 || 0)} - Precio con recargo para pedidos menores a ${pricingFormData.min_m2_per_model}m2`}
                 />
               </CardContent>
             </Card>

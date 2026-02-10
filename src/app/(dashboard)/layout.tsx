@@ -22,6 +22,7 @@ import {
   MessageCircle,
   Eye,
   TrendingUp,
+  AlertCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 import { AuthGuard, LogoutButton, useAuth } from '@/components/auth';
@@ -31,6 +32,7 @@ const navigation = [
   { name: 'Cotizaciones', href: '/cotizaciones', icon: FileText },
   { name: 'Cot. Web', href: '/cotizaciones-web', icon: Globe },
   { name: 'Leads Web', href: '/leads-web', icon: UserPlus },
+  { name: 'Menores al Mínimo', href: '/leads-web/below-minimum', icon: AlertCircle },
   { name: 'Cot. Wpp', href: '/whatsapp', icon: MessageCircle },
   { name: 'Ordenes', href: '/ordenes', icon: ShoppingCart },
   { name: 'Clientes', href: '/clientes', icon: Users },

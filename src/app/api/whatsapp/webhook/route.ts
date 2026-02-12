@@ -29,6 +29,10 @@ import { getPricePerM2, getProductionDays, getActivePricingConfig } from '@/lib/
 import { createClient } from '@/lib/supabase/server';
 import { classifyIntent, isGroqEnabled } from '@/lib/groq';
 import type { PricingConfig } from '@/lib/types/database';
+import {
+  upsertContactProfile,
+  linkConversationToClient,
+} from '@/lib/contact-matching';
 
 const PRINTING_INCREMENT = 0.15; // +15% por cada color de impresión
 
@@ -72,7 +76,8 @@ async function saveCommunication(
   phoneNumber: string,
   direction: 'inbound' | 'outbound',
   content: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
+  clientId?: string | null
 ) {
   try {
     const supabase = await createClient();
@@ -80,6 +85,7 @@ async function saveCommunication(
       channel: 'whatsapp',
       direction,
       content,
+      client_id: clientId || null,
       metadata: {
         phone: phoneNumber,
         ...metadata,
@@ -187,13 +193,26 @@ export async function POST(request: NextRequest) {
     const phoneNumber = from.replace('whatsapp:', '');
     const bodyLower = body.toLowerCase();
 
-    // Guardar mensaje entrante
+    // Omnicanalidad: upsert contact_profile y matching con client
+    const state = await getConversationState(phoneNumber);
+    let clientId: string | null = null;
+    try {
+      const result = await upsertContactProfile({
+        phoneNumber,
+        email: state.clientEmail,
+        displayName: state.clientName,
+        companyName: state.companyName,
+      });
+      clientId = result.clientId;
+      await linkConversationToClient(phoneNumber, clientId);
+    } catch (err) {
+      console.warn('[WhatsApp] Omnicanal: tablas no disponibles o error:', err);
+    }
+
+    // Guardar mensaje entrante con client_id si hay match
     await saveCommunication(phoneNumber, 'inbound', body, {
       hasMedia: hasMediaContent(formData),
-    });
-
-    // Obtener estado (ahora es async)
-    const state = await getConversationState(phoneNumber);
+    }, clientId);
     let responseMessage = '';
     let quoteData: { total: number; totalM2: number } | null = null;
     let needsAdvisor = false;
@@ -579,8 +598,8 @@ Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
     // Enviar respuesta
     await sendWhatsAppMessage({ to: from, body: responseMessage });
 
-    // Guardar mensaje saliente
-    await saveCommunication(phoneNumber, 'outbound', responseMessage, outboundMetadata);
+    // Guardar mensaje saliente con client_id
+    await saveCommunication(phoneNumber, 'outbound', responseMessage, outboundMetadata, clientId);
 
     // TwiML vacío
     return new NextResponse(

@@ -9,6 +9,8 @@
     "lint": "eslint",
     "migration:show": "tsx scripts/show-migration.ts",
     "migration:apply": "tsx scripts/apply-migration.ts",
+    "migration:omnicanal": "tsx scripts/apply-migration.ts 018_omnicanal_contact_profiles.sql",
+    "db:push": "./scripts/db-push-cli.sh",
     "migration:verify": "tsx scripts/verify-migrations-vercel.ts",
     "migration:verify:local": "tsx scripts/verify-migrations-env.ts"
   },

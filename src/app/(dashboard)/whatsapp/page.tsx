@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import {
   MessageCircle,
   Phone,
@@ -15,6 +16,12 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  User,
+  Building2,
+  Mail,
+  ExternalLink,
+  FileText,
+  ShoppingCart,
 } from 'lucide-react';
 
 interface WhatsAppConversation {
@@ -55,6 +62,24 @@ interface Stats {
   totalQuotedValue: number;
 }
 
+interface ContactProfile {
+  contact: {
+    phone_number: string;
+    display_name?: string;
+    company_name?: string;
+    email?: string;
+    client_id?: string;
+    preferred_channel?: string;
+    company_enrichment?: { description?: string; sector?: string; website?: string } | null;
+    last_order_at?: string;
+    total_orders?: number;
+    total_m2?: number;
+  };
+  client: { id: string; name: string; company?: string; email?: string } | null;
+  orders: Array<{ id: string; order_number: string; status: string; total: number; created_at: string }>;
+  quotes: Array<{ id: string; quote_number?: string; total?: number; status?: string; created_at: string }>;
+}
+
 type FilterType = 'all' | 'needs_advisor' | 'quoted' | 'unattended';
 
 export default function WhatsAppPage() {
@@ -63,6 +88,8 @@ export default function WhatsAppPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [profile, setProfile] = useState<ContactProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   // Filtros
   const [filter, setFilter] = useState<FilterType>('all');
@@ -101,6 +128,22 @@ export default function WhatsAppPage() {
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
+    }
+  };
+
+  const fetchProfile = async (phoneNumber: string) => {
+    setProfileLoading(true);
+    setProfile(null);
+    try {
+      const response = await fetch(`/api/contacts/profile?phone=${encodeURIComponent(phoneNumber)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setProfile(data);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    } finally {
+      setProfileLoading(false);
     }
   };
 
@@ -169,6 +212,9 @@ export default function WhatsAppPage() {
   useEffect(() => {
     if (selectedConversation) {
       fetchMessages(selectedConversation);
+      fetchProfile(selectedConversation);
+    } else {
+      setProfile(null);
     }
   }, [selectedConversation]);
 
@@ -350,9 +396,9 @@ export default function WhatsAppPage() {
       </div>
 
       {/* Main content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Conversations list */}
-        <div className="lg:col-span-1 bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="lg:col-span-4 bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="p-4 border-b border-gray-200">
             <h2 className="font-semibold text-gray-900">Conversaciones</h2>
           </div>
@@ -428,8 +474,10 @@ export default function WhatsAppPage() {
           </div>
         </div>
 
-        {/* Conversation detail */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Conversation detail + Profile */}
+        <div className="lg:col-span-8 flex flex-col lg:flex-row gap-6">
+          {/* Messages */}
+          <div className="flex-1 min-w-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
           {selectedConv ? (
             <>
               <div className="p-4 border-b border-gray-200 flex items-center justify-between">
@@ -526,10 +574,13 @@ export default function WhatsAppPage() {
                         ${selectedConv.total_quoted.toLocaleString('es-AR')}
                       </p>
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                    <Link
+                      href="/cotizaciones/nueva"
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
                       Convertir a cotización
                       <ArrowRight className="w-4 h-4" />
-                    </button>
+                    </Link>
                   </div>
                 </div>
               )}
@@ -540,6 +591,115 @@ export default function WhatsAppPage() {
                 <MessageCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
                 <p className="text-lg font-medium">Selecciona una conversación</p>
                 <p className="text-sm mt-1">Elige una conversación de la lista para ver los detalles</p>
+              </div>
+            </div>
+          )}
+          </div>
+
+          {/* Panel de perfil unificado */}
+          {selectedConv && (
+            <div className="lg:w-80 shrink-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-200 bg-gray-50">
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Perfil del contacto
+                </h3>
+              </div>
+              <div className="p-4 space-y-4 max-h-[500px] overflow-y-auto">
+                {profileLoading ? (
+                  <div className="py-8 text-center text-gray-500 text-sm">Cargando perfil...</div>
+                ) : profile ? (
+                  <>
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {profile.contact.display_name || formatPhone(profile.contact.phone_number)}
+                      </p>
+                      {profile.contact.company_name && (
+                        <p className="text-sm text-gray-600 flex items-center gap-1 mt-0.5">
+                          <Building2 className="w-3.5 h-3.5" />
+                          {profile.contact.company_name}
+                        </p>
+                      )}
+                      {profile.contact.email && (
+                        <p className="text-sm text-gray-600 flex items-center gap-1 mt-0.5">
+                          <Mail className="w-3.5 h-3.5" />
+                          {profile.contact.email}
+                        </p>
+                      )}
+                      {profile.contact.company_enrichment && (
+                        <div className="mt-2 p-2 bg-blue-50 rounded-lg text-xs text-gray-700">
+                          {profile.contact.company_enrichment.description && (
+                            <p className="mb-1">{profile.contact.company_enrichment.description}</p>
+                          )}
+                          {profile.contact.company_enrichment.sector && (
+                            <p className="text-blue-600">Sector: {profile.contact.company_enrichment.sector}</p>
+                          )}
+                          {profile.contact.company_enrichment.website && (
+                            <a
+                              href={profile.contact.company_enrichment.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                              <ExternalLink className="w-3 h-3" /> Sitio web
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {profile.contact.client_id && (
+                      <Link
+                        href={`/clientes/${profile.contact.client_id}`}
+                        className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium"
+                      >
+                        <User className="w-4 h-4" />
+                        Ver como cliente
+                        <ExternalLink className="w-3 h-3" />
+                      </Link>
+                    )}
+                    {profile.orders.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-2">
+                          <ShoppingCart className="w-4 h-4" />
+                          Últimas órdenes
+                        </h4>
+                        <ul className="space-y-1">
+                          {profile.orders.slice(0, 5).map((o) => (
+                            <li key={o.id} className="text-sm flex justify-between">
+                              <Link href={`/ordenes/${o.id}`} className="text-blue-600 hover:underline">
+                                {o.order_number}
+                              </Link>
+                              <span className="font-medium">${Number(o.total).toLocaleString('es-AR')}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {profile.quotes.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-2">
+                          <FileText className="w-4 h-4" />
+                          Cotizaciones
+                        </h4>
+                        <ul className="space-y-1">
+                          {profile.quotes.slice(0, 5).map((q) => (
+                            <li key={q.id} className="text-sm flex justify-between">
+                              <span>{q.quote_number || 'Cot.'}</span>
+                              <span className="font-medium">
+                                {q.total ? `$${Number(q.total).toLocaleString('es-AR')}` : '-'}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {profile.orders.length === 0 && profile.quotes.length === 0 && !profile.contact.client_id && (
+                      <p className="text-sm text-gray-500 italic">Sin historial de compras aún</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500 italic">Sin datos de perfil</p>
+                )}
               </div>
             </div>
           )}

@@ -4,6 +4,11 @@
  * O: npx tsx scripts/apply-migration.ts (aplica la última migración)
  */
 
+import * as dotenv from 'dotenv';
+import { resolve } from 'path';
+dotenv.config({ path: resolve(__dirname, '../.env.local') });
+dotenv.config({ path: resolve(__dirname, '../.env.vercel') });
+
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import pg from 'pg';

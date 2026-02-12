@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Menu, X } from 'lucide-react';
+import { useLenis } from 'lenis/react';
 
 const navItems = [
   { name: 'Inicio', href: '/' },
@@ -14,11 +15,24 @@ const navItems = [
   { name: 'Contacto', href: '/contacto' },
 ];
 
+const SHOW_HEADER_THRESHOLD = 80; // Solo mostrar header cuando scroll está cerca del top (hero)
+
 export function LandingHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [headerVisible, setHeaderVisible] = useState(true);
+
+  useLenis((lenis) => {
+    // Solo mostrar header en el hero (cerca del top), ocultar en el resto
+    // Evita que tape cuando el snap acomoda hacia arriba o al cargar con #cotizador
+    setHeaderVisible(lenis.scroll < SHOW_HEADER_THRESHOLD);
+  });
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+    <header
+      className={`fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100 transition-transform duration-300 ease-out ${
+        headerVisible ? 'translate-y-0' : '-translate-y-full'
+      }`}
+    >
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}

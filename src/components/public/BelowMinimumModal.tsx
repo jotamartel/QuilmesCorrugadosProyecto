@@ -179,7 +179,7 @@ export function BelowMinimumModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto" data-lenis-prevent>
       {/* Overlay con blur */}
       <div
         className="fixed inset-0 bg-white/80 backdrop-blur-sm transition-opacity"
@@ -188,7 +188,7 @@ export function BelowMinimumModal({
 
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="relative bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" data-lenis-prevent>
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <div className="flex items-center gap-3">
@@ -342,7 +342,7 @@ export function BelowMinimumModal({
                           required
                         />
                         {showCityDropdown && filteredCities.length > 0 && (
-                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto" data-lenis-prevent>
                             {filteredCities.map((cityItem) => (
                               <button
                                 key={cityItem.id}

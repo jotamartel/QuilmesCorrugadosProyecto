@@ -788,7 +788,7 @@ export function QuoterForm() {
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4F6D87] focus:border-transparent"
                         />
                         {showCityDropdown && filteredCities.length > 0 && (
-                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto" data-lenis-prevent>
                             {filteredCities.map((city) => (
                               <button
                                 key={city.id}

@@ -41,28 +41,33 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white">
       <LandingHeader />
 
-      {/* Hero Section */}
-      <section className="pt-24 pb-16 px-4 bg-gradient-to-br from-blue-50 to-slate-100">
-        <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
-            Cajas de cartón corrugado
-            <span className="text-[#002E55]"> a medida</span>
-          </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Cotizá online en segundos. Fábrica en Quilmes, entregas en todo el país.
-          </p>
-          <a
-            href="#cotizador"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#002E55] hover:bg-[#001a33] text-white font-medium rounded-lg transition-colors"
-          >
-            Cotizar ahora
-            <ArrowDown className="w-4 h-4" />
-          </a>
-        </div>
-      </section>
+      {/* Hero Section - wrapper con spacer para alinear debajo del header al hacer snap */}
+      <div data-snap-section>
+        <div className="h-16" aria-hidden />
+        <section className="pt-24 pb-16 px-4 bg-gradient-to-br from-blue-50 to-slate-100 -mt-16">
+          <div className="max-w-7xl mx-auto text-center">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
+              Cajas de cartón corrugado
+              <span className="text-[#002E55]"> a medida</span>
+            </h1>
+            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+              Cotizá online en segundos. Fábrica en Quilmes, entregas en todo el país.
+            </p>
+            <a
+              href="#cotizador"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#002E55] hover:bg-[#001a33] text-white font-medium rounded-lg transition-colors"
+            >
+              Cotizar ahora
+              <ArrowDown className="w-4 h-4" />
+            </a>
+          </div>
+        </section>
+      </div>
 
       {/* Benefits Section */}
-      <section className="py-12 px-4 bg-white border-b border-gray-100">
+      <div data-snap-section>
+        <div className="h-16" aria-hidden />
+        <section className="py-12 px-4 bg-white border-b border-gray-100 -mt-16">
         <div className="max-w-7xl mx-auto">
           <h2 className="sr-only">Por qué elegir Quilmes Corrugados</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -78,9 +83,12 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+      </div>
 
       {/* Quoter Section */}
-      <section id="cotizador" className="py-16 px-4 bg-gray-50">
+      <div data-snap-section>
+        <div className="h-16" aria-hidden />
+        <section id="cotizador" className="py-16 px-4 bg-gray-50 -mt-16">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-10">
             <h2 className="text-3xl font-bold text-gray-900 mb-3">Cotizá tu caja</h2>
@@ -92,9 +100,12 @@ export default function LandingPage() {
           <QuoterForm />
         </div>
       </section>
+      </div>
 
       {/* About Section */}
-      <section id="nosotros" className="py-16 px-4 bg-white">
+      <div data-snap-section>
+        <div className="h-16" aria-hidden />
+        <section id="nosotros" className="py-16 px-4 bg-white -mt-16">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl font-bold text-gray-900 mb-6">Sobre nosotros</h2>
           <p className="text-lg text-gray-600 mb-8">
@@ -118,6 +129,7 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+      </div>
 
       <LandingFooter />
       <WhatsAppButton />

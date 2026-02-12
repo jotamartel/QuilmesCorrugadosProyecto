@@ -176,10 +176,10 @@ export function BoxPreview3D({ length, width, height, autoRotate = true, designU
             designUrl={designUrl}
           />
 
-          {/* Controles */}
+          {/* Controles - zoom deshabilitado para que el scroll de la página funcione al pasar por encima */}
           <OrbitControls
             enablePan={false}
-            enableZoom={true}
+            enableZoom={false}
             minDistance={3}
             maxDistance={10}
             autoRotate={false}

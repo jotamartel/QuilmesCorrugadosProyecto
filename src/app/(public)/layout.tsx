@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { TrafficTracker } from '@/components/tracking/TrafficTracker';
+import { LenisProvider } from '@/components/providers/LenisProvider';
+import { LenisSnapSetup } from '@/components/providers/LenisSnapSetup';
 
 export const metadata: Metadata = {
   title: 'Fábrica de Cajas de Cartón Corrugado a Medida | Quilmes, Buenos Aires',
@@ -17,7 +19,10 @@ export default function PublicLayout({
   return (
     <>
       <TrafficTracker />
-      {children}
+      <LenisProvider>
+        <LenisSnapSetup />
+        {children}
+      </LenisProvider>
     </>
   );
 }

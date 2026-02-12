@@ -148,7 +148,7 @@ export function BoxItemForm({
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
       {/* Header */}
       <div
-        className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+        className="flex items-center justify-between p-3 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
         onClick={() => onToggleCollapse(box.id)}
       >
         <div className="flex items-center gap-3">
@@ -184,9 +184,9 @@ export function BoxItemForm({
 
       {/* Contenido expandible */}
       {!isCollapsed && (
-        <div className="p-4 space-y-4">
+        <div className="p-3 space-y-3">
           {/* Dimensiones */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Largo (mm)
@@ -368,7 +368,7 @@ export function BoxItemForm({
 
           {/* Mensaje de mínimo no alcanzado */}
           {calculations && !calculations.meetsMinimum && (
-            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
               <p className="text-xs text-yellow-800">
                 <strong>Pedido menor al mínimo recomendado:</strong> Para alcanzar los 3.000 m² recomendados necesitás{' '}
                 <strong>{calculations.minQuantityFor3000m2.toLocaleString('es-AR')}</strong> unidades.

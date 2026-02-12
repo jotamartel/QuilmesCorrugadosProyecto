@@ -85,14 +85,14 @@ export default function LandingPage() {
       </section>
       </div>
 
-      {/* Quoter Section */}
+      {/* Quoter Section - compacto para laptops (768-900px viewport) */}
       <div data-snap-section>
         <div className="h-16" aria-hidden />
-        <section id="cotizador" className="py-16 px-4 bg-gray-50 -mt-16">
+        <section id="cotizador" className="py-6 px-4 bg-gray-50 -mt-16">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl font-bold text-gray-900 mb-3">Cotizá tu caja</h2>
-            <p className="text-gray-600">
+          <div className="text-center mb-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">Cotizá tu caja</h2>
+            <p className="text-sm text-gray-600">
               Ingresá las dimensiones y cantidad. Obtendrás el precio al instante.
             </p>
           </div>

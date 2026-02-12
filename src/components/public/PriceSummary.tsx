@@ -41,8 +41,8 @@ export function PriceSummary({
 
   if (!hasValidBoxes) {
     return (
-      <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-        <div className="text-center text-gray-500 py-8">
+      <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
+        <div className="text-center text-gray-500 py-6">
           <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
           <p>Completá las dimensiones para ver tu pedido</p>
         </div>
@@ -51,9 +51,9 @@ export function PriceSummary({
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 space-y-4">
+    <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100 space-y-3">
       {/* Encabezado */}
-      <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
+      <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
         <Package className="w-5 h-5 text-[#002E55]" />
         <h3 className="font-semibold text-gray-900">
           {boxes.length === 1 ? 'Tu caja' : `Tus ${boxes.length} cajas`}
@@ -61,7 +61,7 @@ export function PriceSummary({
       </div>
 
       {/* Lista de cajas */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {boxes.map((box, index) => {
           const calc = boxCalculations[index];
           if (!calc) return null;
@@ -90,7 +90,7 @@ export function PriceSummary({
       </div>
 
       {/* Detalles técnicos totales */}
-      <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+      <div className="bg-gray-50 rounded-lg p-2.5 text-sm space-y-0.5">
         <div className="flex justify-between">
           <span className="text-gray-500">Total cajas:</span>
           <span className="font-medium">{totalQuantity.toLocaleString('es-AR')} unidades</span>
@@ -135,7 +135,7 @@ export function PriceSummary({
         </div>
       ) : isBelowMinimum && totalSqm >= 1000 ? (
         <div className="space-y-3">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center text-sm">
             <p className="text-yellow-800 font-medium">
               Pedido menor al mínimo recomendado: 3.000 m²
             </p>

@@ -17,8 +17,8 @@ const BoxPreview3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full aspect-[4/3] bg-gray-100 rounded-lg flex items-center justify-center">
-        <p className="text-gray-500">Cargando vista 3D...</p>
+      <div className="w-full aspect-[16/10] bg-gray-100 rounded-lg flex items-center justify-center">
+        <p className="text-gray-500 text-sm">Cargando vista 3D...</p>
       </div>
     ),
   }
@@ -480,9 +480,9 @@ export function QuoterForm() {
   const selectedBox = boxes[selectedBoxIndex] || boxes[0];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Progress - centrado arriba del grid */}
-      <div id="quoter-progress" className="flex items-center justify-center gap-3 max-w-xs mx-auto">
+      <div id="quoter-progress" className="flex items-center justify-center gap-2 max-w-xs mx-auto">
         <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
           step >= 1 ? 'bg-[#002E55] text-white' : 'bg-gray-200 text-gray-500'
         }`}>
@@ -496,12 +496,12 @@ export function QuoterForm() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:items-start">
         {/* Columna izquierda: Formulario */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Paso 1: Datos de las cajas */}
         {step === 1 && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* Lista de cajas */}
             {boxes.map((box, index) => (
               <BoxItemForm
@@ -521,7 +521,7 @@ export function QuoterForm() {
             <button
               type="button"
               onClick={handleAddBox}
-              className="w-full py-3 border-2 border-dashed border-gray-300 hover:border-[#002E55] text-gray-500 hover:text-[#002E55] rounded-xl flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-2 border-2 border-dashed border-gray-300 hover:border-[#002E55] text-gray-500 hover:text-[#002E55] rounded-xl flex items-center justify-center gap-2 transition-colors text-sm"
             >
               <Plus className="w-5 h-5" />
               Agregar otra medida de caja
@@ -529,7 +529,7 @@ export function QuoterForm() {
 
             {/* Resumen de totales - sin precio */}
             {boxes.length > 1 && (
-              <div className="bg-[#002E55] text-white rounded-xl p-4">
+              <div className="bg-[#002E55] text-white rounded-xl p-3">
                 <h4 className="font-medium mb-2">Resumen del pedido</h4>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">

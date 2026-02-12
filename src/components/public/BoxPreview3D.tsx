@@ -143,14 +143,14 @@ export function BoxPreview3D({ length, width, height, autoRotate = true, designU
   // Validar dimensiones mínimas
   if (length < 100 || width < 100 || height < 50) {
     return (
-      <div className="w-full aspect-[4/3] bg-gray-100 rounded-lg flex items-center justify-center">
+      <div className="w-full aspect-[16/10] bg-gray-100 rounded-lg flex items-center justify-center">
         <p className="text-gray-500 text-sm">Ingresá las dimensiones para ver la caja</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full aspect-[4/3] bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg overflow-hidden">
+    <div className="w-full aspect-[16/10] bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg overflow-hidden">
       <Canvas
         camera={{ position: [4, 3, 4], fov: 50 }}
         shadows

@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 4. Últimas órdenes (si hay client_id)
-    let orders: Awaited<ReturnType<typeof supabase.from<'orders'>>>['data'] = [];
+    let orders: Array<Record<string, unknown>> = [];
     if (clientId) {
       const { data } = await supabase
         .from('orders')

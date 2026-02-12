@@ -65,6 +65,7 @@ export function ChatWidget() {
   const [showRestorePrompt, setShowRestorePrompt] = useState(false);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [restoreChecked, setRestoreChecked] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const loadingMoreRef = useRef(false);
@@ -339,23 +340,29 @@ export function ChatWidget() {
             )}
           </div>
 
-          <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-white">
+          <div
+            className={`flex-shrink-0 border-t border-gray-200 bg-white transition-[padding] md:p-4 ${
+              isInputFocused ? 'p-2 md:p-4' : 'p-4'
+            }`}
+          >
             <div className="flex gap-2 items-stretch min-h-0">
               <input
                 ref={inputRef}
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setIsInputFocused(false)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                 placeholder="Escribí tu consulta..."
-                className="flex-1 min-w-0 px-4 py-3 pr-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                className="flex-1 min-w-0 px-4 py-2.5 md:py-3 pr-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
                 disabled={loading}
                 autoFocus
               />
               <button
                 onClick={sendMessage}
                 disabled={loading || !input.trim()}
-                className="flex-shrink-0 p-3 bg-[#25D366] hover:bg-[#20bd5a] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors self-center"
+                className="flex-shrink-0 p-2.5 md:p-3 bg-[#25D366] hover:bg-[#20bd5a] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors self-center"
                 aria-label="Enviar"
               >
                 <Send className="w-5 h-5" />
@@ -365,7 +372,9 @@ export function ChatWidget() {
               href={`https://wa.me/${WHATSAPP_NUMBER}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 flex items-center justify-center gap-2 text-sm text-green-600 hover:text-green-700"
+              className={`mt-2 flex items-center justify-center gap-2 text-sm text-green-600 hover:text-green-700 ${
+                isInputFocused ? 'hidden md:flex mt-0 md:mt-2' : ''
+              }`}
             >
               <MessageCircle className="w-4 h-4" />
               Continuar por WhatsApp

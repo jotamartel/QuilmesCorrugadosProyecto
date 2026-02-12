@@ -340,7 +340,7 @@ export function ChatWidget() {
           </div>
 
           <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-white">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-stretch min-h-0">
               <input
                 ref={inputRef}
                 type="text"
@@ -348,14 +348,15 @@ export function ChatWidget() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                 placeholder="Escribí tu consulta..."
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                className="flex-1 min-w-0 px-4 py-3 pr-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
                 disabled={loading}
                 autoFocus
               />
               <button
                 onClick={sendMessage}
                 disabled={loading || !input.trim()}
-                className="p-3 bg-[#25D366] hover:bg-[#20bd5a] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors"
+                className="flex-shrink-0 p-3 bg-[#25D366] hover:bg-[#20bd5a] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors self-center"
+                aria-label="Enviar"
               >
                 <Send className="w-5 h-5" />
               </button>

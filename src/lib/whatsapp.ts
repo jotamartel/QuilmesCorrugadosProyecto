@@ -245,17 +245,19 @@ export function parseBoxDimensions(message: string): {
   }
 
   const qtyPatterns = [
+    /(\d+)\s*[x×]\s*(\d+)\s*[x×]\s*(\d+)\s*[,\.;]?\s*(\d{2,})/i,
     /(\d{1,3}(?:\.\d{3})*|\d+)\s*(unidades|cajas|piezas|u\.)/i,
     /cantidad\s*:?\s*(\d{1,3}(?:\.\d{3})*|\d+)/i,
     /necesito\s*(\d{1,3}(?:\.\d{3})*|\d+)/i,
     /(\d{2,})\s+(?=\d+\s*[x×]\s*\d+\s*[x×]\s*\d+)/i,
+    /[,\.;]?\s*(\d{2,})\s*(?:mas|más|o\s*menos|unidades|cajas)?/i,
   ];
 
   let quantity: number | undefined;
   for (const pattern of qtyPatterns) {
     const match = text.match(pattern);
     if (match) {
-      quantity = Number(removeThousandsSeparator(match[1]));
+      quantity = Number(removeThousandsSeparator(match[4] || match[1]));
       break;
     }
   }

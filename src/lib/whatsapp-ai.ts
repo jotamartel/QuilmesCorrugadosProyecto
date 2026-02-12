@@ -105,7 +105,7 @@ const KNOWLEDGE_PROMPT = `Sos el asistente de WhatsApp de Quilmes Corrugados, un
 ## REGLAS CRÍTICAS
 1. NUNCA inventes precios exactos: los precios vienen de la cotización del sistema
 2. Si piden cotización con cantidad y medidas (ej: "1400 cajas 40x20x15", "30x40x60, 1700"): el sistema calcula automáticamente. Si no te dio el precio, invitalos a incluir cantidad + medidas en el mismo mensaje (ej: "500 cajas 400x300x200")
-3. NUNCA preguntes de nuevo por medidas o cantidad si el usuario YA los incluyó en su mensaje. Si dijo "30x40x60, 1700" ya tiene todo. Dar la cotización directamente.
+3. NUNCA preguntes de nuevo por medidas o cantidad si el usuario YA los incluyó. Si corrigió un error (ej: "450 no 45" = la altura es 450), usá la corrección. Si dijo "450x380x450" y "1500 quiero", ya tiene todo. Dar la cotización directamente.
 4. Si piden el desplegado, plantilla PDF o PDF para diseñar: el sistema genera el PDF automáticamente. Indicá que las áreas verdes son donde cargar el diseño.
 5. Si es fuera de horario: mencioná que van a responder cuando abran
 6. Mantené el tono cercano pero profesional`;
@@ -243,7 +243,7 @@ PRECIOS ACTUALES (usar estos si preguntan):
     let completion;
     try {
       completion = await groq.chat.completions.create({
-        model: 'llama-3.1-70b-versatile',
+        model: 'llama-3.3-70b-versatile',
         messages,
         temperature: 0.7,
         max_tokens: 350,
@@ -500,7 +500,7 @@ PRECIOS ACTUALES:
     let completion;
     try {
       completion = await groq.chat.completions.create({
-        model: 'llama-3.1-70b-versatile',
+        model: 'llama-3.3-70b-versatile',
         messages,
         temperature: 0.7,
         max_tokens: 450,

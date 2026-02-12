@@ -225,10 +225,12 @@ export function parseBoxDimensions(message: string): {
   const hasExplicitCm = /\b(cm|cent[ií]metros?)\b/i.test(text);
   let convertedFromCm = false;
 
+  // Usar la ÚLTIMA ocurrencia de dimensiones (correcciones del usuario: "450 no 45" → "450x380x450")
   for (const pattern of dimPatterns) {
-    const match = text.match(pattern);
-    if (match) {
-      let [, l, w, h] = match.map(Number);
+    const matches = [...text.matchAll(new RegExp(pattern.source, 'gi'))];
+    const lastMatch = matches[matches.length - 1];
+    if (lastMatch) {
+      let [, l, w, h] = lastMatch.map(Number);
 
       if (hasExplicitCm || (l < 100 && w < 100 && h < 100)) {
         l *= 10;
@@ -244,20 +246,23 @@ export function parseBoxDimensions(message: string): {
     }
   }
 
+  // Quantity: patrones específicos para no confundir con números de dimensiones (ej: 450 de "450x380x45")
   const qtyPatterns = [
     /(\d+)\s*[x×]\s*(\d+)\s*[x×]\s*(\d+)\s*[,\.;]?\s*(\d{2,})/i,
     /(\d{1,3}(?:\.\d{3})*|\d+)\s*(unidades|cajas|piezas|u\.)/i,
     /cantidad\s*:?\s*(\d{1,3}(?:\.\d{3})*|\d+)/i,
-    /necesito\s*(\d{1,3}(?:\.\d{3})*|\d+)/i,
+    /(\d{2,})\s+(?:quiero|necesito|unidades|cajas|piezas|mas|más|menos)/i,
+    /[,\.;]\s*(\d{2,})(?:\s|$)/,
     /(\d{2,})\s+(?=\d+\s*[x×]\s*\d+\s*[x×]\s*\d+)/i,
-    /[,\.;]?\s*(\d{2,})\s*(?:mas|más|o\s*menos|unidades|cajas)?/i,
   ];
 
   let quantity: number | undefined;
   for (const pattern of qtyPatterns) {
-    const match = text.match(pattern);
-    if (match) {
-      quantity = Number(removeThousandsSeparator(match[4] || match[1]));
+    const matches = [...text.matchAll(new RegExp(pattern.source, 'gi'))];
+    const lastMatch = matches[matches.length - 1];
+    if (lastMatch) {
+      const qtyStr = lastMatch[4] || lastMatch[1];
+      quantity = Number(removeThousandsSeparator(qtyStr));
       break;
     }
   }

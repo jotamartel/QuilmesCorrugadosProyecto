@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   sendWhatsAppMessage,
+  sendWhatsAppDocument,
   parseBoxDimensions,
   parseCompanyInfo,
   getConversationState,
@@ -33,6 +34,11 @@ import {
   upsertContactProfile,
   linkConversationToClient,
 } from '@/lib/contact-matching';
+import {
+  generateConversationalResponse,
+  isWhatsAppAIEnabled,
+  type BoxTemplateResponse,
+} from '@/lib/whatsapp-ai';
 
 const PRINTING_INCREMENT = 0.15; // +15% por cada color de impresión
 
@@ -213,9 +219,11 @@ export async function POST(request: NextRequest) {
     await saveCommunication(phoneNumber, 'inbound', body, {
       hasMedia: hasMediaContent(formData),
     }, clientId);
-    let responseMessage = '';
+    let responseMessage: string | BoxTemplateResponse = '';
     let quoteData: { total: number; totalM2: number } | null = null;
     let needsAdvisor = false;
+    /** Con impresión: enviar desplegado PDF inmediatamente */
+    let boxTemplateToSend: { length: number; width: number; height: number } | null = null;
 
     // Detectar media (audio/imagen/video)
     if (hasMediaContent(formData)) {
@@ -439,6 +447,7 @@ Ejemplo: 500`;
 
             responseMessage = getQuoteMessage(dimensions, quantity, hasPrinting, quote);
             quoteData = { total: quote.total, totalM2: quote.totalM2 };
+            if (hasPrinting) boxTemplateToSend = dimensions;
 
             // Crear lead en public_quotes
             await createWhatsAppLead({
@@ -526,7 +535,7 @@ Ejemplo: 400x300x300`;
           responseMessage = getOutOfHoursMessage() + '\n\n---\n\n' + responseMessage;
         }
       }
-      // Estado desconocido - usar Groq
+      // Estado desconocido - clasificar y responder (IA conversacional cuando corresponde)
       else {
         if (isGroqEnabled()) {
           try {
@@ -549,11 +558,8 @@ Quilmes Corrugados - Lunes a Viernes 7:00 - 16:00`;
                 break;
 
               case 'advisor':
-              case 'question_other':
                 responseMessage = getAdvisorMessage();
                 needsAdvisor = true;
-
-                // Notificar al equipo con datos del cliente
                 await sendNotification({
                   type: 'advisor_request',
                   origin: 'WhatsApp',
@@ -566,17 +572,48 @@ Quilmes Corrugados - Lunes a Viernes 7:00 - 16:00`;
                 break;
 
               case 'question_shipping':
-                responseMessage = getShippingMessage(state.step === 'quoted');
+              case 'question_other':
+              case 'unknown':
+                // IA conversacional: respuestas detalladas con conocimiento del negocio
+                if (isWhatsAppAIEnabled()) {
+                  responseMessage = await generateConversationalResponse(body, phoneNumber, {
+                    conversationState: state.step,
+                    clientName: state.clientName,
+                    companyName: state.companyName,
+                    lastQuoteTotal: state.lastQuoteTotal,
+                    lastQuoteM2: state.lastQuoteM2,
+                  });
+                } else {
+                  responseMessage = classification.intent === 'question_shipping'
+                    ? getShippingMessage(state.step === 'quoted')
+                    : `No entendi tu mensaje. Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
+                }
                 break;
 
               default:
-                responseMessage = `No entendi tu mensaje.
+                if (isWhatsAppAIEnabled()) {
+                  responseMessage = await generateConversationalResponse(body, phoneNumber, {
+                    conversationState: state.step,
+                    clientName: state.clientName,
+                    companyName: state.companyName,
+                  });
+                } else {
+                  responseMessage = `No entendi tu mensaje.
 
 Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
+                }
             }
           } catch (error) {
             console.error('[WhatsApp] Error con Groq:', error);
-            responseMessage = 'Escribe "cotizar" para empezar una nueva cotizacion.';
+            if (isWhatsAppAIEnabled()) {
+              try {
+                responseMessage = await generateConversationalResponse(body, phoneNumber);
+              } catch {
+                responseMessage = 'Escribe "cotizar" para empezar una nueva cotizacion.';
+              }
+            } else {
+              responseMessage = 'Escribe "cotizar" para empezar una nueva cotizacion.';
+            }
           }
         } else {
           responseMessage = 'Escribe "cotizar" para empezar una nueva cotizacion.';
@@ -595,11 +632,36 @@ Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
       outboundMetadata.needsAdvisor = true;
     }
 
-    // Enviar respuesta
-    await sendWhatsAppMessage({ to: from, body: responseMessage });
+    // Manejar respuesta que puede ser string o BoxTemplateResponse
+    let textToSend: string;
+    let boxTemplateDims: BoxTemplateResponse['boxTemplate'] | null = null;
+
+    if (typeof responseMessage === 'object' && responseMessage !== null && 'boxTemplate' in responseMessage) {
+      textToSend = responseMessage.response;
+      boxTemplateDims = responseMessage.boxTemplate;
+    } else {
+      textToSend = responseMessage as string;
+    }
+
+    if (boxTemplateDims) {
+      const baseUrl =
+        process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://quilmescorrugados.com.ar');
+      const templateUrl = `${baseUrl}/api/box-template?length=${boxTemplateDims.length}&width=${boxTemplateDims.width}&height=${boxTemplateDims.height}`;
+      await sendWhatsAppDocument({ to: from, mediaUrl: templateUrl });
+    } else if (boxTemplateToSend) {
+      const baseUrl =
+        process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://quilmescorrugados.com.ar');
+      const templateUrl = `${baseUrl}/api/box-template?length=${boxTemplateToSend.length}&width=${boxTemplateToSend.width}&height=${boxTemplateToSend.height}`;
+      await sendWhatsAppDocument({ to: from, mediaUrl: templateUrl });
+    }
+
+    // Enviar mensaje de texto (WhatsApp no permite body junto con document, por eso se envía después)
+    await sendWhatsAppMessage({ to: from, body: textToSend });
 
     // Guardar mensaje saliente con client_id
-    await saveCommunication(phoneNumber, 'outbound', responseMessage, outboundMetadata, clientId);
+    await saveCommunication(phoneNumber, 'outbound', textToSend, outboundMetadata, clientId);
 
     // TwiML vacío
     return new NextResponse(

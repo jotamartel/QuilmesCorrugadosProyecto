@@ -15,10 +15,46 @@ export type ConversionEvent =
   | 'email_click'
   | 'contact_form_submitted'
   | 'product_page_view'
-  | 'faq_viewed';
+  | 'faq_viewed'
+  | 'chat_opened'
+  | 'chat_message_sent';
 
 interface EventData {
   [key: string]: unknown;
+}
+
+/** Mapeo para GA4 / Google Ads (Campaña SEM - docs/CAMPANA_SEM_GOOGLE_ADS.md) */
+function mapToGtagEvent(
+  eventType: ConversionEvent,
+  eventData?: EventData
+): { name: string; params?: Record<string, unknown> } | null {
+  const base = (eventData || {}) as Record<string, unknown>;
+  switch (eventType) {
+    case 'quote_submitted':
+      return {
+        name: 'quote_submitted',
+        params: { ...base, value: 2000, currency: 'ARS' },
+      };
+    case 'contact_form_submitted':
+      return {
+        name: 'contact_form_submitted',
+        params: { ...base, value: 1500, currency: 'ARS' },
+      };
+    case 'whatsapp_click':
+      return {
+        name: 'whatsapp_click',
+        params: { ...base, value: 500, currency: 'ARS' },
+      };
+    case 'phone_click':
+      return {
+        name: 'phone_click',
+        params: { ...base, value: 500, currency: 'ARS' },
+      };
+    case 'landing_page_view':
+      return { name: 'page_view', params: base };
+    default:
+      return { name: eventType, params: base };
+  }
 }
 
 /**
@@ -26,6 +62,14 @@ interface EventData {
  */
 export function trackEvent(eventType: ConversionEvent, eventData?: EventData) {
   if (typeof window === 'undefined') return;
+
+  // GA4 / Google Ads: enviar a gtag para conversiones y remarketing
+  if (typeof (window as any).gtag === 'function') {
+    const gtagEvent = mapToGtagEvent(eventType, eventData);
+    if (gtagEvent) {
+      (window as any).gtag('event', gtagEvent.name, gtagEvent.params);
+    }
+  }
 
   // Usar la función global si está disponible (desde TrafficTracker)
   if ((window as any).trackTrafficEvent) {

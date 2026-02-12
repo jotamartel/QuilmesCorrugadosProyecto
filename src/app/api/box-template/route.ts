@@ -8,12 +8,16 @@ export async function GET(request: NextRequest) {
   const width = parseInt(searchParams.get('width') || '300');
   const height = parseInt(searchParams.get('height') || '300');
 
-  // Validar dimensiones
-  if (length < 200 || length > 800 ||
-      width < 200 || width > 600 ||
-      height < 100 || height > 600) {
+  // Validar dimensiones (alineado con whatsapp: ancho+alto ≤1200, mínimos 200x200x100)
+  if (length < 200 || width < 200 || height < 100) {
     return NextResponse.json(
-      { error: 'Dimensiones fuera de rango permitido' },
+      { error: 'Dimensiones mínimas: 200×200×100 mm' },
+      { status: 400 }
+    );
+  }
+  if (width + height > 1200) {
+    return NextResponse.json(
+      { error: 'Ancho + Alto no puede superar 1200 mm (límite de plancha)' },
       { status: 400 }
     );
   }

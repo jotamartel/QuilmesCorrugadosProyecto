@@ -34,6 +34,11 @@ interface WhatsAppMessage {
   body: string;
 }
 
+interface WhatsAppDocumentMessage {
+  to: string;
+  mediaUrl: string;
+}
+
 // Tipo de cliente
 export type ClientType = 'particular' | 'empresa';
 
@@ -80,6 +85,36 @@ export async function sendWhatsAppMessage({ to, body }: WhatsAppMessage): Promis
     return true;
   } catch (error) {
     console.error('[WhatsApp] Error enviando mensaje:', error);
+    return false;
+  }
+}
+
+/**
+ * Envía un documento (PDF) por WhatsApp via Twilio.
+ * La URL debe ser pública y accesible (ej: /api/box-template?length=400&width=700&height=280).
+ */
+export async function sendWhatsAppDocument({
+  to,
+  mediaUrl,
+}: WhatsAppDocumentMessage): Promise<boolean> {
+  if (!client) {
+    console.log('[WhatsApp] Twilio no configurado. Documento pendiente:', { to, mediaUrl });
+    return false;
+  }
+
+  try {
+    const formattedTo = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
+    // WhatsApp no permite body junto con documentos; se envía el texto en un mensaje aparte
+    await client.messages.create({
+      from: TWILIO_NUMBER,
+      to: formattedTo,
+      mediaUrl: [mediaUrl],
+    });
+
+    console.log('[WhatsApp] Documento enviado a:', to);
+    return true;
+  } catch (error) {
+    console.error('[WhatsApp] Error enviando documento:', error);
     return false;
   }
 }
@@ -172,6 +207,8 @@ export function parseBoxDimensions(message: string): {
   width?: number;
   height?: number;
   quantity?: number;
+  /** true si se interpretaron como cm y se convirtieron a mm */
+  convertedFromCm?: boolean;
 } | null {
   const text = message.toLowerCase();
 
@@ -185,15 +222,19 @@ export function parseBoxDimensions(message: string): {
   let width: number | undefined;
   let height: number | undefined;
 
+  const hasExplicitCm = /\b(cm|cent[ií]metros?)\b/i.test(text);
+  let convertedFromCm = false;
+
   for (const pattern of dimPatterns) {
     const match = text.match(pattern);
     if (match) {
       let [, l, w, h] = match.map(Number);
 
-      if (l < 100 && w < 100 && h < 100) {
+      if (hasExplicitCm || (l < 100 && w < 100 && h < 100)) {
         l *= 10;
         w *= 10;
         h *= 10;
+        convertedFromCm = true;
       }
 
       length = l;
@@ -207,6 +248,7 @@ export function parseBoxDimensions(message: string): {
     /(\d{1,3}(?:\.\d{3})*|\d+)\s*(unidades|cajas|piezas|u\.)/i,
     /cantidad\s*:?\s*(\d{1,3}(?:\.\d{3})*|\d+)/i,
     /necesito\s*(\d{1,3}(?:\.\d{3})*|\d+)/i,
+    /(\d{2,})\s+(?=\d+\s*[x×]\s*\d+\s*[x×]\s*\d+)/i,
   ];
 
   let quantity: number | undefined;
@@ -219,7 +261,7 @@ export function parseBoxDimensions(message: string): {
   }
 
   if (length || width || height || quantity) {
-    return { length, width, height, quantity };
+    return { length, width, height, quantity, convertedFromCm };
   }
 
   return null;
@@ -585,6 +627,12 @@ Validez: 7 dias`;
 
   if (quote.totalM2 < 3000) {
     message += '\n\n(Pedido menor al minimo recomendado de 3000 m2)';
+  }
+
+  if (hasPrinting) {
+    message += `
+
+Te enviamos el desplegado de la caja en el siguiente mensaje para que incorpores tu diseño. Las areas verdes indican donde cargar el logo.`;
   }
 
   message += `

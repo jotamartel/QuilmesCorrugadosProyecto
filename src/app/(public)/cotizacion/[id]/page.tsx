@@ -7,7 +7,6 @@ import dynamic from 'next/dynamic';
 import { CheckCircle2, Package, Clock, MessageCircle, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
-import { WhatsAppButton } from '@/components/public/WhatsAppButton';
 import { BelowMinimumModal } from '@/components/public/BelowMinimumModal';
 import { formatCurrency } from '@/lib/utils/pricing';
 
@@ -306,7 +305,6 @@ export default function QuoteConfirmationPage() {
       </main>
 
       <LandingFooter />
-      <WhatsAppButton />
 
       {/* Modal para pedidos menores al mínimo */}
       {quote && pricingConfig && (

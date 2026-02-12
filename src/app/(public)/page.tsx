@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
-import { WhatsAppButton } from '@/components/public/WhatsAppButton';
 import { QuoterForm } from '@/components/public/QuoterForm';
 import { Factory, Truck, Ruler, Palette, ArrowDown } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
@@ -132,7 +131,6 @@ export default function LandingPage() {
       </div>
 
       <LandingFooter />
-      <WhatsAppButton />
     </div>
   );
 }

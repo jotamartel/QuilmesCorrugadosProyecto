@@ -54,9 +54,6 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...
 
 # Retell AI (opcional, para llamadas)
 RETELL_API_KEY=key_xxxxx
-
-# Google Analytics 4 (para campaña SEM y conversiones)
-NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 ```
 
 ### 3. Correr en desarrollo
@@ -93,10 +90,6 @@ npm run start
 | `/nosotros` | Historia de la empresa |
 | `/contacto` | Formulario y datos de contacto |
 | `/faq` | Preguntas frecuentes (12 Q&A con schema) |
-| `/cajas-ecommerce` | Landing SEM: e-commerce y envíos |
-| `/cajas-alimentos` | Landing SEM: delivery y gastronomía |
-| `/mayorista` | Landing SEM: mayorista y volumen |
-| `/cajas-mudanza` | Landing SEM: mudanzas y guardamuebles |
 
 ## API Pública
 La API está diseñada para ser consumida por LLMs:
@@ -105,14 +98,8 @@ La API está diseñada para ser consumida por LLMs:
 - `GET /api/v1/openapi.json` - OpenAPI spec
 - `GET /llms.txt` - Instrucciones para LLMs
 
-## Campaña SEM Google Ads
-- **Doc:** `docs/CAMPANA_SEM_GOOGLE_ADS.md`
-- **Tracking:** GA4 + gtag (`src/components/tracking/GoogleAnalytics.tsx`, `src/lib/utils/tracking.ts`)
-- **Conversiones:** quote_submitted ($2.000), contact_form_submitted ($1.500), whatsapp_click/phone_click ($500 ARS)
-- **Landings:** `/cajas-ecommerce`, `/cajas-alimentos`, `/mayorista`, `/cajas-mudanza`
-
 ## Archivos Clave Modificados Recientemente
-- `src/app/layout.tsx` - SEO metadata, schemas, favicon, GoogleAnalytics
+- `src/app/layout.tsx` - SEO metadata, schemas, favicon
 - `src/app/sitemap.ts` - Sitemap dinámico
 - `src/app/robots.ts` - Robots.txt dinámico
 - `src/components/public/DesignUploader.tsx` - Fix pdfjs-dist render
@@ -133,7 +120,6 @@ La API está diseñada para ser consumida por LLMs:
 ## Pendientes / Nice-to-have
 - [ ] Testimonios de clientes
 - [ ] Galería de productos con fotos reales
-- [x] Google Analytics (GA4 + conversiones implementado)
-- [x] GA4 configurado: `G-5JLDNYXNB2` (agregar en Vercel dashboard si falta en producción)
+- [ ] Google Analytics
 - [ ] Google Search Console verification
 - [ ] WhatsApp Business API integration

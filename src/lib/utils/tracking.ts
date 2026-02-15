@@ -23,6 +23,57 @@ interface EventData {
   [key: string]: unknown;
 }
 
+/** Mapeo para Meta Pixel (Facebook/Instagram Ads) */
+function mapToFbqEvent(
+  eventType: ConversionEvent,
+  eventData?: EventData
+): { event: string; params?: Record<string, unknown> } | null {
+  const base = (eventData || {}) as Record<string, unknown>;
+  const contentName = (base.section || base.sectionId || eventType) as string;
+  switch (eventType) {
+    case 'quote_submitted':
+      return {
+        event: 'Lead',
+        params: { content_name: 'quote_submitted', value: 2000, currency: 'ARS', ...base },
+      };
+    case 'contact_form_submitted':
+      return {
+        event: 'Lead',
+        params: { content_name: 'contact_form_submitted', value: 1500, currency: 'ARS', ...base },
+      };
+    case 'chat_message_sent':
+      return {
+        event: 'Lead',
+        params: { content_name: 'chat_message_sent', ...base },
+      };
+    case 'whatsapp_click':
+    case 'phone_click':
+    case 'email_click':
+      return {
+        event: 'Contact',
+        params: { content_name: eventType, ...base },
+      };
+    case 'quoter_viewed':
+    case 'product_page_view':
+      return {
+        event: 'ViewContent',
+        params: { content_name: contentName, content_type: 'product', ...base },
+      };
+    case 'quote_started':
+      return {
+        event: 'InitiateCheckout',
+        params: { content_name: 'quote_started', ...base },
+      };
+    case 'chat_opened':
+      return {
+        event: 'ViewContent',
+        params: { content_name: 'chat_opened', content_type: 'chat', ...base },
+      };
+    default:
+      return null;
+  }
+}
+
 /** Mapeo para GA4 / Google Ads (Campaña SEM - docs/CAMPANA_SEM_GOOGLE_ADS.md) */
 function mapToGtagEvent(
   eventType: ConversionEvent,
@@ -68,6 +119,14 @@ export function trackEvent(eventType: ConversionEvent, eventData?: EventData) {
     const gtagEvent = mapToGtagEvent(eventType, eventData);
     if (gtagEvent) {
       (window as any).gtag('event', gtagEvent.name, gtagEvent.params);
+    }
+  }
+
+  // Meta (Facebook) Pixel: enviar eventos para campañas Meta Ads
+  if (typeof (window as any).fbq === 'function') {
+    const fbqEvent = mapToFbqEvent(eventType, eventData);
+    if (fbqEvent) {
+      (window as any).fbq('track', fbqEvent.event, fbqEvent.params);
     }
   }
 

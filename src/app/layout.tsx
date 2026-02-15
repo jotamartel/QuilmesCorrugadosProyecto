@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { GoogleAnalytics } from "@/components/tracking/GoogleAnalytics";
+import { MetaPixel } from "@/components/tracking/MetaPixel";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -259,6 +260,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <GoogleAnalytics />
+        <MetaPixel />
         {children}
       </body>
     </html>

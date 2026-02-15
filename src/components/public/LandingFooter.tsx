@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { Phone, Mail, MapPin } from 'lucide-react';
+import { trackEvent } from '@/lib/utils/tracking';
 
 export function LandingFooter() {
   return (
@@ -31,13 +32,13 @@ export function LandingFooter() {
             <ul className="space-y-3">
               <li className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-[#4F6D87]" />
-                <a href="tel:+5491169249801" className="hover:text-white">
+                <a href="tel:+5491169249801" onClick={() => trackEvent('phone_click', { source: 'footer' })} className="hover:text-white">
                   +54 9 11 6924-9801
                 </a>
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-[#4F6D87]" />
-                <a href="mailto:ventas@quilmescorrugados.com.ar" className="hover:text-white">
+                <a href="mailto:ventas@quilmescorrugados.com.ar" onClick={() => trackEvent('email_click', { source: 'footer' })} className="hover:text-white">
                   ventas@quilmescorrugados.com.ar
                 </a>
               </li>
@@ -80,6 +81,11 @@ export function LandingFooter() {
               <li>
                 <a href="/login" className="hover:text-white">
                   Acceso clientes
+                </a>
+              </li>
+              <li>
+                <a href="/privacidad" className="hover:text-white">
+                  Política de privacidad
                 </a>
               </li>
             </ul>

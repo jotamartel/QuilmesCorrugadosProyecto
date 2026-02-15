@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { X, AlertCircle, Loader2, Send, CheckCircle } from 'lucide-react';
+import { trackEvent } from '@/lib/utils/tracking';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { ARGENTINE_PROVINCES } from '@/lib/types/database';
@@ -163,7 +164,8 @@ export function BelowMinimumModal({
 
       // Mostrar estado de éxito
       setSuccess(true);
-      
+      trackEvent('quote_submitted', { source: 'below_minimum_modal', quote_id: quoteId });
+
       // Llamar a onSuccess después de un breve delay
       setTimeout(() => {
         onSuccess();

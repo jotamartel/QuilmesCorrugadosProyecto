@@ -15,6 +15,7 @@
 | Formulario contacto | OK | `/contacto` → `contact_form_submitted` |
 | Clics WhatsApp/teléfono | OK | `whatsapp_click`, `phone_click` |
 | Chat con attribution | OK | `chat_opened`, `chat_message_sent` con UTM |
+| Meta (Facebook) Pixel | OK | `MetaPixel.tsx` + eventos en `tracking.ts` → ver `docs/META_PIXEL.md` |
 
 ---
 

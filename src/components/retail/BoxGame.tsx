@@ -191,20 +191,20 @@ function useBoxGame() {
     transition('QUOTE');
   }, [transition]);
 
-  // Select a standard box from suggestions (replaces the primary box)
-  const selectStandardBox = useCallback((sug: StandardSuggestion) => {
-    if (boxes.length === 0) return;
-    const primaryQty = boxes[0].cantidad;
-    const result = calcularPrecioMinorista(sug.length_mm, sug.width_mm, sug.height_mm, primaryQty, retailConfig);
+  // Select a standard box from suggestions (replaces the box at given index)
+  const selectStandardBox = useCallback((sug: StandardSuggestion, boxIndex: number) => {
+    if (boxIndex < 0 || boxIndex >= boxes.length) return;
+    const qty = boxes[boxIndex].cantidad;
+    const result = calcularPrecioMinorista(sug.length_mm, sug.width_mm, sug.height_mm, qty, retailConfig);
     const newBox: BoxQuoteLine = {
       largo: sug.length_mm,
       ancho: sug.width_mm,
       alto: sug.height_mm,
-      cantidad: primaryQty,
+      cantidad: qty,
       standardBoxId: sug.id,
       ...result,
     };
-    setBoxes(prev => [newBox, ...prev.slice(1)]);
+    setBoxes(prev => prev.map((b, i) => i === boxIndex ? newBox : b));
   }, [boxes, retailConfig]);
 
   // Submit order from SHIPPING step

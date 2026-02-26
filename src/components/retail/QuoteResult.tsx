@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import type { BoxQuoteLine } from '@/lib/retail/types';
 import type { RetailConfig } from '@/lib/retail/config';
 import { formatPrecio, calcularPrecioMinorista } from '@/lib/retail/pricing';
@@ -21,7 +21,7 @@ interface QuoteResultProps {
   visible: boolean;
   onReset: () => void;
   onOrder: () => void;
-  onSelectStandard?: (box: StandardSuggestion) => void;
+  onSelectStandard?: (box: StandardSuggestion, boxIndex: number) => void;
   retailConfig?: RetailConfig;
 }
 
@@ -32,46 +32,80 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
   const hasMayorista = boxes.some(b => b.isMayorista);
   const belowMinimum = precioTotal < RETAIL_CONFIG.PRECIO_MINIMO_PEDIDO;
 
-  // Standard box suggestions (only for < 1000 m²)
-  const [suggestions, setSuggestions] = useState<StandardSuggestion[]>([]);
+  // Standard box suggestions per box index (only for < 1000 m²)
+  const [suggestionsMap, setSuggestionsMap] = useState<Record<number, StandardSuggestion[]>>({});
   const [allBoxes, setAllBoxes] = useState<StandardSuggestion[]>([]);
-  const [showAllBoxes, setShowAllBoxes] = useState(false);
+  const [showAllForIndex, setShowAllForIndex] = useState<number | null>(null);
   const [loadingAll, setLoadingAll] = useState(false);
-  const primaryBox = boxes[0];
   const showSuggestions = totalM2 < 1000 && onSelectStandard;
 
-  // Whether user is forced to pick a standard box (suggestions present AND none selected yet)
-  const alreadySelectedStandard = primaryBox?.standardBoxId != null;
-  const mustSelectStandard = showSuggestions && suggestions.length > 0 && !alreadySelectedStandard;
+  // Boxes that still need a standard selection
+  const boxesNeedingStandard = useMemo(() => {
+    if (!showSuggestions) return [];
+    return boxes
+      .map((box, index) => ({ box, index }))
+      .filter(({ box }) => box.standardBoxId == null)
+      .filter(({ index }) => (suggestionsMap[index]?.length ?? 0) > 0);
+  }, [showSuggestions, boxes, suggestionsMap]);
+
+  const mustSelectStandard = boxesNeedingStandard.length > 0;
+
+  // Stable key for dimension dependencies — only re-fetch when non-standard box dimensions change
+  const nonStandardDimsKey = useMemo(() => {
+    return boxes
+      .map((b, i) => b.standardBoxId == null ? `${i}:${b.largo},${b.ancho},${b.alto}` : '')
+      .filter(Boolean)
+      .join('|');
+  }, [boxes]);
 
   useEffect(() => {
-    if (!visible || !showSuggestions || !primaryBox) {
-      setSuggestions([]);
-      setAllBoxes([]);
-      setShowAllBoxes(false);
+    if (!visible || !showSuggestions) {
+      setSuggestionsMap({});
+      setShowAllForIndex(null);
+      return;
+    }
+
+    const nonStandardBoxes = boxes
+      .map((b, i) => ({ box: b, index: i }))
+      .filter(({ box }) => box.standardBoxId == null);
+
+    if (nonStandardBoxes.length === 0) {
+      setSuggestionsMap({});
       return;
     }
 
     let cancelled = false;
 
-    fetch(`/api/public/standard-suggestions?l=${primaryBox.largo}&w=${primaryBox.ancho}&h=${primaryBox.alto}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!cancelled && data.suggestions) {
-          setSuggestions(data.suggestions);
-        }
-      })
-      .catch(() => {
-        // Silently fail — suggestions are optional
+    // Clear old suggestions for boxes that no longer exist
+    setSuggestionsMap(prev => {
+      const next: Record<number, StandardSuggestion[]> = {};
+      nonStandardBoxes.forEach(({ index }) => {
+        if (prev[index]) next[index] = prev[index];
       });
+      return next;
+    });
+
+    nonStandardBoxes.forEach(({ box, index }) => {
+      fetch(`/api/public/standard-suggestions?l=${box.largo}&w=${box.ancho}&h=${box.alto}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!cancelled && data.suggestions) {
+            setSuggestionsMap(prev => ({ ...prev, [index]: data.suggestions }));
+          }
+        })
+        .catch(() => {
+          // Silently fail — suggestions are optional
+        });
+    });
 
     return () => { cancelled = true; };
-  }, [visible, showSuggestions, primaryBox?.largo, primaryBox?.ancho, primaryBox?.alto]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, showSuggestions, nonStandardDimsKey]);
 
   // Load all standard boxes when "ver todas las medidas" is clicked
-  const handleShowAllBoxes = () => {
+  const handleShowAllBoxes = (boxIndex: number) => {
     if (allBoxes.length > 0) {
-      setShowAllBoxes(true);
+      setShowAllForIndex(boxIndex);
       return;
     }
     setLoadingAll(true);
@@ -80,7 +114,7 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
       .then((data) => {
         if (data.boxes) {
           setAllBoxes(data.boxes);
-          setShowAllBoxes(true);
+          setShowAllForIndex(boxIndex);
         }
       })
       .catch(() => {
@@ -91,13 +125,15 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
       });
   };
 
-  // Render a suggestion card (reused for both top-2 and "all" list)
-  const renderBoxCard = (sug: StandardSuggestion, isDashed: boolean) => {
+  // Render a suggestion card for a specific box index
+  const renderBoxCard = (sug: StandardSuggestion, boxIndex: number, isDashed: boolean) => {
+    const targetBox = boxes[boxIndex];
+    if (!targetBox) return null;
     const price = calcularPrecioMinorista(
-      sug.length_mm, sug.width_mm, sug.height_mm, primaryBox.cantidad, retailConfig
+      sug.length_mm, sug.width_mm, sug.height_mm, targetBox.cantidad, retailConfig
     );
     const hasStock = sug.stock > 0;
-    const hasEnoughStock = sug.stock >= primaryBox.cantidad;
+    const hasEnoughStock = sug.stock >= targetBox.cantidad;
     return (
       <div
         key={sug.id}
@@ -144,7 +180,7 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
           </div>
         </div>
         <button
-          onClick={() => onSelectStandard!(sug)}
+          onClick={() => onSelectStandard!(sug, boxIndex)}
           className="rounded-xl px-4 py-2 text-xs font-semibold tracking-wide whitespace-nowrap active:scale-95"
           style={{
             fontFamily: 'var(--font-retail-sans), sans-serif',
@@ -309,86 +345,111 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
           )}
         </div>
 
-        {/* Standard box suggestions — forced selection */}
+        {/* Standard box suggestions — per box that needs it */}
         {mustSelectStandard && (
           <div
-            className="max-w-sm mx-auto mt-6"
+            className="max-w-sm mx-auto mt-6 space-y-6"
             style={{
               opacity: visible ? 1 : 0,
               transform: visible ? 'translateY(0)' : 'translateY(20px)',
               transition: `all 400ms cubic-bezier(0.4, 0, 0.2, 1) ${300 + boxes.length * 100}ms`,
             }}
           >
-            <p
-              className="text-sm text-center mb-4 leading-relaxed"
-              style={{
-                fontFamily: 'var(--font-retail-sans), sans-serif',
-                color: 'var(--retail-text)',
-              }}
-            >
-              El volumen de cajas solicitado no alcanza para producirlas a medida, elegi alguna de nuestro catalogo, estas son las mas parecidas:
-            </p>
+            {boxesNeedingStandard.map(({ box, index }) => {
+              const boxSuggestions = suggestionsMap[index] || [];
+              const isShowingAll = showAllForIndex === index;
+              const boxLabel = boxes.length > 1
+                ? `Caja ${index + 1} (${box.largo}x${box.ancho}x${box.alto})`
+                : undefined;
 
-            {/* Top 2 closest suggestions */}
-            <div className="space-y-2">
-              {suggestions.map((sug) => renderBoxCard(sug, true))}
-            </div>
+              return (
+                <div key={index}>
+                  {boxLabel && (
+                    <p
+                      className="text-xs tracking-[0.15em] uppercase text-center mb-2"
+                      style={{
+                        fontFamily: 'var(--font-retail-mono), monospace',
+                        color: 'var(--retail-primary)',
+                      }}
+                    >
+                      {boxLabel}
+                    </p>
+                  )}
+                  <p
+                    className="text-sm text-center mb-4 leading-relaxed"
+                    style={{
+                      fontFamily: 'var(--font-retail-sans), sans-serif',
+                      color: 'var(--retail-text)',
+                    }}
+                  >
+                    {boxes.length > 1
+                      ? 'Elegi una medida estandar para esta caja:'
+                      : 'El volumen de cajas solicitado no alcanza para producirlas a medida, elegi alguna de nuestro catalogo, estas son las mas parecidas:'}
+                  </p>
 
-            {/* "Ver todas las medidas" toggle */}
-            {!showAllBoxes && (
-              <button
-                onClick={handleShowAllBoxes}
-                disabled={loadingAll}
-                className="w-full mt-4 py-2 text-sm font-medium tracking-wide active:scale-95"
-                style={{
-                  fontFamily: 'var(--font-retail-sans), sans-serif',
-                  background: 'transparent',
-                  color: 'var(--retail-primary)',
-                  border: 'none',
-                  textDecoration: 'underline',
-                  textUnderlineOffset: '3px',
-                  cursor: 'pointer',
-                  transition: 'transform 150ms',
-                  opacity: loadingAll ? 0.5 : 1,
-                }}
-              >
-                {loadingAll ? 'Cargando...' : 'Ver todas las medidas'}
-              </button>
-            )}
+                  {/* Top 2 closest suggestions */}
+                  <div className="space-y-2">
+                    {boxSuggestions.map((sug) => renderBoxCard(sug, index, true))}
+                  </div>
 
-            {/* All boxes list */}
-            {showAllBoxes && allBoxes.length > 0 && (
-              <div className="mt-4">
-                <p
-                  className="text-xs tracking-[0.15em] uppercase text-center mb-3"
-                  style={{
-                    fontFamily: 'var(--font-retail-sans), sans-serif',
-                    color: 'var(--retail-text-muted)',
-                  }}
-                >
-                  Todas las medidas
-                </p>
-                <div className="space-y-2">
-                  {allBoxes
-                    // Don't re-show boxes already in the top-2 suggestions
-                    .filter((box) => !suggestions.some((s) => s.id === box.id))
-                    .map((box) => renderBoxCard(box, false))}
+                  {/* "Ver todas las medidas" toggle */}
+                  {!isShowingAll && (
+                    <button
+                      onClick={() => handleShowAllBoxes(index)}
+                      disabled={loadingAll}
+                      className="w-full mt-4 py-2 text-sm font-medium tracking-wide active:scale-95"
+                      style={{
+                        fontFamily: 'var(--font-retail-sans), sans-serif',
+                        background: 'transparent',
+                        color: 'var(--retail-primary)',
+                        border: 'none',
+                        textDecoration: 'underline',
+                        textUnderlineOffset: '3px',
+                        cursor: 'pointer',
+                        transition: 'transform 150ms',
+                        opacity: loadingAll ? 0.5 : 1,
+                      }}
+                    >
+                      {loadingAll ? 'Cargando...' : 'Ver todas las medidas'}
+                    </button>
+                  )}
+
+                  {/* All boxes list */}
+                  {isShowingAll && allBoxes.length > 0 && (
+                    <div className="mt-4">
+                      <p
+                        className="text-xs tracking-[0.15em] uppercase text-center mb-3"
+                        style={{
+                          fontFamily: 'var(--font-retail-sans), sans-serif',
+                          color: 'var(--retail-text-muted)',
+                        }}
+                      >
+                        Todas las medidas
+                      </p>
+                      <div className="space-y-2">
+                        {allBoxes
+                          // Don't re-show boxes already in the top-2 suggestions
+                          .filter((b) => !boxSuggestions.some((s) => s.id === b.id))
+                          .map((b) => renderBoxCard(b, index, false))}
+                      </div>
+                      <button
+                        onClick={() => setShowAllForIndex(null)}
+                        className="w-full mt-3 py-2 text-xs font-medium tracking-wide"
+                        style={{
+                          fontFamily: 'var(--font-retail-sans), sans-serif',
+                          background: 'transparent',
+                          color: 'var(--retail-text-muted)',
+                          border: 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Ocultar
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={() => setShowAllBoxes(false)}
-                  className="w-full mt-3 py-2 text-xs font-medium tracking-wide"
-                  style={{
-                    fontFamily: 'var(--font-retail-sans), sans-serif',
-                    background: 'transparent',
-                    color: 'var(--retail-text-muted)',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Ocultar
-                </button>
-              </div>
-            )}
+              );
+            })}
           </div>
         )}
       </div>

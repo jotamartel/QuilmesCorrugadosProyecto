@@ -1,7 +1,7 @@
 'use client';
 
 import { Lenis } from 'lenis/react';
-import 'lenis/dist/lenis.css';
+// CSS inlined in globals.css to avoid Turbopack resolution issues
 
 const HEADER_HEIGHT = 64; // h-16 = 4rem
 

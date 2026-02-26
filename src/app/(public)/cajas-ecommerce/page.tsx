@@ -17,26 +17,23 @@ export default function CajasEcommercePage() {
     <div className="min-h-screen bg-white">
       <LandingHeader />
 
-      <div data-snap-section>
-        <div className="h-16" aria-hidden />
-        <section className="pt-24 pb-16 px-4 bg-gradient-to-br from-blue-50 to-slate-100 -mt-16">
-          <div className="max-w-7xl mx-auto text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-              Cajas para <span className="text-[#002E55]">E-commerce</span>
-            </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              Packaging profesional para tu tienda online. Medidas compatibles con correo y mensajería. Protegé tus productos en tránsito.
-            </p>
-            <a
-              href="#cotizador"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-[#002E55] hover:bg-[#001a33] text-white font-medium rounded-lg transition-colors"
-            >
-              Cotizar mis cajas
-              <ArrowRight className="w-4 h-4" />
-            </a>
-          </div>
-        </section>
-      </div>
+      <section className="pt-24 pb-16 px-4 bg-gradient-to-br from-blue-50 to-slate-100">
+        <div className="max-w-7xl mx-auto text-center">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+            Cajas para <span className="text-[#002E55]">E-commerce</span>
+          </h1>
+          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            Packaging profesional para tu tienda online. Medidas compatibles con correo y mensajería. Protegé tus productos en tránsito.
+          </p>
+          <a
+            href="#cotizador"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#002E55] hover:bg-[#001a33] text-white font-medium rounded-lg transition-colors"
+          >
+            Cotizar mis cajas
+            <ArrowRight className="w-4 h-4" />
+          </a>
+        </div>
+      </section>
 
       <section className="py-12 px-4 bg-white">
         <div className="max-w-7xl mx-auto">

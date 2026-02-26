@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { TrafficTracker } from '@/components/tracking/TrafficTracker';
 import { LenisProvider } from '@/components/providers/LenisProvider';
-import { LenisSnapSetup } from '@/components/providers/LenisSnapSetup';
 import { ChatWidget } from '@/components/public/ChatWidget';
 
 export const metadata: Metadata = {
@@ -21,7 +20,6 @@ export default function PublicLayout({
     <>
       <TrafficTracker />
       <LenisProvider>
-        <LenisSnapSetup />
         {children}
         <ChatWidget />
       </LenisProvider>

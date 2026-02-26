@@ -33,6 +33,11 @@ interface AddressAutocompleteProps {
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
+/** Check if Google Maps autocomplete is available */
+export function isGoogleMapsAvailable(): boolean {
+  return !!GOOGLE_MAPS_API_KEY;
+}
+
 // Singleton: load Google Maps script once
 let googleMapsLoading = false;
 let googleMapsLoaded = false;

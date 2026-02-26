@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import type { BoxQuoteLine, ShippingMethod, ShippingData } from '@/lib/retail/types';
 import { formatPrecio } from '@/lib/retail/pricing';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
-import AddressAutocomplete, { type ParsedAddress } from './AddressAutocomplete';
+import AddressAutocomplete, { type ParsedAddress, isGoogleMapsAvailable } from './AddressAutocomplete';
 
 interface ShippingStepProps {
   boxes: BoxQuoteLine[];
@@ -135,8 +135,8 @@ export default function ShippingStep({ boxes, visible, onSubmit, onBack, savedSh
       if (!direccion.trim()) errs.direccion = 'Requerido';
       if (!ciudad.trim()) errs.ciudad = 'Requerido';
 
-      // For CABA/AMBA, require validated address from Google Places
-      if (isCabaAmba && !addressValidated && direccion.trim()) {
+      // For CABA/AMBA, require validated address from Google Places (only if API is available)
+      if (isCabaAmba && !addressValidated && direccion.trim() && isGoogleMapsAvailable()) {
         errs._addressValidation = 'Selecciona una direccion de las sugerencias';
       }
     }

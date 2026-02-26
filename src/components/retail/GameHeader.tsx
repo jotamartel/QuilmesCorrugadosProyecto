@@ -10,6 +10,7 @@ interface GameHeaderProps {
   ancho: number;
   alto: number;
   cantidad: number;
+  editingIndex?: number | null;
   /** Scrub slider config — only needed during dimension states */
   scrub?: {
     value: number;
@@ -40,7 +41,7 @@ function getValue(state: GameState, largo: number, ancho: number, alto: number, 
   }
 }
 
-export default function GameHeader({ state, largo, ancho, alto, cantidad, scrub }: GameHeaderProps) {
+export default function GameHeader({ state, largo, ancho, alto, cantidad, editingIndex, scrub }: GameHeaderProps) {
   const isDimensionState = state === 'SET_LARGO' || state === 'SET_ANCHO' || state === 'SET_ALTO';
   const isQuantityState = state === 'SET_CANTIDAD';
   const showHeader = isDimensionState || isQuantityState;
@@ -65,6 +66,21 @@ export default function GameHeader({ state, largo, ancho, alto, cantidad, scrub 
       >
         Quilmes Corrugados
       </div>
+
+      {/* Editing indicator */}
+      {editingIndex != null && (
+        <div
+          className="text-xs font-medium tracking-wide mb-1"
+          style={{
+            fontFamily: 'var(--font-retail-sans), sans-serif',
+            color: 'var(--retail-primary)',
+            opacity: 0.85,
+            transition: 'opacity 300ms',
+          }}
+        >
+          Editando tamaño {editingIndex + 1}
+        </div>
+      )}
 
       {/* Dynamic measurement */}
       <div

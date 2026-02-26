@@ -8,6 +8,7 @@ interface AddMorePromptProps {
   onAddMore: () => void;
   onFinish: () => void;
   visible: boolean;
+  editingIndex: number | null;
 }
 
 export default function AddMorePrompt({
@@ -18,7 +19,10 @@ export default function AddMorePrompt({
   onAddMore,
   onFinish,
   visible,
+  editingIndex,
 }: AddMorePromptProps) {
+  const isEditing = editingIndex !== null;
+
   return (
     <div
       className="flex flex-col items-center gap-4 w-full px-6"
@@ -36,6 +40,19 @@ export default function AddMorePrompt({
           boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
         }}
       >
+        {/* Editing indicator */}
+        {isEditing && (
+          <div
+            className="text-xs font-medium tracking-wide mb-2"
+            style={{
+              fontFamily: 'var(--font-retail-sans), sans-serif',
+              color: 'var(--retail-primary)',
+            }}
+          >
+            Editando tamaño {editingIndex + 1}
+          </div>
+        )}
+
         {/* Summary */}
         <div
           className="text-lg font-semibold tabular-nums mb-1"
@@ -64,7 +81,7 @@ export default function AddMorePrompt({
             color: 'var(--retail-text)',
           }}
         >
-          Agregar otro tamaño?
+          {isEditing ? 'Agregar otro tamaño?' : 'Agregar otro tamaño?'}
         </p>
 
         {/* Buttons */}
@@ -74,22 +91,22 @@ export default function AddMorePrompt({
             className="flex-1 rounded-xl py-3 text-sm font-semibold active:scale-95"
             style={{
               fontFamily: 'var(--font-retail-sans), sans-serif',
-              background: 'var(--retail-bg)',
-              color: 'var(--retail-text)',
-              border: '2px solid var(--retail-text)',
+              background: isEditing ? 'var(--retail-primary)' : 'var(--retail-bg)',
+              color: isEditing ? '#fff' : 'var(--retail-text)',
+              border: isEditing ? 'none' : '2px solid var(--retail-text)',
               transition: 'transform 150ms',
             }}
           >
-            SI
+            {isEditing ? 'GUARDAR' : 'SI'}
           </button>
           <button
             onClick={onFinish}
             className="flex-1 rounded-xl py-3 text-sm font-semibold active:scale-95"
             style={{
               fontFamily: 'var(--font-retail-sans), sans-serif',
-              background: 'var(--retail-primary)',
-              color: '#fff',
-              border: 'none',
+              background: isEditing ? 'var(--retail-bg)' : 'var(--retail-primary)',
+              color: isEditing ? 'var(--retail-text)' : '#fff',
+              border: isEditing ? '2px solid var(--retail-text)' : 'none',
               transition: 'transform 150ms',
             }}
           >

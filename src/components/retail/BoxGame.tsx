@@ -13,6 +13,7 @@ import DimensionSlider from './DimensionSlider';
 import ScrubSlider from './ScrubSlider';
 import QuantityInput from './QuantityInput';
 import AddMorePrompt from './AddMorePrompt';
+import PreviousBoxesList from './PreviousBoxesList';
 import QuoteResult from './QuoteResult';
 import OrderForm from './OrderForm';
 import OrderConfirmation from './OrderConfirmation';
@@ -25,6 +26,7 @@ function useBoxGame() {
   const [cantidad, setCantidad] = useState<number>(0);
   const [boxes, setBoxes] = useState<BoxQuoteLine[]>([]);
   const [formData, setFormData] = useState<OrderFormData | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const hintShownFor = useRef(new Set<GameState>());
@@ -83,9 +85,16 @@ function useBoxGame() {
   }, [cantidad, transition]);
 
   const addMore = useCallback(() => {
-    // Save current box
+    // Save current box (replace if editing, append if new)
     const result = calcularPrecioMinorista(largo, ancho, alto, cantidad);
-    setBoxes(prev => [...prev, { largo, ancho, alto, cantidad, ...result }]);
+    const newBox: BoxQuoteLine = { largo, ancho, alto, cantidad, ...result };
+
+    if (editingIndex !== null) {
+      setBoxes(prev => prev.map((b, i) => i === editingIndex ? newBox : b));
+      setEditingIndex(null);
+    } else {
+      setBoxes(prev => [...prev, newBox]);
+    }
 
     // Reset current box
     setLargo(RETAIL_CONFIG.DEFAULT_LARGO);
@@ -94,20 +103,42 @@ function useBoxGame() {
     setCantidad(0);
 
     transition('SET_LARGO');
-  }, [largo, ancho, alto, cantidad, transition]);
+  }, [largo, ancho, alto, cantidad, editingIndex, transition]);
 
   const finishQuote = useCallback(() => {
-    // Save current box
+    // Save current box (replace if editing, append if new)
     const result = calcularPrecioMinorista(largo, ancho, alto, cantidad);
-    setBoxes(prev => [...prev, { largo, ancho, alto, cantidad, ...result }]);
+    const newBox: BoxQuoteLine = { largo, ancho, alto, cantidad, ...result };
+
+    if (editingIndex !== null) {
+      setBoxes(prev => prev.map((b, i) => i === editingIndex ? newBox : b));
+      setEditingIndex(null);
+    } else {
+      setBoxes(prev => [...prev, newBox]);
+    }
 
     // Go to ORDER_FORM first (collect contact before revealing prices)
     transition('ORDER_FORM');
-  }, [largo, ancho, alto, cantidad, transition]);
+  }, [largo, ancho, alto, cantidad, editingIndex, transition]);
+
+  // Edit a previously saved box
+  const startEdit = useCallback((index: number) => {
+    const box = boxes[index];
+    if (!box) return;
+
+    setEditingIndex(index);
+    setLargo(box.largo);
+    setAncho(box.ancho);
+    setAlto(box.alto);
+    setCantidad(box.cantidad);
+
+    transition('SET_LARGO');
+  }, [boxes, transition]);
 
   const reset = useCallback(() => {
     setBoxes([]);
     setFormData(null);
+    setEditingIndex(null);
     setLargo(RETAIL_CONFIG.DEFAULT_LARGO);
     setAncho(RETAIL_CONFIG.DEFAULT_ANCHO);
     setAlto(RETAIL_CONFIG.DEFAULT_ALTO);
@@ -178,10 +209,10 @@ function useBoxGame() {
   }, [ancho]);
 
   return {
-    state, largo, ancho, alto, cantidad, boxes, formData, isTransitioning, showHint,
+    state, largo, ancho, alto, cantidad, boxes, formData, editingIndex, isTransitioning, showHint,
     setLargo, setAncho, setAlto, setCantidad,
     start, confirmDimension, confirmQuantity, addMore, finishQuote, reset,
-    revealQuote, backToForm, submitOrder,
+    startEdit, revealQuote, backToForm, submitOrder,
     validateAncho, validateAlto,
   };
 }
@@ -269,6 +300,7 @@ export default function BoxGame() {
         ancho={game.ancho}
         alto={game.alto}
         cantidad={game.cantidad}
+        editingIndex={game.editingIndex}
         scrub={isHorizontalDimension && sliderConfig ? {
           value: sliderConfig.value,
           min: sliderConfig.min,
@@ -331,6 +363,21 @@ export default function BoxGame() {
           />
         )}
 
+        {/* Previous boxes list (visible during ADD_MORE when there are saved boxes) */}
+        {isAddMore && game.boxes.length > 0 && (
+          <div
+            className="absolute left-0 right-0 bottom-4 z-10 px-6"
+            style={{ maxHeight: '40%', overflowY: 'auto' }}
+          >
+            <PreviousBoxesList
+              boxes={game.boxes}
+              onEdit={game.startEdit}
+              visible={isAddMore}
+              editingIndex={game.editingIndex}
+            />
+          </div>
+        )}
+
         {/* Order form overlay (appears BEFORE quote to collect contact) */}
         <OrderForm
           boxes={game.boxes}
@@ -383,6 +430,7 @@ export default function BoxGame() {
             onAddMore={game.addMore}
             onFinish={game.finishQuote}
             visible={isAddMore}
+            editingIndex={game.editingIndex}
           />
         )}
 

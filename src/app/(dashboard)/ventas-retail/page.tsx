@@ -11,6 +11,7 @@ import {
   Eye,
   Search,
   GripVertical,
+  Clock,
   CreditCard,
   Package,
   Truck,
@@ -28,6 +29,7 @@ import { formatBoxDimensions, formatPhone } from '@/lib/utils/format';
 
 const fulfillmentOptions = [
   { value: '', label: 'Todos los estados' },
+  { value: 'pending_payment', label: 'Pendiente de pago' },
   { value: 'paid', label: 'Pagado' },
   { value: 'preparing', label: 'Preparando' },
   { value: 'ready_for_dispatch', label: 'Listo para despachar' },
@@ -38,8 +40,9 @@ const fulfillmentOptions = [
   { value: 'rescheduled', label: 'Reprogramado' },
 ];
 
-// Columnas del Kanban — solo estados activos del fulfillment
+// Columnas del Kanban — estados activos del fulfillment
 const kanbanStatuses: FulfillmentStatus[] = [
+  'pending_payment',
   'paid',
   'preparing',
   'ready_for_dispatch',
@@ -50,6 +53,13 @@ const kanbanStatuses: FulfillmentStatus[] = [
 
 // Colores de las summary cards
 const summaryCards = [
+  {
+    key: 'pending_payment',
+    label: 'Pendientes de pago',
+    icon: Clock,
+    color: 'text-gray-600',
+    bg: 'bg-gray-50',
+  },
   {
     key: 'paid',
     label: 'Pagados',
@@ -215,7 +225,7 @@ export default function VentasRetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Ventas Retail</h1>
-          <p className="text-gray-500">Pedidos minoristas pagados por MercadoPago</p>
+          <p className="text-gray-500">Pedidos minoristas</p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -236,7 +246,7 @@ export default function VentasRetailPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {summaryCards.map(card => (
           <Card key={card.key}>
             <CardContent className="p-4">
@@ -383,7 +393,7 @@ export default function VentasRetailPage() {
         </Card>
       ) : (
         /* ═══ KANBAN VIEW ═══ */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
           {kanbanStatuses.map(status => (
             <div
               key={status}

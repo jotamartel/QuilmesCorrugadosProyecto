@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
       .not('fulfillment_status', 'is', null);
 
     const counts: Record<string, number> = {
+      pending_payment: 0,
       paid: 0,
       preparing: 0,
       ready_for_dispatch: 0,
@@ -57,7 +58,6 @@ export async function GET(request: NextRequest) {
       .from('public_quotes')
       .select('*', { count: 'exact' })
       .not('fulfillment_status', 'is', null)
-      .neq('fulfillment_status', 'pending_payment')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 

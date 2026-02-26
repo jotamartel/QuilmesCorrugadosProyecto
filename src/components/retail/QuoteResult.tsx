@@ -32,12 +32,20 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
 
   // Standard box suggestions (only for < 1000 m²)
   const [suggestions, setSuggestions] = useState<StandardSuggestion[]>([]);
+  const [allBoxes, setAllBoxes] = useState<StandardSuggestion[]>([]);
+  const [showAllBoxes, setShowAllBoxes] = useState(false);
+  const [loadingAll, setLoadingAll] = useState(false);
   const primaryBox = boxes[0];
   const showSuggestions = totalM2 < 1000 && onSelectStandard;
+
+  // Whether user is forced to pick a standard box (suggestions present)
+  const mustSelectStandard = showSuggestions && suggestions.length > 0;
 
   useEffect(() => {
     if (!visible || !showSuggestions || !primaryBox) {
       setSuggestions([]);
+      setAllBoxes([]);
+      setShowAllBoxes(false);
       return;
     }
 
@@ -56,6 +64,98 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
 
     return () => { cancelled = true; };
   }, [visible, showSuggestions, primaryBox?.largo, primaryBox?.ancho, primaryBox?.alto]);
+
+  // Load all standard boxes when "ver todas las medidas" is clicked
+  const handleShowAllBoxes = () => {
+    if (allBoxes.length > 0) {
+      setShowAllBoxes(true);
+      return;
+    }
+    setLoadingAll(true);
+    fetch('/api/public/standard-boxes')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.boxes) {
+          setAllBoxes(data.boxes);
+          setShowAllBoxes(true);
+        }
+      })
+      .catch(() => {
+        // Silently fail
+      })
+      .finally(() => {
+        setLoadingAll(false);
+      });
+  };
+
+  // Render a suggestion card (reused for both top-2 and "all" list)
+  const renderBoxCard = (sug: StandardSuggestion, isDashed: boolean) => {
+    const price = calcularPrecioMinorista(
+      sug.length_mm, sug.width_mm, sug.height_mm, primaryBox.cantidad
+    );
+    const hasStock = sug.stock > 0;
+    const hasEnoughStock = sug.stock >= primaryBox.cantidad;
+    return (
+      <div
+        key={sug.id}
+        className="rounded-xl p-4 flex items-center justify-between gap-3"
+        style={{
+          background: 'var(--retail-surface)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+          border: isDashed
+            ? `1px dashed ${hasStock ? 'var(--retail-primary)' : 'var(--retail-border, #d0d0d0)'}`
+            : `1px solid var(--retail-border, #e0e0e0)`,
+        }}
+      >
+        <div className="flex-1 min-w-0">
+          <div
+            className="text-sm font-semibold tabular-nums"
+            style={{
+              fontFamily: 'var(--font-retail-mono), monospace',
+              color: 'var(--retail-text)',
+            }}
+          >
+            {sug.length_mm} x {sug.width_mm} x {sug.height_mm} mm
+          </div>
+          <div className="flex items-baseline gap-3 mt-1">
+            <span
+              className="text-xs tabular-nums"
+              style={{
+                fontFamily: 'var(--font-retail-mono), monospace',
+                color: 'var(--retail-primary)',
+              }}
+            >
+              {formatPrecio(price.precioUnitario)} /ud
+            </span>
+            <span
+              className="text-xs"
+              style={{
+                fontFamily: 'var(--font-retail-sans), sans-serif',
+                color: hasStock ? '#16a34a' : 'var(--retail-text-muted)',
+              }}
+            >
+              {hasStock
+                ? `${sug.stock} en stock`
+                : 'Entrega inmediata'}
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={() => onSelectStandard!(sug)}
+          className="rounded-xl px-4 py-2 text-xs font-semibold tracking-wide whitespace-nowrap active:scale-95"
+          style={{
+            fontFamily: 'var(--font-retail-sans), sans-serif',
+            background: hasEnoughStock ? 'var(--retail-primary)' : 'transparent',
+            color: hasEnoughStock ? '#fff' : 'var(--retail-primary)',
+            border: hasEnoughStock ? 'none' : '2px solid var(--retail-primary)',
+            transition: 'transform 150ms',
+          }}
+        >
+          ELEGIR
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div
@@ -206,8 +306,8 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
           )}
         </div>
 
-        {/* Standard box suggestions */}
-        {showSuggestions && suggestions.length > 0 && (
+        {/* Standard box suggestions — forced selection */}
+        {mustSelectStandard && (
           <div
             className="max-w-sm mx-auto mt-6"
             style={{
@@ -217,81 +317,75 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
             }}
           >
             <p
-              className="text-xs tracking-[0.15em] uppercase text-center mb-3"
+              className="text-sm text-center mb-4 leading-relaxed"
               style={{
                 fontFamily: 'var(--font-retail-sans), sans-serif',
-                color: 'var(--retail-text-muted)',
+                color: 'var(--retail-text)',
               }}
             >
-              Cajas en stock con medida similar
+              El volumen de cajas solicitado no alcanza para producirlas a medida, elegi alguna de nuestro catalogo, estas son las mas parecidas:
             </p>
+
+            {/* Top 2 closest suggestions */}
             <div className="space-y-2">
-              {suggestions.map((sug) => {
-                const price = calcularPrecioMinorista(
-                  sug.length_mm, sug.width_mm, sug.height_mm, primaryBox.cantidad
-                );
-                const hasStock = sug.stock > 0;
-                const hasEnoughStock = sug.stock >= primaryBox.cantidad;
-                return (
-                  <div
-                    key={sug.id}
-                    className="rounded-xl p-4 flex items-center justify-between gap-3"
-                    style={{
-                      background: 'var(--retail-surface)',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                      border: `1px dashed ${hasStock ? 'var(--retail-primary)' : 'var(--retail-border, #d0d0d0)'}`,
-                    }}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div
-                        className="text-sm font-semibold tabular-nums"
-                        style={{
-                          fontFamily: 'var(--font-retail-mono), monospace',
-                          color: 'var(--retail-text)',
-                        }}
-                      >
-                        {sug.length_mm} x {sug.width_mm} x {sug.height_mm} mm
-                      </div>
-                      <div className="flex items-baseline gap-3 mt-1">
-                        <span
-                          className="text-xs tabular-nums"
-                          style={{
-                            fontFamily: 'var(--font-retail-mono), monospace',
-                            color: 'var(--retail-primary)',
-                          }}
-                        >
-                          {formatPrecio(price.precioUnitario)} /ud
-                        </span>
-                        <span
-                          className="text-xs"
-                          style={{
-                            fontFamily: 'var(--font-retail-sans), sans-serif',
-                            color: hasStock ? '#16a34a' : 'var(--retail-text-muted)',
-                          }}
-                        >
-                          {hasStock
-                            ? `${sug.stock} en stock`
-                            : 'Entrega inmediata'}
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => onSelectStandard!(sug)}
-                      className="rounded-xl px-4 py-2 text-xs font-semibold tracking-wide whitespace-nowrap active:scale-95"
-                      style={{
-                        fontFamily: 'var(--font-retail-sans), sans-serif',
-                        background: hasEnoughStock ? 'var(--retail-primary)' : 'transparent',
-                        color: hasEnoughStock ? '#fff' : 'var(--retail-primary)',
-                        border: hasEnoughStock ? 'none' : '2px solid var(--retail-primary)',
-                        transition: 'transform 150ms',
-                      }}
-                    >
-                      ELEGIR
-                    </button>
-                  </div>
-                );
-              })}
+              {suggestions.map((sug) => renderBoxCard(sug, true))}
             </div>
+
+            {/* "Ver todas las medidas" toggle */}
+            {!showAllBoxes && (
+              <button
+                onClick={handleShowAllBoxes}
+                disabled={loadingAll}
+                className="w-full mt-4 py-2 text-sm font-medium tracking-wide active:scale-95"
+                style={{
+                  fontFamily: 'var(--font-retail-sans), sans-serif',
+                  background: 'transparent',
+                  color: 'var(--retail-primary)',
+                  border: 'none',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '3px',
+                  cursor: 'pointer',
+                  transition: 'transform 150ms',
+                  opacity: loadingAll ? 0.5 : 1,
+                }}
+              >
+                {loadingAll ? 'Cargando...' : 'Ver todas las medidas'}
+              </button>
+            )}
+
+            {/* All boxes list */}
+            {showAllBoxes && allBoxes.length > 0 && (
+              <div className="mt-4">
+                <p
+                  className="text-xs tracking-[0.15em] uppercase text-center mb-3"
+                  style={{
+                    fontFamily: 'var(--font-retail-sans), sans-serif',
+                    color: 'var(--retail-text-muted)',
+                  }}
+                >
+                  Todas las medidas
+                </p>
+                <div className="space-y-2">
+                  {allBoxes
+                    // Don't re-show boxes already in the top-2 suggestions
+                    .filter((box) => !suggestions.some((s) => s.id === box.id))
+                    .map((box) => renderBoxCard(box, false))}
+                </div>
+                <button
+                  onClick={() => setShowAllBoxes(false)}
+                  className="w-full mt-3 py-2 text-xs font-medium tracking-wide"
+                  style={{
+                    fontFamily: 'var(--font-retail-sans), sans-serif',
+                    background: 'transparent',
+                    color: 'var(--retail-text-muted)',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Ocultar
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -305,19 +399,22 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
           transition: `all 400ms cubic-bezier(0.4, 0, 0.2, 1) ${300 + boxes.length * 100}ms`,
         }}
       >
-        <button
-          onClick={onOrder}
-          className="w-full rounded-2xl py-4 text-base font-semibold tracking-wide active:scale-95"
-          style={{
-            fontFamily: 'var(--font-retail-sans), sans-serif',
-            background: 'var(--retail-primary)',
-            color: '#fff',
-            border: 'none',
-            transition: 'transform 150ms',
-          }}
-        >
-          COTIZAR ENVIO
-        </button>
+        {/* Only show COTIZAR ENVIO if user does NOT need to pick a standard box */}
+        {!mustSelectStandard && (
+          <button
+            onClick={onOrder}
+            className="w-full rounded-2xl py-4 text-base font-semibold tracking-wide active:scale-95"
+            style={{
+              fontFamily: 'var(--font-retail-sans), sans-serif',
+              background: 'var(--retail-primary)',
+              color: '#fff',
+              border: 'none',
+              transition: 'transform 150ms',
+            }}
+          >
+            COTIZAR ENVIO
+          </button>
+        )}
         <button
           onClick={onReset}
           className="w-full rounded-2xl py-3 text-sm font-medium tracking-wide active:scale-95"

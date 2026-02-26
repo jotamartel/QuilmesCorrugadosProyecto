@@ -1,16 +1,19 @@
 'use client';
 
-import type { BoxQuoteLine } from '@/lib/retail/types';
+import type { BoxQuoteLine, ShippingData } from '@/lib/retail/types';
 import { formatPrecio } from '@/lib/retail/pricing';
 
 interface OrderConfirmationProps {
   boxes: BoxQuoteLine[];
   visible: boolean;
   onReset: () => void;
+  shippingData?: ShippingData | null;
 }
 
-export default function OrderConfirmation({ boxes, visible, onReset }: OrderConfirmationProps) {
-  const precioTotal = boxes.reduce((sum, b) => sum + b.subtotal, 0);
+export default function OrderConfirmation({ boxes, visible, onReset, shippingData }: OrderConfirmationProps) {
+  const precioProductos = boxes.reduce((sum, b) => sum + b.subtotal, 0);
+  const shippingCost = shippingData?.costConfirmed ? shippingData.cost : 0;
+  const precioTotal = precioProductos + shippingCost;
 
   return (
     <div
@@ -92,9 +95,41 @@ export default function OrderConfirmation({ boxes, visible, onReset }: OrderConf
               </span>
             </div>
           ))}
+          {/* Shipping line */}
+          {shippingData && (
+            <div className="pt-2 flex items-baseline justify-between"
+              style={{ borderTop: '1px solid var(--retail-border, #e0e0e0)' }}
+            >
+              <span
+                className="text-xs"
+                style={{
+                  fontFamily: 'var(--font-retail-sans), sans-serif',
+                  color: 'var(--retail-text-muted)',
+                }}
+              >
+                Envio: {shippingData.method === 'retiro_sucursal' ? 'Retiro en sucursal'
+                  : shippingData.method === 'envio_caba_amba' ? 'CABA/AMBA'
+                  : 'Resto del pais'}
+              </span>
+              <span
+                className="text-sm tabular-nums"
+                style={{
+                  fontFamily: 'var(--font-retail-mono), monospace',
+                  color: shippingData.method === 'retiro_sucursal' ? '#16a34a' : 'var(--retail-text)',
+                }}
+              >
+                {shippingData.method === 'retiro_sucursal'
+                  ? 'Gratis'
+                  : shippingData.costConfirmed
+                    ? formatPrecio(shippingData.cost)
+                    : 'A confirmar'}
+              </span>
+            </div>
+          )}
+
           <div
             className="pt-2 flex items-baseline justify-between"
-            style={{ borderTop: '1px solid var(--retail-border, #e0e0e0)' }}
+            style={{ borderTop: shippingData ? 'none' : '1px solid var(--retail-border, #e0e0e0)' }}
           >
             <span
               className="text-sm font-semibold"
@@ -112,29 +147,12 @@ export default function OrderConfirmation({ boxes, visible, onReset }: OrderConf
                 color: 'var(--retail-primary)',
               }}
             >
-              {formatPrecio(precioTotal)}
+              {shippingData && !shippingData.costConfirmed
+                ? `${formatPrecio(precioProductos)} + envio`
+                : formatPrecio(precioTotal)}
             </span>
           </div>
         </div>
-
-        {/* WhatsApp hint */}
-        <p
-          className="text-xs"
-          style={{
-            fontFamily: 'var(--font-retail-sans), sans-serif',
-            color: 'var(--retail-text-muted)',
-          }}
-        >
-          Tambien podes contactarnos por WhatsApp al{' '}
-          <a
-            href="https://wa.me/5491100000000"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: 'var(--retail-primary)', textDecoration: 'underline' }}
-          >
-            +54 9 11 0000-0000
-          </a>
-        </p>
 
         {/* Reset button */}
         <button

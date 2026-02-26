@@ -35,6 +35,16 @@ export const RETAIL_CONFIG = {
   DRAG_SENSITIVITY: 2,           // mm por pixel
   TRANSITION_DURATION: 400,      // ms
   HINT_DURATION: 1500,           // ms
+
+  // Envío
+  SHIPPING_FACTORY_ADDRESS: 'Lugones 219, B1878 Quilmes, Buenos Aires',
+  SHIPPING_CABA_AMBA_COST: 5000, // ARS flat rate (ajustar según necesidad)
+
+  // Bounds del AMBA (para validar que la dirección cae dentro de la zona)
+  AMBA_BOUNDS: {
+    SW: { lat: -35.0, lng: -59.2 },  // Sudoeste
+    NE: { lat: -34.3, lng: -58.1 },  // Nordeste
+  },
 } as const;
 
 export type RetailConfig = typeof RETAIL_CONFIG;

@@ -1,37 +1,61 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { BoxQuoteLine } from '@/lib/retail/types';
-import { formatPrecio } from '@/lib/retail/pricing';
+import { formatPrecio, calcularPrecioMinorista } from '@/lib/retail/pricing';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
+
+export interface StandardSuggestion {
+  id: string;
+  name: string;
+  length_mm: number;
+  width_mm: number;
+  height_mm: number;
+  m2_per_box: number;
+  stock: number;
+}
 
 interface QuoteResultProps {
   boxes: BoxQuoteLine[];
   visible: boolean;
   onReset: () => void;
-  onOrder: () => Promise<void>;
+  onOrder: () => void;
+  onSelectStandard?: (box: StandardSuggestion) => void;
 }
 
-export default function QuoteResult({ boxes, visible, onReset, onOrder }: QuoteResultProps) {
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleOrder = async () => {
-    if (submitting) return;
-    setSubmitting(true);
-    setError('');
-    try {
-      await onOrder();
-    } catch {
-      setError('Error al enviar. Intenta de nuevo.');
-      setSubmitting(false);
-    }
-  };
+export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelectStandard }: QuoteResultProps) {
 
   const precioTotal = boxes.reduce((sum, b) => sum + b.subtotal, 0);
   const totalM2 = boxes.reduce((sum, b) => sum + b.totalM2, 0);
   const hasMayorista = boxes.some(b => b.isMayorista);
   const belowMinimum = precioTotal < RETAIL_CONFIG.PRECIO_MINIMO_PEDIDO;
+
+  // Standard box suggestions (only for < 1000 m²)
+  const [suggestions, setSuggestions] = useState<StandardSuggestion[]>([]);
+  const primaryBox = boxes[0];
+  const showSuggestions = totalM2 < 1000 && onSelectStandard;
+
+  useEffect(() => {
+    if (!visible || !showSuggestions || !primaryBox) {
+      setSuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    fetch(`/api/public/standard-suggestions?l=${primaryBox.largo}&w=${primaryBox.ancho}&h=${primaryBox.alto}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled && data.suggestions) {
+          setSuggestions(data.suggestions);
+        }
+      })
+      .catch(() => {
+        // Silently fail — suggestions are optional
+      });
+
+    return () => { cancelled = true; };
+  }, [visible, showSuggestions, primaryBox?.largo, primaryBox?.ancho, primaryBox?.alto]);
 
   return (
     <div
@@ -181,6 +205,91 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder }: QuoteR
             </p>
           )}
         </div>
+
+        {/* Standard box suggestions */}
+        {showSuggestions && suggestions.length > 0 && (
+          <div
+            className="max-w-sm mx-auto mt-6"
+            style={{
+              opacity: visible ? 1 : 0,
+              transform: visible ? 'translateY(0)' : 'translateY(20px)',
+              transition: `all 400ms cubic-bezier(0.4, 0, 0.2, 1) ${300 + boxes.length * 100}ms`,
+            }}
+          >
+            <p
+              className="text-xs tracking-[0.15em] uppercase text-center mb-3"
+              style={{
+                fontFamily: 'var(--font-retail-sans), sans-serif',
+                color: 'var(--retail-text-muted)',
+              }}
+            >
+              Cajas en stock con medida similar
+            </p>
+            <div className="space-y-2">
+              {suggestions.map((sug) => {
+                const price = calcularPrecioMinorista(
+                  sug.length_mm, sug.width_mm, sug.height_mm, primaryBox.cantidad
+                );
+                return (
+                  <div
+                    key={sug.id}
+                    className="rounded-xl p-4 flex items-center justify-between gap-3"
+                    style={{
+                      background: 'var(--retail-surface)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                      border: '1px dashed var(--retail-primary)',
+                    }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className="text-sm font-semibold tabular-nums"
+                        style={{
+                          fontFamily: 'var(--font-retail-mono), monospace',
+                          color: 'var(--retail-text)',
+                        }}
+                      >
+                        {sug.length_mm} x {sug.width_mm} x {sug.height_mm} mm
+                      </div>
+                      <div className="flex items-baseline gap-3 mt-1">
+                        <span
+                          className="text-xs tabular-nums"
+                          style={{
+                            fontFamily: 'var(--font-retail-mono), monospace',
+                            color: 'var(--retail-primary)',
+                          }}
+                        >
+                          {formatPrecio(price.precioUnitario)} /ud
+                        </span>
+                        <span
+                          className="text-xs"
+                          style={{
+                            fontFamily: 'var(--font-retail-sans), sans-serif',
+                            color: 'var(--retail-text-muted)',
+                          }}
+                        >
+                          {sug.stock} en stock
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => onSelectStandard!(sug)}
+                      className="rounded-xl px-4 py-2 text-xs font-semibold tracking-wide whitespace-nowrap active:scale-95"
+                      style={{
+                        fontFamily: 'var(--font-retail-sans), sans-serif',
+                        background: 'var(--retail-primary)',
+                        color: '#fff',
+                        border: 'none',
+                        transition: 'transform 150ms',
+                      }}
+                    >
+                      ELEGIR
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Buttons */}
@@ -193,9 +302,8 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder }: QuoteR
         }}
       >
         <button
-          onClick={handleOrder}
-          disabled={submitting}
-          className="w-full rounded-2xl py-4 text-base font-semibold tracking-wide active:scale-95 disabled:opacity-50"
+          onClick={onOrder}
+          className="w-full rounded-2xl py-4 text-base font-semibold tracking-wide active:scale-95"
           style={{
             fontFamily: 'var(--font-retail-sans), sans-serif',
             background: 'var(--retail-primary)',
@@ -204,19 +312,10 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder }: QuoteR
             transition: 'transform 150ms',
           }}
         >
-          {submitting ? 'ENVIANDO...' : 'SOLICITAR PEDIDO'}
+          COTIZAR ENVIO
         </button>
-        {error && (
-          <p
-            className="text-xs text-center"
-            style={{ color: '#ef4444', fontFamily: 'var(--font-retail-sans), sans-serif' }}
-          >
-            {error}
-          </p>
-        )}
         <button
           onClick={onReset}
-          disabled={submitting}
           className="w-full rounded-2xl py-3 text-sm font-medium tracking-wide active:scale-95"
           style={{
             fontFamily: 'var(--font-retail-sans), sans-serif',

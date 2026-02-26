@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
         unfolded_length_mm: unfoldedLength,
         unfolded_width_mm: unfoldedWidth,
         m2_per_box: m2,
+        stock: typeof body.stock === 'number' && body.stock >= 0 ? Math.floor(body.stock) : 0,
         is_standard: body.is_standard ?? true,
         is_active: true,
       })

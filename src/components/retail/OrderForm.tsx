@@ -37,7 +37,6 @@ const initialForm: OrderFormData = {
 
 export default function OrderForm({ boxes, visible, onSubmit, onBack, savedData }: OrderFormProps) {
   const [form, setForm] = useState<OrderFormData>(savedData || initialForm);
-  const [showAddress, setShowAddress] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -327,81 +326,6 @@ export default function OrderForm({ boxes, visible, onSubmit, onBack, savedData 
               />
               {errors.telefono && <span className="text-xs text-red-500 mt-1">{errors.telefono}</span>}
             </div>
-          </div>
-
-          {/* Expandable address */}
-          <div>
-            <button
-              onClick={() => setShowAddress(!showAddress)}
-              className="text-sm font-medium"
-              style={{
-                fontFamily: 'var(--font-retail-sans), sans-serif',
-                color: 'var(--retail-primary)',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-              }}
-            >
-              {showAddress ? '- Ocultar direccion de entrega' : '+ Agregar direccion de entrega'}
-            </button>
-
-            {showAddress && (
-              <div
-                className="space-y-3 mt-3"
-                style={{
-                  opacity: 1,
-                  transition: 'all 300ms ease',
-                }}
-              >
-                <div>
-                  <label style={labelStyle}>Direccion</label>
-                  <input
-                    type="text"
-                    value={form.direccion}
-                    onChange={e => update('direccion', e.target.value)}
-                    className="w-full mt-1 px-4 py-3 rounded-xl border-2 outline-none"
-                    style={inputStyle()}
-                    placeholder="Calle y numero"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label style={labelStyle}>Ciudad</label>
-                    <input
-                      type="text"
-                      value={form.ciudad}
-                      onChange={e => update('ciudad', e.target.value)}
-                      className="w-full mt-1 px-4 py-3 rounded-xl border-2 outline-none"
-                      style={inputStyle()}
-                      placeholder="Localidad"
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Cod. Postal</label>
-                    <input
-                      type="text"
-                      value={form.codigoPostal}
-                      onChange={e => update('codigoPostal', e.target.value)}
-                      className="w-full mt-1 px-4 py-3 rounded-xl border-2 outline-none"
-                      style={inputStyle()}
-                      placeholder="1878"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Provincia</label>
-                  <input
-                    type="text"
-                    value={form.provincia}
-                    onChange={e => update('provincia', e.target.value)}
-                    className="w-full mt-1 px-4 py-3 rounded-xl border-2 outline-none"
-                    style={inputStyle()}
-                  />
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Message */}

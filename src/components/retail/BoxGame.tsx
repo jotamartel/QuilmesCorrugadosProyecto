@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import type { GameState, BoxQuoteLine, OrderFormData } from '@/lib/retail/types';
+import type { GameState, BoxQuoteLine, OrderFormData, ShippingData } from '@/lib/retail/types';
+import type { StandardSuggestion } from './QuoteResult';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import { calcularPrecioMinorista } from '@/lib/retail/pricing';
 import { trackEvent } from '@/lib/retail/tracking';
@@ -16,6 +17,7 @@ import AddMorePrompt from './AddMorePrompt';
 import PreviousBoxesList from './PreviousBoxesList';
 import QuoteResult from './QuoteResult';
 import OrderForm from './OrderForm';
+import ShippingStep from './ShippingStep';
 import OrderConfirmation from './OrderConfirmation';
 
 function useBoxGame() {
@@ -26,6 +28,7 @@ function useBoxGame() {
   const [cantidad, setCantidad] = useState<number>(0);
   const [boxes, setBoxes] = useState<BoxQuoteLine[]>([]);
   const [formData, setFormData] = useState<OrderFormData | null>(null);
+  const [shippingData, setShippingData] = useState<ShippingData | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showHint, setShowHint] = useState(false);
@@ -138,6 +141,7 @@ function useBoxGame() {
   const reset = useCallback(() => {
     setBoxes([]);
     setFormData(null);
+    setShippingData(null);
     setEditingIndex(null);
     setLargo(RETAIL_CONFIG.DEFAULT_LARGO);
     setAncho(RETAIL_CONFIG.DEFAULT_ANCHO);
@@ -157,39 +161,123 @@ function useBoxGame() {
     transition('ORDER_FORM');
   }, [transition]);
 
-  // Submit order from QUOTE screen (data already collected)
-  const submitOrder = useCallback(async () => {
-    if (!formData) return;
+  // From QUOTE → SHIPPING step
+  const goToShipping = useCallback(() => {
+    transition('SHIPPING');
+  }, [transition]);
 
-    const response = await fetch('/api/public/retail-quotes', {
+  // From SHIPPING → back to QUOTE
+  const backToQuote = useCallback(() => {
+    transition('QUOTE');
+  }, [transition]);
+
+  // Select a standard box from suggestions (replaces the primary box)
+  const selectStandardBox = useCallback((sug: StandardSuggestion) => {
+    if (boxes.length === 0) return;
+    const primaryQty = boxes[0].cantidad;
+    const result = calcularPrecioMinorista(sug.length_mm, sug.width_mm, sug.height_mm, primaryQty);
+    const newBox: BoxQuoteLine = {
+      largo: sug.length_mm,
+      ancho: sug.width_mm,
+      alto: sug.height_mm,
+      cantidad: primaryQty,
+      standardBoxId: sug.id,
+      ...result,
+    };
+    setBoxes(prev => [newBox, ...prev.slice(1)]);
+  }, [boxes]);
+
+  // Submit order from SHIPPING step
+  // For confirmed-price methods: creates MercadoPago checkout and redirects
+  // For "a confirmar" methods: saves quote directly (no payment)
+  const submitOrder = useCallback(async (shipping: ShippingData) => {
+    if (!formData) return;
+    setShippingData(shipping);
+
+    const payload = {
+      ...formData,
+      direccion: shipping.direccion,
+      ciudad: shipping.ciudad,
+      provincia: shipping.provincia,
+      codigoPostal: shipping.codigoPostal,
+      shippingMethod: shipping.method,
+      shippingCost: shipping.cost,
+      shippingCostConfirmed: shipping.costConfirmed,
+      boxes: boxes.map(b => ({
+        largo: b.largo,
+        ancho: b.ancho,
+        alto: b.alto,
+        cantidad: b.cantidad,
+        precioUnitario: b.precioUnitario,
+        subtotal: b.subtotal,
+        m2PerBox: b.m2PerBox,
+        totalM2: b.totalM2,
+        isMayorista: b.isMayorista,
+        standardBoxId: b.standardBoxId,
+      })),
+    };
+
+    // If shipping cost is NOT confirmed (resto del país), skip payment — just save quote
+    if (!shipping.costConfirmed) {
+      const response = await fetch('/api/public/retail-quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Error al enviar');
+      }
+
+      const precioTotal = boxes.reduce((sum, b) => sum + b.subtotal, 0);
+      trackEvent('Lead', { value: precioTotal, currency: 'ARS' });
+      transition('ORDER_SENT');
+      return;
+    }
+
+    // For confirmed-price orders: create MercadoPago checkout
+    const response = await fetch('/api/public/retail-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...formData,
-        boxes: boxes.map(b => ({
-          largo: b.largo,
-          ancho: b.ancho,
-          alto: b.alto,
-          cantidad: b.cantidad,
-          precioUnitario: b.precioUnitario,
-          subtotal: b.subtotal,
-          m2PerBox: b.m2PerBox,
-          totalM2: b.totalM2,
-          isMayorista: b.isMayorista,
-        })),
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
       const err = await response.json();
-      throw new Error(err.error || 'Error al enviar');
+      // If MP not configured, fall back to regular quote saving
+      if (response.status === 503) {
+        const fallback = await fetch('/api/public/retail-quotes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!fallback.ok) {
+          const fallbackErr = await fallback.json();
+          throw new Error(fallbackErr.error || 'Error al enviar');
+        }
+        const precioTotal = boxes.reduce((sum, b) => sum + b.subtotal, 0);
+        trackEvent('Lead', { value: precioTotal + shipping.cost, currency: 'ARS' });
+        transition('ORDER_SENT');
+        return;
+      }
+      throw new Error(err.error || 'Error al crear el pago');
     }
 
-    // Track lead conversion
-    const precioTotal = boxes.reduce((sum, b) => sum + b.subtotal, 0);
-    trackEvent('Lead', { value: precioTotal, currency: 'ARS' });
+    const data = await response.json();
 
-    transition('ORDER_SENT');
+    // Track checkout initiation
+    const precioTotal = boxes.reduce((sum, b) => sum + b.subtotal, 0);
+    trackEvent('InitiateCheckout', { value: precioTotal + shipping.cost, currency: 'ARS' });
+
+    // Redirect to MercadoPago checkout
+    // Use sandbox_init_point for test mode, init_point for production
+    const checkoutUrl = data.sandbox_init_point || data.init_point;
+    if (checkoutUrl) {
+      window.location.href = checkoutUrl;
+    } else {
+      throw new Error('No se pudo obtener el link de pago');
+    }
   }, [boxes, formData, transition]);
 
   // Validate ancho considering MAX_SHEET_WIDTH
@@ -209,10 +297,10 @@ function useBoxGame() {
   }, [ancho]);
 
   return {
-    state, largo, ancho, alto, cantidad, boxes, formData, editingIndex, isTransitioning, showHint,
+    state, largo, ancho, alto, cantidad, boxes, formData, shippingData, editingIndex, isTransitioning, showHint,
     setLargo, setAncho, setAlto, setCantidad,
     start, confirmDimension, confirmQuantity, addMore, finishQuote, reset,
-    startEdit, revealQuote, backToForm, submitOrder,
+    startEdit, revealQuote, backToForm, goToShipping, backToQuote, selectStandardBox, submitOrder,
     validateAncho, validateAlto,
   };
 }
@@ -235,8 +323,9 @@ export default function BoxGame() {
   const isAddMore = game.state === 'ADD_MORE';
   const isQuote = game.state === 'QUOTE';
   const isOrderForm = game.state === 'ORDER_FORM';
+  const isShipping = game.state === 'SHIPPING';
   const isOrderSent = game.state === 'ORDER_SENT';
-  const showBox = !isQuote && !isOrderForm && !isOrderSent;
+  const showBox = !isQuote && !isOrderForm && !isShipping && !isOrderSent;
 
   // Hint text
   const getHintText = () => {
@@ -392,7 +481,17 @@ export default function BoxGame() {
           boxes={game.boxes}
           visible={isQuote}
           onReset={game.reset}
-          onOrder={game.submitOrder}
+          onOrder={game.goToShipping}
+          onSelectStandard={game.selectStandardBox}
+        />
+
+        {/* Shipping step overlay */}
+        <ShippingStep
+          boxes={game.boxes}
+          visible={isShipping}
+          onSubmit={game.submitOrder}
+          onBack={game.backToQuote}
+          savedShipping={game.shippingData}
         />
 
         {/* Order confirmation overlay */}
@@ -400,6 +499,7 @@ export default function BoxGame() {
           boxes={game.boxes}
           visible={isOrderSent}
           onReset={game.reset}
+          shippingData={game.shippingData}
         />
       </div>
 
@@ -436,7 +536,7 @@ export default function BoxGame() {
 
         {/* Confirm button (dimension states + quantity) */}
         <ConfirmButton
-          label={isDimensionState ? 'SIGUIENTE CARA' : 'LISTO'}
+          label={isAltoState ? 'CANTIDAD' : isDimensionState ? 'SIGUIENTE CARA' : 'LISTO'}
           onClick={isDimensionState ? game.confirmDimension : game.confirmQuantity}
           visible={(isDimensionState || (isQuantityState && game.cantidad >= RETAIL_CONFIG.MIN_CANTIDAD)) && !game.isTransitioning}
         />

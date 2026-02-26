@@ -1,12 +1,18 @@
 /**
- * API Pública: /api/public/retail-quotes
- * Guardar cotizaciones del configurador retail (sin autenticación)
+ * API Pública: /api/public/retail-checkout
+ * Crea una preferencia de MercadoPago Checkout Pro
+ * 1. Guarda la cotización en Supabase (igual que retail-quotes)
+ * 2. Crea una preferencia de pago en MercadoPago
+ * 3. Devuelve el init_point (URL de pago)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateUnfolded } from '@/lib/utils/box-calculations';
 import type { TaxCondition } from '@/lib/types/database';
+
+const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN || '';
 
 interface RetailBox {
   largo: number;
@@ -21,38 +27,38 @@ interface RetailBox {
   standardBoxId?: string;
 }
 
-interface RetailQuoteRequest {
+interface CheckoutRequest {
   clientType: 'empresa' | 'particular';
-  // Empresa
   razonSocial?: string;
   nombreFantasia?: string;
   cuit?: string;
   condicionIva?: string;
-  // Particular
   nombreCompleto?: string;
   dni?: string;
-  // Contact
   email: string;
   telefono: string;
-  // Address (from shipping step)
   direccion?: string;
   ciudad?: string;
   provincia?: string;
   codigoPostal?: string;
-  // Shipping
   shippingMethod?: 'retiro_sucursal' | 'envio_caba_amba' | 'envio_resto_pais';
   shippingCost?: number;
   shippingCostConfirmed?: boolean;
-  // Message
   mensaje?: string;
-  // Boxes
   boxes: RetailBox[];
 }
 
 export async function POST(request: NextRequest) {
   try {
+    if (!MP_ACCESS_TOKEN || MP_ACCESS_TOKEN.includes('0000000000')) {
+      return NextResponse.json(
+        { error: 'MercadoPago no está configurado. Configura MERCADOPAGO_ACCESS_TOKEN.' },
+        { status: 503 }
+      );
+    }
+
     const supabase = createAdminClient();
-    const body: RetailQuoteRequest = await request.json();
+    const body: CheckoutRequest = await request.json();
 
     // ═══════════════════════════════════════════════════════════
     // VALIDACIONES
@@ -73,23 +79,17 @@ export async function POST(request: NextRequest) {
       errors.push('El email no es valido');
     }
 
-    if (!body.telefono?.trim()) {
-      errors.push('El telefono es requerido');
-    }
-
-    if (!body.boxes || body.boxes.length === 0) {
-      errors.push('Debe incluir al menos una caja');
-    }
+    if (!body.telefono?.trim()) errors.push('El telefono es requerido');
+    if (!body.boxes || body.boxes.length === 0) errors.push('Debe incluir al menos una caja');
 
     if (errors.length > 0) {
       return NextResponse.json({ error: errors.join('. ') }, { status: 400 });
     }
 
     // ═══════════════════════════════════════════════════════════
-    // PREPARAR DATOS
+    // GUARDAR COTIZACIÓN EN SUPABASE
     // ═══════════════════════════════════════════════════════════
 
-    // Derive requester name and tax condition from client type
     const requesterName = body.clientType === 'empresa'
       ? body.razonSocial!.trim()
       : body.nombreCompleto!.trim();
@@ -102,28 +102,27 @@ export async function POST(request: NextRequest) {
       ? (body.condicionIva as TaxCondition) || 'responsable_inscripto'
       : 'consumidor_final';
 
-    // Use the first box for the primary dimensions (required by public_quotes schema)
     const primaryBox = body.boxes[0];
     const unfolded = calculateUnfolded(primaryBox.largo, primaryBox.ancho, primaryBox.alto);
-
-    // Calculate totals across all boxes
     const totalSqm = body.boxes.reduce((sum, b) => sum + b.totalM2, 0);
     const totalSubtotal = body.boxes.reduce((sum, b) => sum + b.subtotal, 0);
 
-    // Build message with full quote breakdown
+    // Shipping
+    const shippingCost = body.shippingCostConfirmed ? (body.shippingCost || 0) : 0;
+    const totalConEnvio = totalSubtotal + shippingCost;
+
+    const shippingLabel = body.shippingMethod ? {
+      retiro_sucursal: 'Retiro por sucursal (Lugones 219, Quilmes)',
+      envio_caba_amba: `Envio CABA/AMBA ($${shippingCost.toLocaleString('es-AR')})`,
+      envio_resto_pais: 'Envio al resto del pais (costo a confirmar)',
+    }[body.shippingMethod] : null;
+
     const boxLines = body.boxes.map((b, i) =>
       `Caja ${i + 1}: ${b.largo}x${b.ancho}x${b.alto}mm — ${b.cantidad} uds — $${b.subtotal.toLocaleString('es-AR')}${b.isMayorista ? ' (mayorista)' : ''}`
     ).join('\n');
 
-    // Shipping info
-    const shippingLabel = body.shippingMethod ? {
-      retiro_sucursal: 'Retiro por sucursal (Lugones 219, Quilmes)',
-      envio_caba_amba: `Envio CABA/AMBA ($${(body.shippingCost || 0).toLocaleString('es-AR')})`,
-      envio_resto_pais: 'Envio al resto del pais (costo a confirmar)',
-    }[body.shippingMethod] : null;
-
     const fullMessage = [
-      `[Cotizacion Retail]`,
+      `[Cotizacion Retail — Pago MP]`,
       `Tipo: ${body.clientType === 'empresa' ? 'Empresa' : 'Particular'}`,
       body.clientType === 'empresa' && body.cuit ? `CUIT: ${body.cuit}` : null,
       body.clientType === 'particular' && body.dni ? `DNI: ${body.dni}` : null,
@@ -135,63 +134,45 @@ export async function POST(request: NextRequest) {
       body.shippingMethod && body.shippingMethod !== 'retiro_sucursal' && body.direccion
         ? `Direccion: ${body.direccion}, ${body.ciudad || ''}, ${body.provincia || 'Buenos Aires'} ${body.codigoPostal || ''}`
         : null,
-      body.shippingCostConfirmed && body.shippingCost
-        ? `Total con envio: $${(totalSubtotal + body.shippingCost).toLocaleString('es-AR')}`
+      body.shippingCostConfirmed && shippingCost > 0
+        ? `Total con envio: $${totalConEnvio.toLocaleString('es-AR')}`
         : null,
       body.mensaje?.trim() ? `\nMensaje: ${body.mensaje.trim()}` : null,
     ].filter(Boolean).join('\n');
 
-    // Tracking metadata
     const sourceIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-                     request.headers.get('x-real-ip') ||
-                     'unknown';
-    const sourceUserAgent = request.headers.get('user-agent') || 'unknown';
-
-    // ═══════════════════════════════════════════════════════════
-    // GUARDAR EN SUPABASE
-    // ═══════════════════════════════════════════════════════════
+                     request.headers.get('x-real-ip') || 'unknown';
 
     const { data: quote, error } = await supabase
       .from('public_quotes')
       .insert({
-        // Solicitante
         requester_name: requesterName,
         requester_company: requesterCompany,
         requester_email: body.email.trim().toLowerCase(),
         requester_phone: body.telefono.replace(/\D/g, ''),
         requester_cuit: body.cuit?.replace(/\D/g, '') || null,
         requester_tax_condition: taxCondition,
-
-        // Dirección
         address: body.direccion?.trim() || null,
         city: body.ciudad?.trim() || null,
         province: body.provincia || 'Buenos Aires',
         postal_code: body.codigoPostal?.trim() || null,
-
-        // Primera caja (campo obligatorio del schema)
         length_mm: primaryBox.largo,
         width_mm: primaryBox.ancho,
         height_mm: primaryBox.alto,
         quantity: primaryBox.cantidad,
         has_printing: false,
         printing_colors: 0,
-
-        // Cálculos
         sheet_width_mm: unfolded.unfoldedWidth,
         sheet_length_mm: unfolded.unfoldedLength,
         sqm_per_box: unfolded.m2,
         total_sqm: totalSqm,
         price_per_m2: totalSqm > 0 ? Math.round(totalSubtotal / totalSqm) : 0,
         unit_price: primaryBox.precioUnitario,
-        subtotal: totalSubtotal,
+        subtotal: totalConEnvio,
         estimated_days: 5,
-
-        // Tracking
         source_ip: sourceIp,
-        source_user_agent: sourceUserAgent,
+        source_user_agent: request.headers.get('user-agent') || 'unknown',
         message: fullMessage,
-
-        // Estado
         status: 'pending',
         requested_contact: true,
       })
@@ -199,11 +180,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Error saving retail quote:', error);
-      return NextResponse.json(
-        { error: 'Error al guardar la cotizacion' },
-        { status: 500 }
-      );
+      console.error('Error saving quote:', error);
+      return NextResponse.json({ error: 'Error al guardar la cotizacion' }, { status: 500 });
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -232,15 +210,76 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // CREAR PREFERENCIA DE MERCADOPAGO
+    // ═══════════════════════════════════════════════════════════
+
+    const client = new MercadoPagoConfig({ accessToken: MP_ACCESS_TOKEN });
+    const preference = new Preference(client);
+
+    // Build items list
+    const items = body.boxes.map((box, i) => ({
+      id: `box-${i + 1}`,
+      title: `Caja ${box.largo}x${box.ancho}x${box.alto}mm`,
+      description: `Caja de carton corrugado ${box.largo}x${box.ancho}x${box.alto}mm x${box.cantidad} unidades`,
+      quantity: 1, // Agrupamos como subtotal
+      unit_price: box.subtotal,
+      currency_id: 'ARS' as const,
+    }));
+
+    // Add shipping as item if confirmed cost
+    if (body.shippingCostConfirmed && shippingCost > 0) {
+      items.push({
+        id: 'shipping',
+        title: `Envio ${body.shippingMethod === 'envio_caba_amba' ? 'CABA/AMBA' : 'Nacional'}`,
+        description: `Costo de envio`,
+        quantity: 1,
+        unit_price: shippingCost,
+        currency_id: 'ARS' as const,
+      });
+    }
+
+    // Base URL for callbacks
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quilmes-corrugados.vercel.app';
+
+    const preferenceData = await preference.create({
+      body: {
+        items,
+        payer: {
+          name: requesterName,
+          email: body.email.trim().toLowerCase(),
+          phone: {
+            number: body.telefono.replace(/\D/g, ''),
+          },
+        },
+        back_urls: {
+          success: `${baseUrl}/cajas/pago?status=approved&quote=${quote.id}`,
+          failure: `${baseUrl}/cajas/pago?status=rejected&quote=${quote.id}`,
+          pending: `${baseUrl}/cajas/pago?status=pending&quote=${quote.id}`,
+        },
+        auto_return: 'approved',
+        external_reference: quote.id,
+        statement_descriptor: 'QUILMES CORRUGADOS',
+        notification_url: `${baseUrl}/api/webhooks/mercadopago`,
+      },
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // RESPUESTA
+    // ═══════════════════════════════════════════════════════════
+
     return NextResponse.json({
       success: true,
+      quote_id: quote.id,
       quote_number: quote.quote_number,
+      init_point: preferenceData.init_point,
+      sandbox_init_point: preferenceData.sandbox_init_point,
     }, { status: 201 });
 
   } catch (error) {
-    console.error('Error in POST /api/public/retail-quotes:', error);
+    console.error('Error in POST /api/public/retail-checkout:', error);
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      { error: 'Error al crear el checkout' },
       { status: 500 }
     );
   }

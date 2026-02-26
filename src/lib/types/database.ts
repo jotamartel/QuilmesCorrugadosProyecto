@@ -80,6 +80,7 @@ export interface Box {
   unfolded_length_mm: number;
   unfolded_width_mm: number;
   m2_per_box: number;
+  stock: number;
   is_standard: boolean;
   is_active: boolean;
   created_at: string;

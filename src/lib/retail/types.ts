@@ -12,6 +12,7 @@ export interface BoxQuoteLine extends BoxConfig {
   m2PerBox: number;          // m² por caja
   totalM2: number;           // m² total del line item
   isMayorista: boolean;      // si aplica precio mayorista
+  standardBoxId?: string;    // ID de caja estándar del catálogo (si fue seleccionada de sugerencias)
 }
 
 export interface RetailQuote {
@@ -29,7 +30,20 @@ export type GameState =
   | 'ADD_MORE'
   | 'QUOTE'
   | 'ORDER_FORM'
+  | 'SHIPPING'
   | 'ORDER_SENT';
+
+export type ShippingMethod = 'retiro_sucursal' | 'envio_caba_amba' | 'envio_resto_pais';
+
+export interface ShippingData {
+  method: ShippingMethod;
+  cost: number;            // 0 para retiro y resto del país
+  costConfirmed: boolean;  // false para resto del país (precio a confirmar)
+  direccion: string;
+  ciudad: string;
+  provincia: string;
+  codigoPostal: string;
+}
 
 export type ClientType = 'empresa' | 'particular';
 

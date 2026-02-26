@@ -253,54 +253,58 @@ export default function ConfiguracionPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
-                    label="Precio estándar ($/m2)"
-                    type="number"
-                    value={pricingFormData.price_per_m2_standard}
-                    onChange={(e) => setPricingFormData({ ...pricingFormData, price_per_m2_standard: Number(e.target.value) })}
-                    disabled={!editMode}
-                    hint={`Actual: ${formatCurrency(pricingConfig?.price_per_m2_standard || 0)}`}
-                  />
-                  <Input
                     label="Precio por volumen ($/m2)"
                     type="number"
                     value={pricingFormData.price_per_m2_volume}
                     onChange={(e) => setPricingFormData({ ...pricingFormData, price_per_m2_volume: Number(e.target.value) })}
                     disabled={!editMode}
-                    hint={`Actual: ${formatCurrency(pricingConfig?.price_per_m2_volume || 0)}`}
+                    hint={`Actual: ${formatCurrency(pricingConfig?.price_per_m2_volume || 0)} — Pedidos > ${pricingFormData.volume_threshold_m2} m2`}
+                  />
+                  <Input
+                    label="Precio estándar ($/m2)"
+                    type="number"
+                    value={pricingFormData.price_per_m2_standard}
+                    onChange={(e) => setPricingFormData({ ...pricingFormData, price_per_m2_standard: Number(e.target.value) })}
+                    disabled={!editMode}
+                    hint={`Actual: ${formatCurrency(pricingConfig?.price_per_m2_standard || 0)} — Pedidos de ${pricingFormData.min_m2_per_model} a ${pricingFormData.volume_threshold_m2} m2`}
                   />
                 </div>
-                <Input
-                  label="Umbral de volumen (m2)"
-                  type="number"
-                  value={pricingFormData.volume_threshold_m2}
-                  onChange={(e) => setPricingFormData({ ...pricingFormData, volume_threshold_m2: Number(e.target.value) })}
-                  disabled={!editMode}
-                  hint="m2 mínimos para aplicar precio por volumen"
-                />
-                <Input
-                  label="Mínimo m2 por modelo"
-                  type="number"
-                  value={pricingFormData.min_m2_per_model}
-                  onChange={(e) => setPricingFormData({ ...pricingFormData, min_m2_per_model: Number(e.target.value) })}
-                  disabled={!editMode}
-                  hint="m2 mínimos recomendados por modelo de caja"
-                />
-                <Input
-                  label="Precio menor al mínimo ($/m2)"
-                  type="number"
-                  value={pricingFormData.price_per_m2_below_minimum}
-                  onChange={(e) => setPricingFormData({ ...pricingFormData, price_per_m2_below_minimum: Number(e.target.value) })}
-                  disabled={!editMode}
-                  hint={`Actual: ${formatCurrency(pricingConfig?.price_per_m2_below_minimum || (pricingConfig?.price_per_m2_standard || 700) * 1.20 || 0)} - Precio con recargo para pedidos menores a ${pricingFormData.min_m2_per_model}m2`}
-                />
-                <Input
-                  label="Precio minorista ($/m2)"
-                  type="number"
-                  value={pricingFormData.price_per_m2_retail}
-                  onChange={(e) => setPricingFormData({ ...pricingFormData, price_per_m2_retail: Number(e.target.value) })}
-                  disabled={!editMode}
-                  hint={`Actual: ${formatCurrency(pricingConfig?.price_per_m2_retail || 900)} - Precio para ventas minoristas (< 1000 m2) en /cajas`}
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Precio menor al mínimo ($/m2)"
+                    type="number"
+                    value={pricingFormData.price_per_m2_below_minimum}
+                    onChange={(e) => setPricingFormData({ ...pricingFormData, price_per_m2_below_minimum: Number(e.target.value) })}
+                    disabled={!editMode}
+                    hint={`Actual: ${formatCurrency(pricingConfig?.price_per_m2_below_minimum || 0)} — Pedidos de 1000 a ${pricingFormData.min_m2_per_model} m2`}
+                  />
+                  <Input
+                    label="Precio minorista ($/m2)"
+                    type="number"
+                    value={pricingFormData.price_per_m2_retail}
+                    onChange={(e) => setPricingFormData({ ...pricingFormData, price_per_m2_retail: Number(e.target.value) })}
+                    disabled={!editMode}
+                    hint={`Actual: ${formatCurrency(pricingConfig?.price_per_m2_retail || 900)} — Pedidos < 1000 m2 (ventas en /cajas)`}
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Umbral de volumen (m2)"
+                    type="number"
+                    value={pricingFormData.volume_threshold_m2}
+                    onChange={(e) => setPricingFormData({ ...pricingFormData, volume_threshold_m2: Number(e.target.value) })}
+                    disabled={!editMode}
+                    hint="m2 a partir de los cuales aplica precio por volumen"
+                  />
+                  <Input
+                    label="Mínimo m2 por modelo"
+                    type="number"
+                    value={pricingFormData.min_m2_per_model}
+                    onChange={(e) => setPricingFormData({ ...pricingFormData, min_m2_per_model: Number(e.target.value) })}
+                    disabled={!editMode}
+                    hint="m2 mínimos recomendados por modelo de caja"
+                  />
+                </div>
               </CardContent>
             </Card>
 

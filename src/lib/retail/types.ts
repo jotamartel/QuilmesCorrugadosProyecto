@@ -43,6 +43,8 @@ export interface ShippingData {
   ciudad: string;
   provincia: string;
   codigoPostal: string;
+  lat?: number;            // Coordenadas de Google Maps para planificación de entregas
+  lng?: number;
 }
 
 export type ClientType = 'empresa' | 'particular';

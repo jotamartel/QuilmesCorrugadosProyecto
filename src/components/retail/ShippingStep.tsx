@@ -47,6 +47,8 @@ export default function ShippingStep({ boxes, visible, onSubmit, onBack, savedSh
   const [codigoPostal, setCodigoPostal] = useState(savedShipping?.codigoPostal ?? '');
   const [provincia, setProvincia] = useState(savedShipping?.provincia || 'Buenos Aires');
   const [addressValidated, setAddressValidated] = useState(false);
+  const [addressLat, setAddressLat] = useState<number | undefined>(savedShipping?.lat);
+  const [addressLng, setAddressLng] = useState<number | undefined>(savedShipping?.lng);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -96,6 +98,10 @@ export default function ShippingStep({ boxes, visible, onSubmit, onBack, savedSh
     setProvincia(parsed.provincia || 'Buenos Aires');
     setCodigoPostal(parsed.codigoPostal);
     setAddressValidated(true);
+
+    // Store coordinates for delivery route planning
+    setAddressLat(parsed.lat ?? undefined);
+    setAddressLng(parsed.lng ?? undefined);
 
     // If they chose CABA/AMBA but the address is outside, switch to resto del país
     if (selectedMethod === 'envio_caba_amba' && !isInCabaAmba(parsed)) {
@@ -158,6 +164,8 @@ export default function ShippingStep({ boxes, visible, onSubmit, onBack, savedSh
         ciudad: isPickup ? '' : ciudad.trim(),
         provincia: isPickup ? '' : provincia.trim(),
         codigoPostal: isPickup ? '' : codigoPostal.trim(),
+        lat: isPickup ? undefined : addressLat,
+        lng: isPickup ? undefined : addressLng,
       });
     } catch {
       setErrors({ _general: 'Error al enviar. Intenta de nuevo.' });

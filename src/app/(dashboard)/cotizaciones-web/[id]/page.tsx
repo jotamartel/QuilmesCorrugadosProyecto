@@ -46,6 +46,7 @@ interface PublicQuoteWithFormatted extends PublicQuote {
 
 const STATUS_CONFIG: Record<PublicQuoteStatus, { label: string; variant: 'success' | 'warning' | 'error' | 'info' }> = {
   pending: { label: 'Pendiente', variant: 'warning' },
+  approved: { label: 'Aprobado', variant: 'success' },
   contacted: { label: 'Contactado', variant: 'info' },
   converted: { label: 'Convertido', variant: 'success' },
   rejected: { label: 'Rechazado', variant: 'error' },

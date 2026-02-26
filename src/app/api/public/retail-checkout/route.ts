@@ -41,6 +41,8 @@ interface CheckoutRequest {
   ciudad?: string;
   provincia?: string;
   codigoPostal?: string;
+  lat?: number;
+  lng?: number;
   shippingMethod?: 'retiro_sucursal' | 'envio_caba_amba' | 'envio_resto_pais';
   shippingCost?: number;
   shippingCostConfirmed?: boolean;
@@ -156,6 +158,8 @@ export async function POST(request: NextRequest) {
         city: body.ciudad?.trim() || null,
         province: body.provincia || 'Buenos Aires',
         postal_code: body.codigoPostal?.trim() || null,
+        delivery_lat: body.lat || null,
+        delivery_lng: body.lng || null,
         length_mm: primaryBox.largo,
         width_mm: primaryBox.ancho,
         height_mm: primaryBox.alto,
@@ -175,6 +179,9 @@ export async function POST(request: NextRequest) {
         message: fullMessage,
         status: 'pending',
         requested_contact: true,
+        shipping_method: body.shippingMethod || null,
+        shipping_cost: shippingCost,
+        fulfillment_status: 'pending_payment',
       })
       .select('id, quote_number')
       .single();

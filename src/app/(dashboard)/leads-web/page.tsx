@@ -58,6 +58,7 @@ interface QuotesResponse {
 
 const STATUS_CONFIG: Record<PublicQuoteStatus, { label: string; color: string; icon: typeof Clock }> = {
   pending: { label: 'Pendiente', color: 'warning', icon: Clock },
+  approved: { label: 'Aprobado', color: 'success', icon: CheckCircle2 },
   contacted: { label: 'Contactado', color: 'info', icon: Eye },
   converted: { label: 'Convertido', color: 'success', icon: CheckCircle2 },
   rejected: { label: 'Rechazado', color: 'error', icon: XCircle },

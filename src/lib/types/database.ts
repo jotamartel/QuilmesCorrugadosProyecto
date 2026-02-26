@@ -19,7 +19,21 @@ export type CheckExitType = 'deposit' | 'cash' | 'endorsement';
 export type IntegrationStatus = 'success' | 'error' | 'pending';
 export type IntegrationType = 'xubio' | 'arba';
 export type ClientSource = 'manual' | 'web' | 'email' | 'whatsapp';
-export type PublicQuoteStatus = 'pending' | 'contacted' | 'converted' | 'rejected';
+export type PublicQuoteStatus = 'pending' | 'approved' | 'contacted' | 'converted' | 'rejected';
+
+// Fulfillment status para ordenes retail (separado del status de pago)
+export type FulfillmentStatus =
+  | 'pending_payment'
+  | 'paid'
+  | 'preparing'
+  | 'ready_for_dispatch'
+  | 'dispatched'
+  | 'in_transit'
+  | 'delivered'
+  | 'failed_delivery'
+  | 'rescheduled';
+
+export type DeliveryRouteStatus = 'planned' | 'dispatched' | 'in_progress' | 'completed' | 'cancelled';
 
 export interface PricingConfig {
   id: string;
@@ -371,6 +385,27 @@ export interface Vehicle {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface DeliveryRoute {
+  id: string;
+  route_date: string;
+  vehicle_id: string | null;
+  driver_token: string;
+  status: DeliveryRouteStatus;
+  total_stops: number;
+  completed_stops: number;
+  failed_stops: number;
+  optimized_waypoint_order: number[] | null;
+  route_polyline: string | null;
+  estimated_duration_minutes: number | null;
+  estimated_distance_km: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  // Relaciones opcionales
+  vehicle?: Vehicle;
 }
 
 export interface Payment {
@@ -962,6 +997,23 @@ export interface PublicQuote {
   converted_at: string | null;
   converted_by: string | null;
 
+  // Coordenadas de entrega (Google Maps)
+  delivery_lat: number | null;
+  delivery_lng: number | null;
+
+  // Fulfillment (ciclo de vida de entrega)
+  fulfillment_status: FulfillmentStatus;
+  delivery_date: string | null;
+  delivery_sequence: number | null;
+  delivery_route_id: string | null;
+  dispatched_at: string | null;
+  delivered_at: string | null;
+  driver_notes: string | null;
+  failed_delivery_reason: string | null;
+  reschedule_date: string | null;
+  shipping_method: string | null;
+  shipping_cost: number;
+
   created_at: string;
   updated_at: string;
 }
@@ -1025,9 +1077,34 @@ export interface ConvertPublicQuoteRequest {
 
 export const PUBLIC_QUOTE_STATUS_LABELS: Record<PublicQuoteStatus, string> = {
   pending: 'Pendiente',
+  approved: 'Aprobado',
   contacted: 'Contactado',
   converted: 'Convertido',
   rejected: 'Rechazado',
+};
+
+export const FULFILLMENT_STATUS_LABELS: Record<FulfillmentStatus, string> = {
+  pending_payment: 'Pendiente de pago',
+  paid: 'Pagado',
+  preparing: 'Preparando',
+  ready_for_dispatch: 'Listo para despachar',
+  dispatched: 'Despachado',
+  in_transit: 'En camino',
+  delivered: 'Entregado',
+  failed_delivery: 'No entregado',
+  rescheduled: 'Reprogramado',
+};
+
+export const FULFILLMENT_STATUS_COLORS: Record<FulfillmentStatus, string> = {
+  pending_payment: 'bg-gray-100 text-gray-800',
+  paid: 'bg-blue-100 text-blue-800',
+  preparing: 'bg-yellow-100 text-yellow-800',
+  ready_for_dispatch: 'bg-green-100 text-green-800',
+  dispatched: 'bg-purple-100 text-purple-800',
+  in_transit: 'bg-indigo-100 text-indigo-800',
+  delivered: 'bg-emerald-100 text-emerald-800',
+  failed_delivery: 'bg-red-100 text-red-800',
+  rescheduled: 'bg-orange-100 text-orange-800',
 };
 
 export const CLIENT_SOURCE_LABELS: Record<ClientSource, string> = {

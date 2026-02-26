@@ -39,6 +39,8 @@ interface RetailQuoteRequest {
   ciudad?: string;
   provincia?: string;
   codigoPostal?: string;
+  lat?: number;
+  lng?: number;
   // Shipping
   shippingMethod?: 'retiro_sucursal' | 'envio_caba_amba' | 'envio_resto_pais';
   shippingCost?: number;
@@ -167,6 +169,8 @@ export async function POST(request: NextRequest) {
         city: body.ciudad?.trim() || null,
         province: body.provincia || 'Buenos Aires',
         postal_code: body.codigoPostal?.trim() || null,
+        delivery_lat: body.lat || null,
+        delivery_lng: body.lng || null,
 
         // Primera caja (campo obligatorio del schema)
         length_mm: primaryBox.largo,
@@ -194,6 +198,9 @@ export async function POST(request: NextRequest) {
         // Estado
         status: 'pending',
         requested_contact: true,
+        shipping_method: body.shippingMethod || null,
+        shipping_cost: body.shippingCost || 0,
+        fulfillment_status: 'pending_payment',
       })
       .select('id, quote_number')
       .single();

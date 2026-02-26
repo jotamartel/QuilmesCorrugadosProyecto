@@ -55,12 +55,20 @@ export async function POST(request: NextRequest) {
         ? 'rejected'
         : 'pending'; // pending, in_process, etc.
 
+    // Map to fulfillment status
+    const fulfillmentStatus = status === 'approved'
+      ? 'paid'
+      : status === 'rejected' || status === 'cancelled' || status === 'refunded'
+        ? 'pending_payment'
+        : 'pending_payment';
+
     // Update quote in Supabase
     const supabase = createAdminClient();
     const { error } = await supabase
       .from('public_quotes')
       .update({
         status: quoteStatus,
+        fulfillment_status: fulfillmentStatus,
         // Store payment info in message (append)
         message: undefined, // We'll use a raw query instead
       })

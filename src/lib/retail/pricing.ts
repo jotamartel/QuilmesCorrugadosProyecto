@@ -12,8 +12,8 @@ export interface PrecioResult {
 
 /**
  * Calcula el precio por caja.
- * - Si el total de m² del pedido es < 3000: precio minorista (cost-plus)
- * - Si el total de m² del pedido es >= 3000: precio mayorista (m² × $/m²)
+ * - Si el total de m² del pedido es >= WHOLESALE_THRESHOLD_M2 (1000): precio mayorista (m² × $/m² mayorista)
+ * - Si el total de m² del pedido es < WHOLESALE_THRESHOLD_M2: precio minorista (m² × $/m² minorista)
  */
 export function calcularPrecioMinorista(
   largo: number,
@@ -31,18 +31,11 @@ export function calcularPrecioMinorista(
   let precioUnitario: number;
 
   if (isMayorista) {
-    // Precio mayorista: m² por caja × precio por m²
+    // Precio mayorista: m² por caja × precio por m² mayorista
     precioUnitario = Math.round(m2PerBox * config.WHOLESALE_PRICE_PER_M2);
   } else {
-    // Precio minorista: cost-plus
-    const precioBase =
-      (volumen * config.FACTOR_MATERIAL) +
-      config.COSTO_BASE_FIJO +
-      config.RECARGO_MANIPULACION;
-
-    precioUnitario = Math.round(
-      precioBase * (1 + config.MARGEN_MINORISTA)
-    );
+    // Precio minorista: m² por caja × precio por m² minorista
+    precioUnitario = Math.round(m2PerBox * config.RETAIL_PRICE_PER_M2);
   }
 
   const subtotal = precioUnitario * cantidad;

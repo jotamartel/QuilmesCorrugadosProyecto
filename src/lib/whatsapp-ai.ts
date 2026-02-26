@@ -28,6 +28,7 @@ function getFallbackPricingConfig(): PricingConfig {
     volume_threshold_m2: 5000,
     min_m2_per_model: 3000,
     price_per_m2_below_minimum: 900,
+    price_per_m2_retail: 900,
     free_shipping_min_m2: 3000,
     free_shipping_max_km: 60,
     production_days_standard: 7,

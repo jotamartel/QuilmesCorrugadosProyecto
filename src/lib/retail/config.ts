@@ -1,4 +1,49 @@
-export const RETAIL_CONFIG = {
+export interface RetailConfig {
+  // Límites de dimensiones (mm)
+  MIN_LARGO: number;
+  MAX_LARGO: number;
+  MIN_ANCHO: number;
+  MAX_ANCHO: number;
+  MIN_ALTO: number;
+  MAX_ALTO: number;
+
+  // Valores iniciales (mm)
+  DEFAULT_LARGO: number;
+  DEFAULT_ANCHO: number;
+  DEFAULT_ALTO: number;
+
+  // Límites de cantidad
+  MIN_CANTIDAD: number;
+
+  // Restricción de producción
+  MAX_SHEET_WIDTH: number;
+
+  // Precio minorista (< 1000 m²): $/m²
+  RETAIL_PRICE_PER_M2: number;
+  PRECIO_MINIMO_PEDIDO: number;
+  DECIMALES_PRECIO: number;
+
+  // Precio mayorista (>= 1000 m²)
+  WHOLESALE_THRESHOLD_M2: number;
+  WHOLESALE_PRICE_PER_M2: number;
+
+  // Interacción
+  DRAG_SENSITIVITY: number;
+  TRANSITION_DURATION: number;
+  HINT_DURATION: number;
+
+  // Envío
+  SHIPPING_FACTORY_ADDRESS: string;
+  SHIPPING_CABA_AMBA_COST: number;
+
+  // Bounds AMBA
+  AMBA_BOUNDS: {
+    SW: { lat: number; lng: number };
+    NE: { lat: number; lng: number };
+  };
+}
+
+export const RETAIL_CONFIG: RetailConfig = {
   // Límites de dimensiones (mm)
   MIN_LARGO: 100,
   MAX_LARGO: 800,
@@ -19,17 +64,14 @@ export const RETAIL_CONFIG = {
   // Ancho de plancha = Alto + Ancho (no puede superar 1200mm por los rollos)
   MAX_SHEET_WIDTH: 1200, // mm
 
-  // Precio minorista (< 3000 m²)
-  FACTOR_MATERIAL: 0.000015,     // ARS por mm³
-  COSTO_BASE_FIJO: 150,          // ARS por caja
-  RECARGO_MANIPULACION: 50,      // ARS por caja
-  MARGEN_MINORISTA: 0.35,        // 35%
-  PRECIO_MINIMO_PEDIDO: 5000,    // ARS
-  DECIMALES_PRECIO: 0,           // Redondeo sin decimales
+  // Precio minorista (< 1000 m²): configurable desde dashboard
+  RETAIL_PRICE_PER_M2: 900,       // ARS por m² — valor default, se sobreescribe con config de DB
+  PRECIO_MINIMO_PEDIDO: 5000,     // ARS
+  DECIMALES_PRECIO: 0,            // Redondeo sin decimales
 
-  // Precio mayorista (>= 3000 m²)
-  WHOLESALE_THRESHOLD_M2: 3000,  // m² mínimo para precio mayorista
-  WHOLESALE_PRICE_PER_M2: 700,   // ARS por m²
+  // Precio mayorista (>= 1000 m²)
+  WHOLESALE_THRESHOLD_M2: 1000,   // m² mínimo para precio mayorista
+  WHOLESALE_PRICE_PER_M2: 700,    // ARS por m²
 
   // Interacción
   DRAG_SENSITIVITY: 2,           // mm por pixel
@@ -45,6 +87,4 @@ export const RETAIL_CONFIG = {
     SW: { lat: -35.0, lng: -59.2 },  // Sudoeste
     NE: { lat: -34.3, lng: -58.1 },  // Nordeste
   },
-} as const;
-
-export type RetailConfig = typeof RETAIL_CONFIG;
+};

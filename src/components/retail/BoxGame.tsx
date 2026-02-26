@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { GameState, BoxQuoteLine, OrderFormData, ShippingData } from '@/lib/retail/types';
 import type { StandardSuggestion } from './QuoteResult';
-import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { RETAIL_CONFIG, type RetailConfig } from '@/lib/retail/config';
 import { calcularPrecioMinorista } from '@/lib/retail/pricing';
 import { trackEvent } from '@/lib/retail/tracking';
 
@@ -33,6 +33,26 @@ function useBoxGame() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const hintShownFor = useRef(new Set<GameState>());
+
+  // Dynamic retail config (loaded from DB)
+  const [retailConfig, setRetailConfig] = useState<RetailConfig>(RETAIL_CONFIG);
+
+  useEffect(() => {
+    fetch('/api/public/retail-config')
+      .then(res => res.json())
+      .then(data => {
+        if (data.price_per_m2_retail) {
+          setRetailConfig(prev => ({
+            ...prev,
+            RETAIL_PRICE_PER_M2: data.price_per_m2_retail,
+            WHOLESALE_PRICE_PER_M2: data.price_per_m2_wholesale || prev.WHOLESALE_PRICE_PER_M2,
+          }));
+        }
+      })
+      .catch(() => {
+        // Use defaults if fetch fails
+      });
+  }, []);
 
   const transition = useCallback((nextState: GameState) => {
     setIsTransitioning(true);
@@ -89,7 +109,7 @@ function useBoxGame() {
 
   const addMore = useCallback(() => {
     // Save current box (replace if editing, append if new)
-    const result = calcularPrecioMinorista(largo, ancho, alto, cantidad);
+    const result = calcularPrecioMinorista(largo, ancho, alto, cantidad, retailConfig);
     const newBox: BoxQuoteLine = { largo, ancho, alto, cantidad, ...result };
 
     if (editingIndex !== null) {
@@ -106,11 +126,11 @@ function useBoxGame() {
     setCantidad(0);
 
     transition('SET_LARGO');
-  }, [largo, ancho, alto, cantidad, editingIndex, transition]);
+  }, [largo, ancho, alto, cantidad, editingIndex, transition, retailConfig]);
 
   const finishQuote = useCallback(() => {
     // Save current box (replace if editing, append if new)
-    const result = calcularPrecioMinorista(largo, ancho, alto, cantidad);
+    const result = calcularPrecioMinorista(largo, ancho, alto, cantidad, retailConfig);
     const newBox: BoxQuoteLine = { largo, ancho, alto, cantidad, ...result };
 
     if (editingIndex !== null) {
@@ -122,7 +142,7 @@ function useBoxGame() {
 
     // Go to ORDER_FORM first (collect contact before revealing prices)
     transition('ORDER_FORM');
-  }, [largo, ancho, alto, cantidad, editingIndex, transition]);
+  }, [largo, ancho, alto, cantidad, editingIndex, transition, retailConfig]);
 
   // Edit a previously saved box
   const startEdit = useCallback((index: number) => {
@@ -175,7 +195,7 @@ function useBoxGame() {
   const selectStandardBox = useCallback((sug: StandardSuggestion) => {
     if (boxes.length === 0) return;
     const primaryQty = boxes[0].cantidad;
-    const result = calcularPrecioMinorista(sug.length_mm, sug.width_mm, sug.height_mm, primaryQty);
+    const result = calcularPrecioMinorista(sug.length_mm, sug.width_mm, sug.height_mm, primaryQty, retailConfig);
     const newBox: BoxQuoteLine = {
       largo: sug.length_mm,
       ancho: sug.width_mm,
@@ -185,7 +205,7 @@ function useBoxGame() {
       ...result,
     };
     setBoxes(prev => [newBox, ...prev.slice(1)]);
-  }, [boxes]);
+  }, [boxes, retailConfig]);
 
   // Submit order from SHIPPING step
   // For confirmed-price methods: creates MercadoPago checkout and redirects
@@ -333,6 +353,7 @@ function useBoxGame() {
 
   return {
     state, largo, ancho, alto, cantidad, boxes, formData, shippingData, editingIndex, isTransitioning, showHint,
+    retailConfig,
     setLargo, setAncho, setAlto, setCantidad,
     start, confirmDimension, confirmQuantity, addMore, finishQuote, reset,
     startEdit, revealQuote, backToForm, goToShipping, backToQuote, selectStandardBox, submitOrder,
@@ -425,6 +446,7 @@ export default function BoxGame() {
         alto={game.alto}
         cantidad={game.cantidad}
         editingIndex={game.editingIndex}
+        retailConfig={game.retailConfig}
         onIncrement={game.incrementDimension}
         onDecrement={game.decrementDimension}
         scrub={isHorizontalDimension && sliderConfig ? {
@@ -520,6 +542,7 @@ export default function BoxGame() {
           onReset={game.reset}
           onOrder={game.goToShipping}
           onSelectStandard={game.selectStandardBox}
+          retailConfig={game.retailConfig}
         />
 
         {/* Shipping step overlay */}

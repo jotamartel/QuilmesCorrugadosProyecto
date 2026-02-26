@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { BoxQuoteLine } from '@/lib/retail/types';
+import type { RetailConfig } from '@/lib/retail/config';
 import { formatPrecio, calcularPrecioMinorista } from '@/lib/retail/pricing';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 
@@ -21,9 +22,10 @@ interface QuoteResultProps {
   onReset: () => void;
   onOrder: () => void;
   onSelectStandard?: (box: StandardSuggestion) => void;
+  retailConfig?: RetailConfig;
 }
 
-export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelectStandard }: QuoteResultProps) {
+export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelectStandard, retailConfig }: QuoteResultProps) {
 
   const precioTotal = boxes.reduce((sum, b) => sum + b.subtotal, 0);
   const totalM2 = boxes.reduce((sum, b) => sum + b.totalM2, 0);
@@ -91,7 +93,7 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
   // Render a suggestion card (reused for both top-2 and "all" list)
   const renderBoxCard = (sug: StandardSuggestion, isDashed: boolean) => {
     const price = calcularPrecioMinorista(
-      sug.length_mm, sug.width_mm, sug.height_mm, primaryBox.cantidad
+      sug.length_mm, sug.width_mm, sug.height_mm, primaryBox.cantidad, retailConfig
     );
     const hasStock = sug.stock > 0;
     const hasEnoughStock = sug.stock >= primaryBox.cantidad;

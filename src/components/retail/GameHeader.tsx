@@ -1,6 +1,7 @@
 'use client';
 
 import type { GameState } from '@/lib/retail/types';
+import type { RetailConfig } from '@/lib/retail/config';
 import { calcularPrecioMinorista, formatPrecio } from '@/lib/retail/pricing';
 import ScrubSlider from './ScrubSlider';
 
@@ -11,6 +12,7 @@ interface GameHeaderProps {
   alto: number;
   cantidad: number;
   editingIndex?: number | null;
+  retailConfig?: RetailConfig;
   /** Scrub slider config — only needed during dimension states */
   scrub?: {
     value: number;
@@ -44,14 +46,14 @@ function getValue(state: GameState, largo: number, ancho: number, alto: number, 
   }
 }
 
-export default function GameHeader({ state, largo, ancho, alto, cantidad, editingIndex, scrub, onIncrement, onDecrement }: GameHeaderProps) {
+export default function GameHeader({ state, largo, ancho, alto, cantidad, editingIndex, retailConfig, scrub, onIncrement, onDecrement }: GameHeaderProps) {
   const isDimensionState = state === 'SET_LARGO' || state === 'SET_ANCHO' || state === 'SET_ALTO';
   const isQuantityState = state === 'SET_CANTIDAD';
   const showHeader = isDimensionState || isQuantityState;
   const isHidden = state === 'QUOTE';
 
-  // Live price estimate
-  const { precioUnitario } = calcularPrecioMinorista(largo, ancho, alto, 1);
+  // Live price estimate (uses dynamic retail config if available)
+  const { precioUnitario } = calcularPrecioMinorista(largo, ancho, alto, 1, retailConfig);
 
   return (
     <div

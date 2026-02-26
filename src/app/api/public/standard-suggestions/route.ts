@@ -20,13 +20,12 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Fetch all active standard boxes with stock > 0
+    // Fetch all active standard boxes (include stock = 0 so we can suggest them)
     const { data: boxes, error } = await supabase
       .from('boxes')
       .select('id, name, length_mm, width_mm, height_mm, m2_per_box, stock')
       .eq('is_standard', true)
-      .eq('is_active', true)
-      .gt('stock', 0);
+      .eq('is_active', true);
 
     if (error) {
       console.error('Error fetching standard boxes:', error);

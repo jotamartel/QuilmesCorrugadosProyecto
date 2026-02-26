@@ -230,6 +230,8 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
                 const price = calcularPrecioMinorista(
                   sug.length_mm, sug.width_mm, sug.height_mm, primaryBox.cantidad
                 );
+                const hasStock = sug.stock > 0;
+                const hasEnoughStock = sug.stock >= primaryBox.cantidad;
                 return (
                   <div
                     key={sug.id}
@@ -237,7 +239,7 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
                     style={{
                       background: 'var(--retail-surface)',
                       boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                      border: '1px dashed var(--retail-primary)',
+                      border: `1px dashed ${hasStock ? 'var(--retail-primary)' : 'var(--retail-border, #d0d0d0)'}`,
                     }}
                   >
                     <div className="flex-1 min-w-0">
@@ -264,10 +266,12 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
                           className="text-xs"
                           style={{
                             fontFamily: 'var(--font-retail-sans), sans-serif',
-                            color: 'var(--retail-text-muted)',
+                            color: hasStock ? '#16a34a' : 'var(--retail-text-muted)',
                           }}
                         >
-                          {sug.stock} en stock
+                          {hasStock
+                            ? `${sug.stock} en stock`
+                            : 'Entrega inmediata'}
                         </span>
                       </div>
                     </div>
@@ -276,9 +280,9 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
                       className="rounded-xl px-4 py-2 text-xs font-semibold tracking-wide whitespace-nowrap active:scale-95"
                       style={{
                         fontFamily: 'var(--font-retail-sans), sans-serif',
-                        background: 'var(--retail-primary)',
-                        color: '#fff',
-                        border: 'none',
+                        background: hasEnoughStock ? 'var(--retail-primary)' : 'transparent',
+                        color: hasEnoughStock ? '#fff' : 'var(--retail-primary)',
+                        border: hasEnoughStock ? 'none' : '2px solid var(--retail-primary)',
                         transition: 'transform 150ms',
                       }}
                     >

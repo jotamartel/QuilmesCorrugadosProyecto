@@ -40,8 +40,9 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
   const primaryBox = boxes[0];
   const showSuggestions = totalM2 < 1000 && onSelectStandard;
 
-  // Whether user is forced to pick a standard box (suggestions present)
-  const mustSelectStandard = showSuggestions && suggestions.length > 0;
+  // Whether user is forced to pick a standard box (suggestions present AND none selected yet)
+  const alreadySelectedStandard = primaryBox?.standardBoxId != null;
+  const mustSelectStandard = showSuggestions && suggestions.length > 0 && !alreadySelectedStandard;
 
   useEffect(() => {
     if (!visible || !showSuggestions || !primaryBox) {

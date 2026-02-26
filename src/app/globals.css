@@ -82,3 +82,40 @@ body {
     font-size: 16px !important;
   }
 }
+
+/* ========================================
+   RETAIL MODULE (Box Builder Game)
+   ======================================== */
+
+:root {
+  --retail-bg: #F5F0EB;
+  --retail-surface: #FFFFFF;
+  --retail-primary: #E8734A;
+  --retail-primary-hover: #D4623B;
+  --retail-text: #2D2926;
+  --retail-text-muted: #8B8680;
+  --retail-box-front: #D4A574;
+  --retail-box-right: #C4956A;
+  --retail-box-top: #E4B584;
+  --retail-box-active: #E8734A;
+}
+
+@keyframes retailHintPulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+@keyframes retailFadeOut {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; pointer-events: none; }
+}
+
+/* Safe area insets for notched phones */
+.pt-safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pb-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

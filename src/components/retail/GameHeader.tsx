@@ -19,6 +19,9 @@ interface GameHeaderProps {
     onChange: (value: number) => void;
     validate?: (value: number) => number;
   };
+  /** Fine adjustment callbacks for +1 / -1 mm */
+  onIncrement?: () => void;
+  onDecrement?: () => void;
 }
 
 function getLabel(state: GameState): string {
@@ -41,7 +44,7 @@ function getValue(state: GameState, largo: number, ancho: number, alto: number, 
   }
 }
 
-export default function GameHeader({ state, largo, ancho, alto, cantidad, editingIndex, scrub }: GameHeaderProps) {
+export default function GameHeader({ state, largo, ancho, alto, cantidad, editingIndex, scrub, onIncrement, onDecrement }: GameHeaderProps) {
   const isDimensionState = state === 'SET_LARGO' || state === 'SET_ANCHO' || state === 'SET_ALTO';
   const isQuantityState = state === 'SET_CANTIDAD';
   const showHeader = isDimensionState || isQuantityState;
@@ -101,14 +104,62 @@ export default function GameHeader({ state, largo, ancho, alto, cantidad, editin
           >
             {getLabel(state)}
           </div>
-          <div
-            className="text-4xl font-semibold tabular-nums"
-            style={{
-              fontFamily: 'var(--font-retail-mono), monospace',
-              color: 'var(--retail-text)',
-            }}
-          >
-            {getValue(state, largo, ancho, alto, cantidad)}
+          <div className="flex items-center justify-center gap-3">
+            {/* − button */}
+            {isDimensionState && onDecrement && (
+              <button
+                onClick={onDecrement}
+                className="flex items-center justify-center rounded-lg active:scale-90"
+                style={{
+                  width: 36,
+                  height: 36,
+                  background: 'var(--retail-surface)',
+                  border: '2px solid var(--retail-border, #e0e0e0)',
+                  color: 'var(--retail-text)',
+                  fontFamily: 'var(--font-retail-mono), monospace',
+                  fontSize: 20,
+                  fontWeight: 600,
+                  lineHeight: 1,
+                  transition: 'transform 100ms',
+                  cursor: 'pointer',
+                }}
+                aria-label="Reducir 1 mm"
+              >
+                −
+              </button>
+            )}
+            <div
+              className="text-4xl font-semibold tabular-nums"
+              style={{
+                fontFamily: 'var(--font-retail-mono), monospace',
+                color: 'var(--retail-text)',
+              }}
+            >
+              {getValue(state, largo, ancho, alto, cantidad)}
+            </div>
+            {/* + button */}
+            {isDimensionState && onIncrement && (
+              <button
+                onClick={onIncrement}
+                className="flex items-center justify-center rounded-lg active:scale-90"
+                style={{
+                  width: 36,
+                  height: 36,
+                  background: 'var(--retail-surface)',
+                  border: '2px solid var(--retail-border, #e0e0e0)',
+                  color: 'var(--retail-text)',
+                  fontFamily: 'var(--font-retail-mono), monospace',
+                  fontSize: 20,
+                  fontWeight: 600,
+                  lineHeight: 1,
+                  transition: 'transform 100ms',
+                  cursor: 'pointer',
+                }}
+                aria-label="Aumentar 1 mm"
+              >
+                +
+              </button>
+            )}
           </div>
         </div>
       </div>

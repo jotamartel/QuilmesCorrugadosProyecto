@@ -296,12 +296,47 @@ function useBoxGame() {
     return newAlto;
   }, [ancho]);
 
+  // Fine adjustment: +1 / -1 for current dimension
+  const incrementDimension = useCallback(() => {
+    switch (state) {
+      case 'SET_LARGO':
+        setLargo(v => Math.min(v + 1, RETAIL_CONFIG.MAX_LARGO));
+        break;
+      case 'SET_ANCHO':
+        setAncho(v => {
+          const next = Math.min(v + 1, RETAIL_CONFIG.MAX_ANCHO);
+          return validateAncho(next);
+        });
+        break;
+      case 'SET_ALTO':
+        setAlto(v => {
+          const next = Math.min(v + 1, RETAIL_CONFIG.MAX_ALTO);
+          return validateAlto(next);
+        });
+        break;
+    }
+  }, [state, validateAncho, validateAlto]);
+
+  const decrementDimension = useCallback(() => {
+    switch (state) {
+      case 'SET_LARGO':
+        setLargo(v => Math.max(v - 1, RETAIL_CONFIG.MIN_LARGO));
+        break;
+      case 'SET_ANCHO':
+        setAncho(v => Math.max(v - 1, RETAIL_CONFIG.MIN_ANCHO));
+        break;
+      case 'SET_ALTO':
+        setAlto(v => Math.max(v - 1, RETAIL_CONFIG.MIN_ALTO));
+        break;
+    }
+  }, [state]);
+
   return {
     state, largo, ancho, alto, cantidad, boxes, formData, shippingData, editingIndex, isTransitioning, showHint,
     setLargo, setAncho, setAlto, setCantidad,
     start, confirmDimension, confirmQuantity, addMore, finishQuote, reset,
     startEdit, revealQuote, backToForm, goToShipping, backToQuote, selectStandardBox, submitOrder,
-    validateAncho, validateAlto,
+    validateAncho, validateAlto, incrementDimension, decrementDimension,
   };
 }
 
@@ -390,6 +425,8 @@ export default function BoxGame() {
         alto={game.alto}
         cantidad={game.cantidad}
         editingIndex={game.editingIndex}
+        onIncrement={game.incrementDimension}
+        onDecrement={game.decrementDimension}
         scrub={isHorizontalDimension && sliderConfig ? {
           value: sliderConfig.value,
           min: sliderConfig.min,

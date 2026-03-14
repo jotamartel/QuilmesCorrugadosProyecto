@@ -58,6 +58,12 @@ export function LandingHeader() {
                 {item.name}
               </a>
             ))}
+            <Link
+              href="/cajas"
+              className="px-4 py-2 bg-[#002E55] hover:bg-[#001a33] text-white text-sm font-semibold rounded-full transition-colors"
+            >
+              Compra Minorista
+            </Link>
           </div>
 
           {/* Mobile menu button */}
@@ -86,6 +92,13 @@ export function LandingHeader() {
                 {item.name}
               </a>
             ))}
+            <Link
+              href="/cajas"
+              className="block mt-3 text-center px-4 py-2.5 bg-[#002E55] hover:bg-[#001a33] text-white font-semibold rounded-full transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Compra Minorista
+            </Link>
           </div>
         )}
       </nav>

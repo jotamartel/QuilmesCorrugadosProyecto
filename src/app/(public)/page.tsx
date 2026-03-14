@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { QuoterForm } from '@/components/public/QuoterForm';
-import { Factory, Truck, Ruler, Palette, ArrowDown } from 'lucide-react';
+import Link from 'next/link';
+import { Factory, Truck, Ruler, Palette, ArrowDown, ShoppingBag } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
 
 const benefits = [
@@ -50,13 +51,25 @@ export default function LandingPage() {
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Cotizá online en segundos. Fábrica en Quilmes, entregas en todo el país.
           </p>
-          <a
-            href="#cotizador"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#002E55] hover:bg-[#001a33] text-white font-medium rounded-lg transition-colors"
-          >
-            Cotizar ahora
-            <ArrowDown className="w-4 h-4" />
-          </a>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a
+              href="#cotizador"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#002E55] hover:bg-[#001a33] text-white font-medium rounded-lg transition-colors"
+            >
+              Cotizar ahora
+              <ArrowDown className="w-4 h-4" />
+            </a>
+            <Link
+              href="/cajas"
+              className="inline-flex items-center gap-2 px-6 py-3 border-2 border-[#002E55] text-[#002E55] hover:bg-[#002E55] hover:text-white font-medium rounded-lg transition-colors"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              Compra Minorista
+            </Link>
+          </div>
+          <p className="mt-4 text-sm text-gray-500">
+            Mayorista: mín 3.000 m² · Minorista: sin mínimo
+          </p>
         </div>
       </section>
 

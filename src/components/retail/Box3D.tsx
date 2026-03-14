@@ -107,7 +107,7 @@ export default function Box3D({ largo, ancho, alto, activeState, isTransitioning
             transform: `translateZ(${d / 2}px)`,
             transition: 'background 250ms',
             boxShadow: isFrontActive
-              ? 'inset 0 0 0 2.5px rgba(232,115,74,0.5)'
+              ? 'inset 0 0 0 2.5px rgba(0,46,85,0.45)'
               : 'none',
           }}
         >
@@ -141,7 +141,7 @@ export default function Box3D({ largo, ancho, alto, activeState, isTransitioning
             transform: `rotateY(90deg) translateZ(${w / 2}px)`,
             transition: 'background 250ms',
             boxShadow: isRightActive
-              ? 'inset 0 0 0 2.5px rgba(232,115,74,0.5)'
+              ? 'inset 0 0 0 2.5px rgba(0,46,85,0.45)'
               : 'none',
           }}
         >

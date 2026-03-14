@@ -113,7 +113,7 @@ html.lenis, html.lenis body { height: auto; }
   --retail-box-front: #D4A574;
   --retail-box-right: #C4956A;
   --retail-box-top: #E4B584;
-  --retail-box-active: #002E55;
+  --retail-box-active: #E8C99A;
 }
 
 @keyframes retailHintPulse {

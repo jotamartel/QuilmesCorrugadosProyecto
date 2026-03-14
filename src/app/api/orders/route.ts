@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { DATA_START_DATE } from '@/lib/utils/constants';
 import type { OrderStatus } from '@/lib/types/database';
 
 // GET /api/orders - Lista órdenes
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest) {
         client:clients(id, name, company),
         quote:quotes(id, quote_number)
       `, { count: 'exact' })
+      .gte('created_at', DATA_START_DATE)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 

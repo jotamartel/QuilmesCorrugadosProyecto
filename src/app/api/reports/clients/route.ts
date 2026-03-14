@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { DATA_START_DATE } from '@/lib/utils/constants';
 import { parseISO } from 'date-fns';
 
 export async function GET(request: NextRequest) {
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
         created_at,
         client:clients(id, name, company)
       `)
+      .gte('created_at', DATA_START_DATE)
       .neq('status', 'cancelled');
 
     // Aplicar filtros de fecha si existen

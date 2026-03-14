@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { DATA_START_DATE } from '@/lib/utils/constants';
 import type { CreateClientRequest } from '@/lib/types/database';
 
 // GET /api/clients - Lista clientes
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('clients')
       .select('*', { count: 'exact' })
+      .gte('created_at', DATA_START_DATE)
       .order('name', { ascending: true })
       .range(offset, offset + limit - 1);
 

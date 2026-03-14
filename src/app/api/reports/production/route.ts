@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { DATA_START_DATE } from '@/lib/utils/constants';
 import { ORDER_STATUS_LABELS } from '@/lib/utils/format';
 import type { OrderStatus } from '@/lib/types/database';
 
@@ -16,6 +17,7 @@ export async function GET() {
     const { data: orders, error } = await supabase
       .from('orders')
       .select('status, total_m2, total')
+      .gte('created_at', DATA_START_DATE)
       .neq('status', 'cancelled');
 
     if (error) throw error;

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { DATA_START_DATE } from '@/lib/utils/constants';
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('public_quotes')
       .select('*', { count: 'exact' })
+      .gte('created_at', DATA_START_DATE)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -84,7 +86,8 @@ export async function GET(request: NextRequest) {
     // Obtener conteos por status, requested_contact y source
     const { data: allQuotes } = await supabase
       .from('public_quotes')
-      .select('status, requested_contact, source');
+      .select('status, requested_contact, source')
+      .gte('created_at', DATA_START_DATE);
 
     const counts = {
       pending: 0,

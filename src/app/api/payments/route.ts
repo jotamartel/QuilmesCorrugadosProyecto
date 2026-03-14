@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { DATA_START_DATE } from '@/lib/utils/constants';
 import type { CreatePaymentRequest } from '@/lib/types/database';
 
 // GET /api/payments - Listar pagos
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest) {
         order:orders(order_number),
         client:clients(name, company)
       `)
+      .gte('created_at', DATA_START_DATE)
       .order('created_at', { ascending: false });
 
     if (orderId) {

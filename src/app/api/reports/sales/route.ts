@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { DATA_START_DATE } from '@/lib/utils/constants';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -22,11 +23,12 @@ export async function GET(request: NextRequest) {
     const endDate = to ? parseISO(to) : new Date();
     const startDate = from ? parseISO(from) : startOfMonth(endDate);
 
-    // Obtener cotizaciones del período
+    // Obtener cotizaciones del período (mínimo DATA_START_DATE para ocultar datos de prueba)
+    const effectiveStartDate = new Date(Math.max(startDate.getTime(), new Date(DATA_START_DATE).getTime()));
     const { data: quotes, error: quotesError } = await supabase
       .from('quotes')
       .select('id, total, total_m2, status, created_at')
-      .gte('created_at', startDate.toISOString())
+      .gte('created_at', effectiveStartDate.toISOString())
       .lte('created_at', endDate.toISOString());
 
     if (quotesError) throw quotesError;
@@ -35,7 +37,7 @@ export async function GET(request: NextRequest) {
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select('id, total, total_m2, status, created_at')
-      .gte('created_at', startDate.toISOString())
+      .gte('created_at', effectiveStartDate.toISOString())
       .lte('created_at', endDate.toISOString())
       .neq('status', 'cancelled');
 

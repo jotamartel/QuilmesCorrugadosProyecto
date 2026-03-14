@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { DATA_START_DATE } from '@/lib/utils/constants';
 import {
   calculateUnfolded,
   isOversized,
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
         *,
         client:clients(id, name, company)
       `, { count: 'exact' })
+      .gte('created_at', DATA_START_DATE)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 

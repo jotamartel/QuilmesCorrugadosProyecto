@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { DATA_START_DATE } from '@/lib/utils/constants';
 import type { FulfillmentStatus } from '@/lib/types/database';
 
 export async function GET(request: NextRequest) {
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
     const { data: statusCounts } = await supabase
       .from('public_quotes')
       .select('fulfillment_status')
+      .gte('created_at', DATA_START_DATE)
       .not('fulfillment_status', 'is', null);
 
     const counts: Record<string, number> = {
@@ -57,6 +59,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('public_quotes')
       .select('*', { count: 'exact' })
+      .gte('created_at', DATA_START_DATE)
       .not('fulfillment_status', 'is', null)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);

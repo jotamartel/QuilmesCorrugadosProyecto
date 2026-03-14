@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { DATA_START_DATE } from '@/lib/utils/constants';
 import { parseISO, startOfMonth, endOfMonth, format } from 'date-fns';
 
 export async function GET(request: NextRequest) {
@@ -19,7 +20,8 @@ export async function GET(request: NextRequest) {
     const endDate = to ? parseISO(to) : endOfMonth(new Date());
     const startDate = from ? parseISO(from) : startOfMonth(new Date());
 
-    // Obtener órdenes del período
+    // Obtener órdenes del período (mínimo DATA_START_DATE para ocultar datos de prueba)
+    const effectiveStartDate = new Date(Math.max(startDate.getTime(), new Date(DATA_START_DATE).getTime()));
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select(`
@@ -35,7 +37,7 @@ export async function GET(request: NextRequest) {
         total,
         client:clients(id, name, company)
       `)
-      .gte('created_at', startDate.toISOString())
+      .gte('created_at', effectiveStartDate.toISOString())
       .lte('created_at', endDate.toISOString())
       .neq('status', 'cancelled')
       .order('created_at', { ascending: false });

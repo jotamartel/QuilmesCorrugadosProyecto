@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { DATA_START_DATE } from '@/lib/utils/constants';
 
 interface PrecisionData {
   order_id: string;
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
         client:clients(name, company),
         items:order_items(quantity, quantity_delivered, m2_per_box)
       `)
+      .gte('created_at', DATA_START_DATE)
       .eq('quantities_confirmed', true)
       .not('quantities_confirmed_at', 'is', null)
       .order('quantities_confirmed_at', { ascending: false })

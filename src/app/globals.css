@@ -104,16 +104,16 @@ html.lenis, html.lenis body { height: auto; }
    ======================================== */
 
 :root {
-  --retail-bg: #F5F0EB;
+  --retail-bg: #EFF4F8;
   --retail-surface: #FFFFFF;
-  --retail-primary: #E8734A;
-  --retail-primary-hover: #D4623B;
-  --retail-text: #2D2926;
-  --retail-text-muted: #8B8680;
+  --retail-primary: #002E55;
+  --retail-primary-hover: #001a33;
+  --retail-text: #1a1a2e;
+  --retail-text-muted: #6B7280;
   --retail-box-front: #D4A574;
   --retail-box-right: #C4956A;
   --retail-box-top: #E4B584;
-  --retail-box-active: #E8734A;
+  --retail-box-active: #002E55;
 }
 
 @keyframes retailHintPulse {

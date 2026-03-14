@@ -177,7 +177,7 @@ export default function GameHeader({ state, largo, ancho, alto, cantidad, editin
             transition: 'opacity 300ms',
           }}
         >
-          ~{formatPrecio(precioUnitario)} /ud
+          {formatPrecio(precioUnitario)} x unidad
         </div>
       )}
 

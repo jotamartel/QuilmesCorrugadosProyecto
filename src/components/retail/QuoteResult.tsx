@@ -164,7 +164,7 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
                 color: 'var(--retail-primary)',
               }}
             >
-              {formatPrecio(price.precioUnitario)} /ud
+              {formatPrecio(price.precioUnitario)} x unidad
             </span>
             <span
               className="text-xs"
@@ -271,7 +271,7 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
                     color: 'var(--retail-text-muted)',
                   }}
                 >
-                  {formatPrecio(box.precioUnitario)} /ud
+                  {formatPrecio(box.precioUnitario)} x unidad
                   {box.isMayorista && (
                     <span style={{ color: 'var(--retail-primary)', marginLeft: '6px' }}>
                       mayorista

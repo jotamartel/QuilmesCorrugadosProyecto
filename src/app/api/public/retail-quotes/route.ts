@@ -6,6 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateUnfolded } from '@/lib/utils/box-calculations';
+import { calcularPrecioMinorista } from '@/lib/retail/pricing';
+import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { notifyNewRetailLead } from '@/lib/telegram/notifications';
 import type { TaxCondition } from '@/lib/types/database';
 
 interface RetailBox {
@@ -81,6 +84,29 @@ export async function POST(request: NextRequest) {
 
     if (!body.boxes || body.boxes.length === 0) {
       errors.push('Debe incluir al menos una caja');
+    } else {
+      // Los limites del canal tambien se validan aca: la UI se puede saltear
+      // posteando directo a la API.
+      const c = RETAIL_CONFIG;
+      body.boxes.forEach((b, i) => {
+        const n = i + 1;
+        const dims: [string, number, number, number][] = [
+          ['largo', b.largo, c.MIN_LARGO, c.MAX_LARGO],
+          ['ancho', b.ancho, c.MIN_ANCHO, c.MAX_ANCHO],
+          ['alto', b.alto, c.MIN_ALTO, c.MAX_ALTO],
+        ];
+        for (const [nombre, valor, min, max] of dims) {
+          if (!Number.isFinite(valor) || valor < min || valor > max) {
+            errors.push(`Caja ${n}: el ${nombre} debe estar entre ${min} y ${max} mm`);
+          }
+        }
+        if (Number.isFinite(b.alto) && Number.isFinite(b.ancho) && b.alto + b.ancho > c.MAX_SHEET_WIDTH) {
+          errors.push(`Caja ${n}: alto + ancho no puede superar ${c.MAX_SHEET_WIDTH} mm`);
+        }
+        if (!Number.isInteger(b.cantidad) || b.cantidad < c.MIN_CANTIDAD) {
+          errors.push(`Caja ${n}: el minimo es ${c.MIN_CANTIDAD} unidades`);
+        }
+      });
     }
 
     if (errors.length > 0) {
@@ -104,23 +130,65 @@ export async function POST(request: NextRequest) {
       ? (body.condicionIva as TaxCondition) || 'responsable_inscripto'
       : 'consumidor_final';
 
+    // ═══════════════════════════════════════════════════════════
+    // RECALCULO DE PRECIOS EN EL SERVIDOR
+    // ═══════════════════════════════════════════════════════════
+    // Nunca confiar en precioUnitario/subtotal/totalM2 que manda el cliente:
+    // son campos del body y cualquiera puede editarlos desde la pestaña Network.
+    // Se recalcula todo a partir de las dimensiones y la cantidad, usando el
+    // precio por m2 vigente en la base.
+
+    const { data: pricing } = await supabase
+      .from('pricing_config')
+      .select('price_per_m2_retail, price_per_m2_standard')
+      .eq('is_active', true)
+      .order('valid_from', { ascending: false })
+      .limit(1)
+      .single();
+
+    const configPrecios = {
+      ...RETAIL_CONFIG,
+      RETAIL_PRICE_PER_M2: Number(pricing?.price_per_m2_retail) || RETAIL_CONFIG.RETAIL_PRICE_PER_M2,
+      WHOLESALE_PRICE_PER_M2: Number(pricing?.price_per_m2_standard) || RETAIL_CONFIG.WHOLESALE_PRICE_PER_M2,
+    };
+
+    const cajas = body.boxes.map((b) => {
+      const precio = calcularPrecioMinorista(b.largo, b.ancho, b.alto, b.cantidad, configPrecios);
+      return {
+        largo: b.largo,
+        ancho: b.ancho,
+        alto: b.alto,
+        cantidad: b.cantidad,
+        standardBoxId: b.standardBoxId,
+        precioUnitario: precio.precioUnitario,
+        subtotal: precio.subtotal,
+        m2PerBox: precio.m2PerBox,
+        totalM2: precio.totalM2,
+        isMayorista: precio.isMayorista,
+      };
+    });
+
     // Use the first box for the primary dimensions (required by public_quotes schema)
-    const primaryBox = body.boxes[0];
+    const primaryBox = cajas[0];
     const unfolded = calculateUnfolded(primaryBox.largo, primaryBox.ancho, primaryBox.alto);
 
     // Calculate totals across all boxes
-    const totalSqm = body.boxes.reduce((sum, b) => sum + b.totalM2, 0);
-    const totalSubtotal = body.boxes.reduce((sum, b) => sum + b.subtotal, 0);
+    const totalSqm = cajas.reduce((sum, b) => sum + b.totalM2, 0);
+    const totalSubtotal = cajas.reduce((sum, b) => sum + b.subtotal, 0);
+
+    // El costo de envio tampoco puede venir del cliente. Hoy todos los metodos
+    // quedan "a confirmar" salvo el retiro, que es gratis: en ambos casos, 0.
+    const shippingCost = 0;
 
     // Build message with full quote breakdown
-    const boxLines = body.boxes.map((b, i) =>
+    const boxLines = cajas.map((b, i) =>
       `Caja ${i + 1}: ${b.largo}x${b.ancho}x${b.alto}mm — ${b.cantidad} uds — $${b.subtotal.toLocaleString('es-AR')}${b.isMayorista ? ' (mayorista)' : ''}`
     ).join('\n');
 
     // Shipping info
     const shippingLabel = body.shippingMethod ? {
       retiro_sucursal: 'Retiro por sucursal (Lugones 219, Quilmes)',
-      envio_caba_amba: `Envio CABA/AMBA ($${(body.shippingCost || 0).toLocaleString('es-AR')})`,
+      envio_caba_amba: 'Envio CABA/AMBA (costo a confirmar)',
       envio_resto_pais: 'Envio al resto del pais (costo a confirmar)',
     }[body.shippingMethod] : null;
 
@@ -137,8 +205,8 @@ export async function POST(request: NextRequest) {
       body.shippingMethod && body.shippingMethod !== 'retiro_sucursal' && body.direccion
         ? `Direccion: ${body.direccion}, ${body.ciudad || ''}, ${body.provincia || 'Buenos Aires'} ${body.codigoPostal || ''}`
         : null,
-      body.shippingCostConfirmed && body.shippingCost
-        ? `Total con envio: $${(totalSubtotal + body.shippingCost).toLocaleString('es-AR')}`
+      shippingCost > 0
+        ? `Total con envio: $${(totalSubtotal + shippingCost).toLocaleString('es-AR')}`
         : null,
       body.mensaje?.trim() ? `\nMensaje: ${body.mensaje.trim()}` : null,
     ].filter(Boolean).join('\n');
@@ -199,7 +267,7 @@ export async function POST(request: NextRequest) {
         status: 'pending',
         requested_contact: true,
         shipping_method: body.shippingMethod || null,
-        shipping_cost: body.shippingCost || 0,
+        shipping_cost: shippingCost,
         fulfillment_status: 'pending_payment',
       })
       .select('id, quote_number')
@@ -214,29 +282,40 @@ export async function POST(request: NextRequest) {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // REDUCIR STOCK (si se eligió caja estándar del catálogo)
+    // STOCK: NO se descuenta acá
+    // ═══════════════════════════════════════════════════════════
+    // Esta ruta guarda una *cotizacion*, no una venta. Descontar stock al cotizar
+    // drenaba el catalogo con consultas que nunca se cerraban, y ensuciaba
+    // justamente el dato que /api/public/standard-suggestions usa para decidir
+    // que medidas puede prometer con entrega inmediata.
+    // El descuento tiene que ocurrir cuando la venta se confirma.
+
+    // ═══════════════════════════════════════════════════════════
+    // NOTIFICAR POR TELEGRAM
     // ═══════════════════════════════════════════════════════════
 
-    for (const box of body.boxes) {
-      if (box.standardBoxId) {
-        try {
-          const { data: currentBox } = await supabase
-            .from('boxes')
-            .select('stock')
-            .eq('id', box.standardBoxId)
-            .single();
-
-          if (currentBox) {
-            const newStock = Math.max(0, (currentBox.stock || 0) - box.cantidad);
-            await supabase
-              .from('boxes')
-              .update({ stock: newStock })
-              .eq('id', box.standardBoxId);
-          }
-        } catch (stockErr) {
-          console.warn('Error reducing stock for box', box.standardBoxId, stockErr);
-        }
-      }
+    // Await para que no se corte en serverless
+    try {
+      await notifyNewRetailLead({
+        quoteId: quote.id,
+        quoteNumber: quote.quote_number,
+        clientType: body.clientType,
+        nombre: requesterName,
+        empresa: requesterCompany,
+        email: body.email.trim(),
+        telefono: body.telefono,
+        cuit: body.cuit || null,
+        boxes: cajas,
+        shippingMethod: body.shippingMethod || null,
+        shippingCost,
+        shippingCostConfirmed: shippingCost > 0,
+        direccion: body.direccion || null,
+        ciudad: body.ciudad || null,
+        provincia: body.provincia || null,
+        source: 'retail',
+      });
+    } catch (err) {
+      console.error('[Telegram] Error notificando:', err);
     }
 
     return NextResponse.json({

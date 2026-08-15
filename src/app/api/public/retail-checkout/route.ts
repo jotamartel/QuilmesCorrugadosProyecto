@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateUnfolded } from '@/lib/utils/box-calculations';
+import { calcularPrecioMinorista } from '@/lib/retail/pricing';
+import { RETAIL_CONFIG } from '@/lib/retail/config';
 import type { TaxCondition } from '@/lib/types/database';
 
 const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN || '';
@@ -104,22 +106,60 @@ export async function POST(request: NextRequest) {
       ? (body.condicionIva as TaxCondition) || 'responsable_inscripto'
       : 'consumidor_final';
 
-    const primaryBox = body.boxes[0];
-    const unfolded = calculateUnfolded(primaryBox.largo, primaryBox.ancho, primaryBox.alto);
-    const totalSqm = body.boxes.reduce((sum, b) => sum + b.totalM2, 0);
-    const totalSubtotal = body.boxes.reduce((sum, b) => sum + b.subtotal, 0);
+    // ═══════════════════════════════════════════════════════════
+    // RECALCULO DE PRECIOS EN EL SERVIDOR
+    // ═══════════════════════════════════════════════════════════
+    // Esta ruta arma la preferencia de pago de MercadoPago, asi que el precio
+    // NO puede salir del body: seria cobrarle al cliente lo que el cliente
+    // decida. Se recalcula desde las dimensiones con el precio vigente en la base.
 
-    // Shipping
-    const shippingCost = body.shippingCostConfirmed ? (body.shippingCost || 0) : 0;
+    const { data: pricing } = await supabase
+      .from('pricing_config')
+      .select('price_per_m2_retail, price_per_m2_standard')
+      .eq('is_active', true)
+      .order('valid_from', { ascending: false })
+      .limit(1)
+      .single();
+
+    const configPrecios = {
+      ...RETAIL_CONFIG,
+      RETAIL_PRICE_PER_M2: Number(pricing?.price_per_m2_retail) || RETAIL_CONFIG.RETAIL_PRICE_PER_M2,
+      WHOLESALE_PRICE_PER_M2: Number(pricing?.price_per_m2_standard) || RETAIL_CONFIG.WHOLESALE_PRICE_PER_M2,
+    };
+
+    const cajas = body.boxes.map((b) => {
+      const precio = calcularPrecioMinorista(b.largo, b.ancho, b.alto, b.cantidad, configPrecios);
+      return {
+        largo: b.largo,
+        ancho: b.ancho,
+        alto: b.alto,
+        cantidad: b.cantidad,
+        standardBoxId: b.standardBoxId,
+        precioUnitario: precio.precioUnitario,
+        subtotal: precio.subtotal,
+        m2PerBox: precio.m2PerBox,
+        totalM2: precio.totalM2,
+        isMayorista: precio.isMayorista,
+      };
+    });
+
+    const primaryBox = cajas[0];
+    const unfolded = calculateUnfolded(primaryBox.largo, primaryBox.ancho, primaryBox.alto);
+    const totalSqm = cajas.reduce((sum, b) => sum + b.totalM2, 0);
+    const totalSubtotal = cajas.reduce((sum, b) => sum + b.subtotal, 0);
+
+    // Shipping: el costo tampoco puede venir del cliente. Hoy no hay tarifa
+    // calculada en el servidor, asi que se cobra 0 y se coordina aparte.
+    const shippingCost = 0;
     const totalConEnvio = totalSubtotal + shippingCost;
 
     const shippingLabel = body.shippingMethod ? {
       retiro_sucursal: 'Retiro por sucursal (Lugones 219, Quilmes)',
-      envio_caba_amba: `Envio CABA/AMBA ($${shippingCost.toLocaleString('es-AR')})`,
+      envio_caba_amba: 'Envio CABA/AMBA (costo a confirmar)',
       envio_resto_pais: 'Envio al resto del pais (costo a confirmar)',
     }[body.shippingMethod] : null;
 
-    const boxLines = body.boxes.map((b, i) =>
+    const boxLines = cajas.map((b, i) =>
       `Caja ${i + 1}: ${b.largo}x${b.ancho}x${b.alto}mm — ${b.cantidad} uds — $${b.subtotal.toLocaleString('es-AR')}${b.isMayorista ? ' (mayorista)' : ''}`
     ).join('\n');
 
@@ -225,7 +265,7 @@ export async function POST(request: NextRequest) {
     const preference = new Preference(client);
 
     // Build items list
-    const items = body.boxes.map((box, i) => ({
+    const items = cajas.map((box, i) => ({
       id: `box-${i + 1}`,
       title: `Caja ${box.largo}x${box.ancho}x${box.alto}mm`,
       description: `Caja de carton corrugado ${box.largo}x${box.ancho}x${box.alto}mm x${box.cantidad} unidades`,

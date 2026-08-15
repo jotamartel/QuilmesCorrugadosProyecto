@@ -16,6 +16,7 @@ import QuantityInput from './QuantityInput';
 import AddMorePrompt from './AddMorePrompt';
 import PreviousBoxesList from './PreviousBoxesList';
 import QuoteResult from './QuoteResult';
+import WhatsAppBubble from './WhatsAppBubble';
 import OrderForm from './OrderForm';
 import ShippingStep from './ShippingStep';
 import OrderConfirmation from './OrderConfirmation';
@@ -317,12 +318,16 @@ export default function BoxGame() {
   const game = useBoxGame();
   const hasStarted = useRef(false);
 
-  // Auto-start on mount
-  if (!hasStarted.current && game.state === 'IDLE') {
+  // Auto-start on mount.
+  // Va en un effect: leer y escribir un ref durante el render es incorrecto en
+  // React (y el setTimeout estaba solo para esquivar el setState en render).
+  useEffect(() => {
+    if (hasStarted.current || game.state !== 'IDLE') return;
     hasStarted.current = true;
-    // Use setTimeout to avoid setState during render
-    setTimeout(() => game.start(), 0);
-  }
+    game.start();
+    // Solo debe correr al montar, cuando el juego todavia esta en IDLE.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isDimensionState = game.state === 'SET_LARGO' || game.state === 'SET_ANCHO' || game.state === 'SET_ALTO';
   const isHorizontalDimension = game.state === 'SET_LARGO' || game.state === 'SET_ANCHO';
@@ -514,6 +519,10 @@ export default function BoxGame() {
           shippingData={game.shippingData}
         />
       </div>
+
+      {/* Globo de WhatsApp: desde que ve el precio en adelante.
+          Montaje condicional para que su estado se reinicie con cada cotizacion. */}
+      {(isQuote || isShipping || isOrderSent) && <WhatsAppBubble boxes={game.boxes} />}
 
       {/* FOOTER (changes by state) */}
       <div

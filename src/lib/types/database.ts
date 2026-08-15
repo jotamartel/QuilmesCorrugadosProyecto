@@ -42,7 +42,8 @@ export interface PricingConfig {
   volume_threshold_m2: number;
   min_m2_per_model: number;
   price_per_m2_below_minimum: number | null; // Precio con recargo para pedidos < 3000m2
-  price_per_m2_retail: number; // Precio por m2 para ventas minoristas (< 1000 m2)
+  price_per_m2_retail: number; // Precio por m2 para ventas de stock (< wholesale_min_m2)
+  wholesale_min_m2: number; // Limite entre stock (/cajas) y produccion a medida (mayorista)
   free_shipping_min_m2: number;
   free_shipping_max_km: number;
   production_days_standard: number;

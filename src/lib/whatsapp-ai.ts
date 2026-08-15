@@ -19,7 +19,12 @@ const groq = process.env.GROQ_API_KEY
 
 const PRINTING_INCREMENT = 0.15; // +15% por cada color de impresión
 
-/** Config de precios por defecto cuando la DB no devuelve config (ej: env vars, RLS) */
+/**
+ * Config de precios de respaldo, para cuando la DB no responde (env vars, RLS).
+ * Tiene que quedar ALINEADA con la fila activa de pricing_config: si se
+ * desincroniza, el bot cotiza precios viejos justo cuando nadie lo esta mirando.
+ * Ultima verificacion contra produccion: 2026-08-15.
+ */
 function getFallbackPricingConfig(): PricingConfig {
   return {
     id: 'fallback',
@@ -27,8 +32,9 @@ function getFallbackPricingConfig(): PricingConfig {
     price_per_m2_volume: 700,
     volume_threshold_m2: 5000,
     min_m2_per_model: 3000,
+    wholesale_min_m2: 1000,
     price_per_m2_below_minimum: 900,
-    price_per_m2_retail: 900,
+    price_per_m2_retail: 990,
     free_shipping_min_m2: 3000,
     free_shipping_max_km: 60,
     production_days_standard: 7,
@@ -65,15 +71,18 @@ const KNOWLEDGE_PROMPT = `Sos el asistente de WhatsApp de Quilmes Corrugados, un
 - Máximo: ancho + alto no puede superar 1200 mm (limitación de plancha)
 - Cantidad mínima: 100 unidades por modelo
 
-### Precios (información general)
-- Pedido estándar (≥3000 m²): ~$700/m² según config activa
-- Pedidos grandes (≥5000 m²): precio mayorista con descuento
-- Pedidos entre 1000 y 3000 m²: precio con recargo (~$900/m² publicado). Por contacto directo WhatsApp podemos ofrecer $850/m²
+### Precios
+Los precios y los cortes de tramo NO van escritos acá: llegan en el bloque
+"PRECIOS ACTUALES" de cada consulta, leídos de la configuración vigente.
+Usar SOLO esos valores. Nunca inventar un precio, ni ofrecer descuentos,
+rebajas o condiciones especiales que no estén en ese bloque: si el cliente
+pide una mejora, derivar a un asesor.
 - Impresión: +15% por cada color adicional
 - Moneda: ARS, sin IVA en la cotización
 
 ### Envíos
-- Envío GRATIS: pedidos ≥4000 m² dentro de 60 km de Quilmes
+- Hay envío gratis por volumen y cercanía; el mínimo de m² y el radio en km
+  llegan en el bloque "PRECIOS ACTUALES". No afirmar otros valores.
 - Para otras zonas o cantidades menores: se cotiza el envío
 - Enviamos a todo el país
 
@@ -93,7 +102,8 @@ const KNOWLEDGE_PROMPT = `Sos el asistente de WhatsApp de Quilmes Corrugados, un
 - Horario: Lunes a Viernes 7:00 - 16:00 (Argentina)
 
 ### Estrategias comerciales (para mencionar cuando corresponda)
-- Pedidos pequeños: ofrecer $850/m² si coordinan directo
+- Pedidos chicos: se venden de stock por el canal minorista (/cajas), con
+  entrega más rápida. Derivar ahí en vez de negociar precio.
 - Combinación de pedidos: si dos clientes tienen medidas similares, se pueden combinar para mejor precio
 - Re-compra: si compraron hace 2-4 meses, podemos contactarlos para ver si necesitan más
 
@@ -136,6 +146,8 @@ export interface AIContext {
     price_per_m2_standard: number;
     price_per_m2_volume: number;
     price_per_m2_below_minimum?: number;
+    price_per_m2_retail: number;
+    wholesale_min_m2: number;
     min_m2_per_model: number;
     volume_threshold_m2: number;
     free_shipping_min_m2: number;
@@ -219,10 +231,11 @@ ${ctx.clientName ? `- Nombre del contacto: ${ctx.clientName}` : ''}
 ${ctx.companyName ? `- Empresa: ${ctx.companyName}` : ''}
 ${ctx.lastQuoteTotal ? `- Última cotización: $${ctx.lastQuoteTotal.toLocaleString('es-AR')} (${ctx.lastQuoteM2?.toLocaleString('es-AR')} m²)` : ''}
 ${pricing ? `
-PRECIOS ACTUALES (usar estos si preguntan):
-- Estándar: $${pricing.price_per_m2_standard}/m² (≥${pricing.min_m2_per_model} m²)
-- Mayorista: $${pricing.price_per_m2_volume}/m² (≥${pricing.volume_threshold_m2} m²)
-- Pedidos chicos: $${pricing.price_per_m2_below_minimum ?? pricing.price_per_m2_standard * 1.2}/m² (coordinar directo: $850)
+PRECIOS ACTUALES (usar SOLO estos si preguntan — no inventar ni negociar otros):
+- De stock, hasta ${pricing.wholesale_min_m2} m²: $${pricing.price_per_m2_retail}/m² (medidas estándar, desde 100 cajas, se compra en /cajas)
+- A medida, ${pricing.wholesale_min_m2} a ${pricing.min_m2_per_model} m²: $${pricing.price_per_m2_below_minimum ?? pricing.price_per_m2_standard * 1.2}/m²
+- A medida, ${pricing.min_m2_per_model} a ${pricing.volume_threshold_m2} m²: $${pricing.price_per_m2_standard}/m²
+- A medida, más de ${pricing.volume_threshold_m2} m²: $${pricing.price_per_m2_volume}/m²
 - Envío gratis: ≥${pricing.free_shipping_min_m2} m² y ≤${pricing.free_shipping_max_km} km
 ` : ''}`;
 

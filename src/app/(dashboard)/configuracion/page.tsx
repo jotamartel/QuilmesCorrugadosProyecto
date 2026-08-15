@@ -38,14 +38,18 @@ export default function ConfiguracionPage() {
   const [arbaStatus, setArbaStatus] = useState<{ success: boolean; message: string } | null>(null);
 
   // Form state for pricing
+  // Estos valores se pisan con la config real apenas carga. Se mantienen
+  // alineados con pricing_config para que un fallo de lectura no muestre
+  // precios viejos en el formulario.
   const [pricingFormData, setPricingFormData] = useState({
-    price_per_m2_standard: 700,
-    price_per_m2_volume: 670,
+    price_per_m2_standard: 740,
+    price_per_m2_volume: 700,
     volume_threshold_m2: 5000,
     min_m2_per_model: 3000,
-    price_per_m2_below_minimum: 840, // Precio con recargo para pedidos < 3000m2
-    price_per_m2_retail: 900, // Precio minorista para ventas < 1000 m2
-    free_shipping_min_m2: 4000,
+    wholesale_min_m2: 1000, // Limite entre stock (/cajas) y produccion a medida
+    price_per_m2_below_minimum: 900, // Recargo entre wholesale_min_m2 y min_m2_per_model
+    price_per_m2_retail: 990, // Precio de stock, por debajo de wholesale_min_m2
+    free_shipping_min_m2: 3000,
     free_shipping_max_km: 60,
     production_days_standard: 7,
     production_days_printing: 14,
@@ -74,8 +78,9 @@ export default function ConfiguracionPage() {
           price_per_m2_volume: data.price_per_m2_volume,
           volume_threshold_m2: data.volume_threshold_m2,
           min_m2_per_model: data.min_m2_per_model,
+          wholesale_min_m2: data.wholesale_min_m2 ?? 1000,
           price_per_m2_below_minimum: data.price_per_m2_below_minimum || (data.price_per_m2_standard * 1.20),
-          price_per_m2_retail: data.price_per_m2_retail || 900,
+          price_per_m2_retail: data.price_per_m2_retail || 990,
           free_shipping_min_m2: data.free_shipping_min_m2,
           free_shipping_max_km: data.free_shipping_max_km,
           production_days_standard: data.production_days_standard,
@@ -276,25 +281,25 @@ export default function ConfiguracionPage() {
                     value={pricingFormData.price_per_m2_below_minimum}
                     onChange={(e) => setPricingFormData({ ...pricingFormData, price_per_m2_below_minimum: Number(e.target.value) })}
                     disabled={!editMode}
-                    hint={`Actual: ${formatCurrency(pricingConfig?.price_per_m2_below_minimum || 0)} — Pedidos de 1000 a ${pricingFormData.min_m2_per_model} m2`}
+                    hint={`Actual: ${formatCurrency(pricingConfig?.price_per_m2_below_minimum || 0)} — Pedidos de ${pricingFormData.wholesale_min_m2} a ${pricingFormData.min_m2_per_model} m2`}
                   />
                   <Input
-                    label="Precio minorista ($/m2)"
+                    label="Precio de stock ($/m2)"
                     type="number"
                     value={pricingFormData.price_per_m2_retail}
                     onChange={(e) => setPricingFormData({ ...pricingFormData, price_per_m2_retail: Number(e.target.value) })}
                     disabled={!editMode}
-                    hint={`Actual: ${formatCurrency(pricingConfig?.price_per_m2_retail || 900)} — Pedidos < 1000 m2 (ventas en /cajas)`}
+                    hint={`Actual: ${formatCurrency(pricingConfig?.price_per_m2_retail || 990)} — Pedidos < ${pricingFormData.wholesale_min_m2} m2 (canal minorista, /cajas)`}
                   />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <Input
-                    label="Umbral de volumen (m2)"
+                    label="Límite stock / a medida (m2)"
                     type="number"
-                    value={pricingFormData.volume_threshold_m2}
-                    onChange={(e) => setPricingFormData({ ...pricingFormData, volume_threshold_m2: Number(e.target.value) })}
+                    value={pricingFormData.wholesale_min_m2}
+                    onChange={(e) => setPricingFormData({ ...pricingFormData, wholesale_min_m2: Number(e.target.value) })}
                     disabled={!editMode}
-                    hint="m2 a partir de los cuales aplica precio por volumen"
+                    hint="Hasta acá se vende de stock por /cajas. De acá en adelante se produce a medida y cotiza el mayorista"
                   />
                   <Input
                     label="Mínimo m2 por modelo"
@@ -302,7 +307,15 @@ export default function ConfiguracionPage() {
                     value={pricingFormData.min_m2_per_model}
                     onChange={(e) => setPricingFormData({ ...pricingFormData, min_m2_per_model: Number(e.target.value) })}
                     disabled={!editMode}
-                    hint="m2 mínimos recomendados por modelo de caja"
+                    hint="Debajo de este volumen, la producción a medida lleva recargo"
+                  />
+                  <Input
+                    label="Umbral de volumen (m2)"
+                    type="number"
+                    value={pricingFormData.volume_threshold_m2}
+                    onChange={(e) => setPricingFormData({ ...pricingFormData, volume_threshold_m2: Number(e.target.value) })}
+                    disabled={!editMode}
+                    hint="m2 a partir de los cuales aplica precio por volumen"
                   />
                 </div>
               </CardContent>

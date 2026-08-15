@@ -49,11 +49,13 @@ function useBoxGame() {
             ...prev,
             RETAIL_PRICE_PER_M2: data.price_per_m2_retail,
             WHOLESALE_PRICE_PER_M2: data.price_per_m2_wholesale || prev.WHOLESALE_PRICE_PER_M2,
+            // El tope del canal tambien sale de la base: moverlo no requiere deploy.
+            WHOLESALE_THRESHOLD_M2: data.wholesale_min_m2 || prev.WHOLESALE_THRESHOLD_M2,
           }));
         }
       })
-      .catch(() => {
-        // Use defaults if fetch fails
+      .catch((err) => {
+        console.error('[retail] No se pudo leer la config de precios, se usan los respaldos:', err);
       });
   }, []);
 

@@ -64,14 +64,18 @@ export const RETAIL_CONFIG: RetailConfig = {
   // Ancho de plancha = Alto + Ancho (no puede superar 1200mm por los rollos)
   MAX_SHEET_WIDTH: 1200, // mm
 
-  // Precio minorista (< 1000 m²): configurable desde dashboard
-  RETAIL_PRICE_PER_M2: 900,       // ARS por m² — valor default, se sobreescribe con config de DB
+  // Precio de stock. Estos son valores de RESPALDO: en runtime se sobreescriben
+  // con pricing_config vía /api/public/retail-config, que es la fuente de
+  // verdad. Se mantienen alineados con la base para que, si falla la lectura,
+  // no se cotice un precio viejo.
+  RETAIL_PRICE_PER_M2: 990,       // ARS por m² — pricing_config.price_per_m2_retail
   PRECIO_MINIMO_PEDIDO: 5000,     // ARS
   DECIMALES_PRECIO: 0,            // Redondeo sin decimales
 
-  // Precio mayorista (>= 1000 m²)
-  WHOLESALE_THRESHOLD_M2: 1000,   // m² mínimo para precio mayorista
-  WHOLESALE_PRICE_PER_M2: 700,    // ARS por m²
+  // Tope del canal: pasado este volumen el pedido ya no sale de stock sino de
+  // produccion a medida, y se deriva al cotizador mayorista.
+  WHOLESALE_THRESHOLD_M2: 1000,   // m² — pricing_config.wholesale_min_m2
+  WHOLESALE_PRICE_PER_M2: 900,    // ARS por m² — solo para mostrar a cuanto sale al derivar
 
   // Interacción
   DRAG_SENSITIVITY: 2,           // mm por pixel

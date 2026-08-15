@@ -146,16 +146,19 @@ export async function POST(request: NextRequest) {
 
     const { data: pricing } = await supabase
       .from('pricing_config')
-      .select('price_per_m2_retail, price_per_m2_standard')
+      .select('price_per_m2_retail, price_per_m2_below_minimum, wholesale_min_m2')
       .eq('is_active', true)
       .order('valid_from', { ascending: false })
       .limit(1)
       .single();
 
+    const topeM2 = Number(pricing?.wholesale_min_m2) || RETAIL_CONFIG.WHOLESALE_THRESHOLD_M2;
+
     const configPrecios = {
       ...RETAIL_CONFIG,
       RETAIL_PRICE_PER_M2: Number(pricing?.price_per_m2_retail) || RETAIL_CONFIG.RETAIL_PRICE_PER_M2,
-      WHOLESALE_PRICE_PER_M2: Number(pricing?.price_per_m2_standard) || RETAIL_CONFIG.WHOLESALE_PRICE_PER_M2,
+      WHOLESALE_PRICE_PER_M2: Number(pricing?.price_per_m2_below_minimum) || RETAIL_CONFIG.WHOLESALE_PRICE_PER_M2,
+      WHOLESALE_THRESHOLD_M2: topeM2,
     };
 
     const cajas = body.boxes.map((b) => {
@@ -173,6 +176,21 @@ export async function POST(request: NextRequest) {
         isMayorista: precio.isMayorista,
       };
     });
+
+    // Tope del canal: por encima de este volumen el pedido ya no sale de stock
+    // sino de produccion a medida, y lo cotiza el mayorista con su propia
+    // escalera. Sin este corte los dos canales se superponen y el mismo pedido
+    // puede terminar con dos precios distintos segun por donde entre.
+    const m2Pedido = cajas.reduce((sum, b) => sum + b.totalM2, 0);
+    if (m2Pedido >= topeM2) {
+      return NextResponse.json({
+        error: `Este pedido supera los ${topeM2.toLocaleString('es-AR')} m² que vendemos de stock. A ese volumen lo producimos a medida: cotizalo en el cotizador mayorista.`,
+        code: 'SUPERA_TOPE_STOCK',
+        total_m2: Math.round(m2Pedido),
+        tope_m2: topeM2,
+        cotizador: '/#cotizador',
+      }, { status: 409 });
+    }
 
     // Use the first box for the primary dimensions (required by public_quotes schema)
     const primaryBox = cajas[0];

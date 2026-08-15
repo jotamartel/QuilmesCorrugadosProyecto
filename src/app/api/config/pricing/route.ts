@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
       'price_per_m2_volume',
       'volume_threshold_m2',
       'min_m2_per_model',
+      'wholesale_min_m2',
       'price_per_m2_below_minimum',
       'price_per_m2_retail',
       'free_shipping_min_m2',
@@ -83,13 +84,16 @@ export async function POST(request: NextRequest) {
     const { data: config, error } = await supabase
       .from('pricing_config')
       .insert({
-        price_per_m2_standard: body.price_per_m2_standard ?? 700,
-        price_per_m2_volume: body.price_per_m2_volume ?? 670,
+        // Los ?? son respaldo si el body viene incompleto; se mantienen
+        // alineados con la fila activa para no introducir precios viejos.
+        price_per_m2_standard: body.price_per_m2_standard ?? 740,
+        price_per_m2_volume: body.price_per_m2_volume ?? 700,
         volume_threshold_m2: body.volume_threshold_m2 ?? 5000,
         min_m2_per_model: body.min_m2_per_model ?? 3000,
-        price_per_m2_below_minimum: body.price_per_m2_below_minimum ?? (body.price_per_m2_standard ?? 700) * 1.20,
-        price_per_m2_retail: body.price_per_m2_retail ?? 900,
-        free_shipping_min_m2: body.free_shipping_min_m2 ?? 4000,
+        wholesale_min_m2: body.wholesale_min_m2 ?? 1000,
+        price_per_m2_below_minimum: body.price_per_m2_below_minimum ?? (body.price_per_m2_standard ?? 740) * 1.20,
+        price_per_m2_retail: body.price_per_m2_retail ?? 990,
+        free_shipping_min_m2: body.free_shipping_min_m2 ?? 3000,
         free_shipping_max_km: body.free_shipping_max_km ?? 60,
         production_days_standard: body.production_days_standard ?? 7,
         production_days_printing: body.production_days_printing ?? 14,

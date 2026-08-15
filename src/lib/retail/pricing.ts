@@ -11,9 +11,20 @@ export interface PrecioResult {
 }
 
 /**
- * Calcula el precio por caja.
- * - Si el total de m² del pedido es >= WHOLESALE_THRESHOLD_M2 (1000): precio mayorista (m² × $/m² mayorista)
- * - Si el total de m² del pedido es < WHOLESALE_THRESHOLD_M2: precio minorista (m² × $/m² minorista)
+ * Precio de una caja vendida de stock por /cajas.
+ *
+ * Es un precio único: este canal vende medidas estándar que ya están en
+ * depósito, y su tope es WHOLESALE_THRESHOLD_M2. Pasado ese volumen el pedido
+ * ya no sale de stock sino de producción a medida, y se deriva al cotizador
+ * mayorista, que tiene su propia escalera (ver lib/utils/pricing.ts).
+ *
+ * Antes esta función aplicaba precio mayorista por encima del umbral. Eso hacía
+ * que el mismo pedido saliera más barato acá que por el cotizador principal
+ * —hasta $479.840 de diferencia en 2.999 m²—. Ahora los dos canales no se
+ * superponen y cada volumen tiene un solo precio posible.
+ *
+ * `isMayorista` queda indicando que el pedido superó el tope del canal, para
+ * que la UI pueda derivarlo.
  */
 export function calcularPrecioMinorista(
   largo: number,
@@ -26,18 +37,11 @@ export function calcularPrecioMinorista(
   const volumen = largo * ancho * alto; // mm³
   const { m2: m2PerBox } = calculateUnfolded(largo, ancho, alto);
   const totalM2 = m2PerBox * cantidad;
+
+  // Supera el tope del canal de stock: hay que derivar al mayorista.
   const isMayorista = totalM2 >= config.WHOLESALE_THRESHOLD_M2;
 
-  let precioUnitario: number;
-
-  if (isMayorista) {
-    // Precio mayorista: m² por caja × precio por m² mayorista
-    precioUnitario = Math.round(m2PerBox * config.WHOLESALE_PRICE_PER_M2);
-  } else {
-    // Precio minorista: m² por caja × precio por m² minorista
-    precioUnitario = Math.round(m2PerBox * config.RETAIL_PRICE_PER_M2);
-  }
-
+  const precioUnitario = Math.round(m2PerBox * config.RETAIL_PRICE_PER_M2);
   const subtotal = precioUnitario * cantidad;
 
   return { precioUnitario, subtotal, volumen, m2PerBox, totalM2, isMayorista };

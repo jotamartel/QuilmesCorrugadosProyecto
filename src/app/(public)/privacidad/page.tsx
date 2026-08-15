@@ -4,7 +4,8 @@ import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 
 export const metadata: Metadata = {
-  title: 'Política de Privacidad | Quilmes Corrugados',
+  // El layout raiz aplica el template "%s | Quilmes Corrugados": no repetirlo aca.
+  title: 'Política de Privacidad',
   description: 'Política de privacidad de Quilmes Corrugados. Cómo protegemos y utilizamos la información personal de nuestros clientes.',
   alternates: {
     canonical: 'https://quilmescorrugados.com.ar/privacidad',

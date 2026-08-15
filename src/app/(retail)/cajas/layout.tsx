@@ -19,7 +19,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Armá tu caja | Quilmes Corrugados',
+  // El layout raiz aplica el template "%s | Quilmes Corrugados": no repetirlo aca.
+  title: 'Armá tu caja',
   description: 'Diseñá tu caja de cartón corrugado a medida y cotizá al instante. Tocá, arrastrá y armá tu caja personalizada.',
 };
 

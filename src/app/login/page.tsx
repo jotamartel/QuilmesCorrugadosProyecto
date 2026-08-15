@@ -3,7 +3,8 @@ import { LoginForm } from '@/components/auth';
 import { LoadingPage } from '@/components/ui/loading';
 
 export const metadata = {
-  title: 'Iniciar Sesion - Quilmes Corrugados',
+  // El layout raiz aplica el template "%s | Quilmes Corrugados": no repetirlo aca.
+  title: 'Iniciar Sesion',
   description: 'Acceso al sistema de gestion de Quilmes Corrugados',
 };
 

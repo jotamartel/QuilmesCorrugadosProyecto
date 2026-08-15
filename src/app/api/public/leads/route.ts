@@ -9,6 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { getPricePerM2, calculateSubtotal } from '@/lib/utils/pricing';
 import { sendNotification } from '@/lib/notifications';
+import { notifyNewRetailLead } from '@/lib/telegram/notifications';
 import type { PricingConfig } from '@/lib/types/database';
 
 interface BoxData {
@@ -191,6 +192,37 @@ export async function POST(request: NextRequest) {
     // NO enviar email aquí - el usuario solo vio el precio, aún no pidió contacto
     // El email se enviará cuando el usuario haga clic en "Quiero que me contacten"
     // (en /api/public/quotes cuando requested_contact = true)
+
+    // Notificar por Telegram (lead que vio precio, sin solicitar contacto)
+    try {
+      await notifyNewRetailLead({
+        quoteId: quote.id,
+        quoteNumber: quote.quote_number,
+        clientType: body.client_type || 'particular',
+        nombre: body.requester_name.trim(),
+        empresa: body.requester_company?.trim() || null,
+        email: body.requester_email.trim(),
+        telefono: body.requester_phone,
+        cuit: body.requester_cuit || null,
+        boxes: boxCalculations.map(b => ({
+          largo: b.length_mm,
+          ancho: b.width_mm,
+          alto: b.height_mm,
+          cantidad: b.quantity,
+          precioUnitario: Math.round((calculateSubtotal(b.totalSqm, pricePerM2) / b.quantity) * 100) / 100,
+          subtotal: calculateSubtotal(b.totalSqm, pricePerM2),
+          m2PerBox: b.sqmPerBox,
+          totalM2: b.totalSqm,
+          isMayorista: true,
+        })),
+        shippingMethod: null,
+        shippingCost: 0,
+        shippingCostConfirmed: false,
+        source: 'lead',
+      });
+    } catch (err) {
+      console.error('[Telegram] Error notificando lead:', err);
+    }
 
     // Devolver los cálculos para mostrar en el frontend
     return NextResponse.json({

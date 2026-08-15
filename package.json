@@ -15,6 +15,7 @@
     "migration:verify:local": "tsx scripts/verify-migrations-env.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@supabase/ssr": "^0.8.0",

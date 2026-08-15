@@ -8,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { getPricePerM2, calculateSubtotal, getProductionDays } from '@/lib/utils/pricing';
 import { sendNotification } from '@/lib/notifications';
+import { notifyNewRetailLead } from '@/lib/telegram/notifications';
 import type { CreatePublicQuoteRequest, PricingConfig } from '@/lib/types/database';
 
 export async function POST(request: NextRequest) {
@@ -249,6 +250,37 @@ export async function POST(request: NextRequest) {
         console.error('Error sending quote notification:', err);
         // No fallar la request si falla el email
       });
+
+      // Notificar por Telegram
+      try {
+        await notifyNewRetailLead({
+          quoteId: quote.id,
+          quoteNumber: quote.quote_number,
+          clientType: body.requester_company ? 'empresa' : 'particular',
+          nombre: body.requester_name.trim(),
+          empresa: body.requester_company?.trim() || null,
+          email: body.requester_email.trim(),
+          telefono: body.requester_phone,
+          cuit: body.requester_cuit || null,
+          boxes: [{
+            largo: body.length_mm,
+            ancho: body.width_mm,
+            alto: body.height_mm,
+            cantidad: body.quantity,
+            precioUnitario: unitPrice,
+            subtotal: subtotal,
+            m2PerBox: unfolded.m2,
+            totalM2: totalSqm,
+            isMayorista: true,
+          }],
+          shippingMethod: null,
+          shippingCost: 0,
+          shippingCostConfirmed: false,
+          source: 'mayorista',
+        });
+      } catch (err) {
+        console.error('[Telegram] Error notificando cotizacion mayorista:', err);
+      }
 
       // Si es de alto valor, enviar notificación adicional
       if (subtotal >= 3000000) {

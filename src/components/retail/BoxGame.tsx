@@ -23,6 +23,8 @@ import OrderConfirmation from './OrderConfirmation';
 
 function useBoxGame() {
   const [state, setState] = useState<GameState>('IDLE');
+  // Id de la fila creada al revelar el precio, para completarla al enviar.
+  const [quoteId, setQuoteId] = useState<string | null>(null);
   const [largo, setLargo] = useState<number>(RETAIL_CONFIG.DEFAULT_LARGO);
   const [ancho, setAncho] = useState<number>(RETAIL_CONFIG.DEFAULT_ANCHO);
   const [alto, setAlto] = useState<number>(RETAIL_CONFIG.DEFAULT_ALTO);
@@ -164,6 +166,8 @@ function useBoxGame() {
     setFormData(null);
     setShippingData(null);
     setEditingIndex(null);
+    // Cotizacion nueva = fila nueva. Si no se limpia, el envio pisaria el lead anterior.
+    setQuoteId(null);
     setLargo(RETAIL_CONFIG.DEFAULT_LARGO);
     setAncho(RETAIL_CONFIG.DEFAULT_ANCHO);
     setAlto(RETAIL_CONFIG.DEFAULT_ALTO);
@@ -172,11 +176,48 @@ function useBoxGame() {
     transition('SET_LARGO');
   }, [transition]);
 
-  // After contact form, reveal the quote
+  // After contact form, reveal the quote.
+  // Se guarda el contacto ACA, antes de mostrar el precio: el que mira el precio
+  // y se va igual queda registrado y las automatizaciones lo pueden trabajar.
+  // El id vuelve para que el envio complete esa fila en vez de duplicarla.
   const revealQuote = useCallback(async (data: OrderFormData) => {
     setFormData(data);
     transition('QUOTE');
-  }, [transition]);
+
+    try {
+      const res = await fetch('/api/public/retail-quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientType: data.clientType,
+          razonSocial: data.razonSocial,
+          nombreFantasia: data.nombreFantasia,
+          cuit: data.cuit,
+          condicionIva: data.condicionIva,
+          nombreCompleto: data.nombreCompleto,
+          dni: data.dni,
+          email: data.email,
+          telefono: data.telefono,
+          mensaje: data.mensaje,
+          boxes: boxes.map(b => ({
+            largo: b.largo, ancho: b.ancho, alto: b.alto, cantidad: b.cantidad,
+            precioUnitario: b.precioUnitario, subtotal: b.subtotal,
+            m2PerBox: b.m2PerBox, totalM2: b.totalM2,
+            isMayorista: b.isMayorista, standardBoxId: b.standardBoxId,
+          })),
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.quote_id) setQuoteId(json.quote_id);
+      } else {
+        console.error('[retail] No se pudo registrar el lead:', res.status);
+      }
+    } catch (err) {
+      // No bloquear la vista del precio si falla el registro.
+      console.error('[retail] Error registrando el lead:', err);
+    }
+  }, [transition, boxes]);
 
   const backToForm = useCallback(() => {
     transition('ORDER_FORM');
@@ -216,6 +257,8 @@ function useBoxGame() {
 
     const payload = {
       ...formData,
+      // Completa la fila creada al revelar el precio en vez de duplicarla.
+      quoteId: quoteId ?? undefined,
       direccion: shipping.direccion,
       ciudad: shipping.ciudad,
       provincia: shipping.provincia,
@@ -251,7 +294,7 @@ function useBoxGame() {
     const precioTotal = boxes.reduce((sum, b) => sum + b.subtotal, 0);
     trackEvent('Lead', { value: precioTotal + shipping.cost, currency: 'ARS' });
     transition('ORDER_SENT');
-  }, [boxes, formData, transition]);
+  }, [boxes, formData, transition, quoteId]);
 
   // Validate ancho considering MAX_SHEET_WIDTH
   const validateAncho = useCallback((newAncho: number): number => {

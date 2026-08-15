@@ -52,6 +52,12 @@ interface RetailQuoteRequest {
   mensaje?: string;
   // Boxes
   boxes: RetailBox[];
+  /**
+   * Id devuelto por la llamada anterior. El canal minorista guarda el contacto
+   * apenas revela el precio (si no, el que mira y se va se pierde entero) y
+   * despues completa esa misma fila con el envio, en vez de crear otra.
+   */
+  quoteId?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -221,53 +227,110 @@ export async function POST(request: NextRequest) {
     // GUARDAR EN SUPABASE
     // ═══════════════════════════════════════════════════════════
 
+    // Hay envio elegido => el usuario cerro la solicitud. Sin envio, es un lead:
+    // vio el precio y todavia no confirmo nada.
+    const esSolicitud = !!body.shippingMethod;
+
+    const datosCotizacion = {
+      // Solicitante
+      requester_name: requesterName,
+      requester_company: requesterCompany,
+      requester_email: body.email.trim().toLowerCase(),
+      requester_phone: body.telefono.replace(/\D/g, ''),
+      requester_cuit: body.cuit?.replace(/\D/g, '') || null,
+      requester_tax_condition: taxCondition,
+      address: body.direccion?.trim() || null,
+      city: body.ciudad?.trim() || null,
+      province: body.provincia || 'Buenos Aires',
+      postal_code: body.codigoPostal?.trim() || null,
+      delivery_lat: body.lat || null,
+      delivery_lng: body.lng || null,
+      length_mm: primaryBox.largo,
+      width_mm: primaryBox.ancho,
+      height_mm: primaryBox.alto,
+      quantity: primaryBox.cantidad,
+      sheet_width_mm: unfolded.unfoldedWidth,
+      sheet_length_mm: unfolded.unfoldedLength,
+      sqm_per_box: unfolded.m2,
+      total_sqm: totalSqm,
+      price_per_m2: totalSqm > 0 ? Math.round(totalSubtotal / totalSqm) : 0,
+      unit_price: primaryBox.precioUnitario,
+      subtotal: totalSubtotal,
+      message: fullMessage,
+      requested_contact: esSolicitud,
+      shipping_method: body.shippingMethod || null,
+      shipping_cost: shippingCost,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Avisa por Telegram y responde. El id vuelve al front para que la segunda
+    // llamada complete esta misma fila en lugar de crear otra.
+    const responderConNotificacion = async (
+      fila: { id: string; quote_number: number },
+      solicitud: boolean,
+    ) => {
+      try {
+        await notifyNewRetailLead({
+          quoteId: fila.id,
+          quoteNumber: String(fila.quote_number),
+          clientType: body.clientType,
+          nombre: requesterName,
+          empresa: requesterCompany,
+          email: body.email.trim(),
+          telefono: body.telefono,
+          cuit: body.cuit || null,
+          boxes: cajas,
+          shippingMethod: body.shippingMethod || null,
+          shippingCost,
+          shippingCostConfirmed: shippingCost > 0,
+          direccion: body.direccion || null,
+          ciudad: body.ciudad || null,
+          provincia: body.provincia || null,
+          source: solicitud ? 'retail' : 'lead',
+        });
+      } catch (err) {
+        console.error('[Telegram] Error notificando:', err);
+      }
+
+      return NextResponse.json({
+        success: true,
+        quote_id: fila.id,
+        quote_number: fila.quote_number,
+      }, { status: 201 });
+    };
+
+    // Si viene quoteId, completar esa fila en vez de crear otra. El filtro por
+    // email y por requested_contact=false evita que alguien pise la cotizacion
+    // de otro mandando un id cualquiera.
+    if (body.quoteId) {
+      const { data: actualizada, error: errUpd } = await supabase
+        .from('public_quotes')
+        .update(datosCotizacion)
+        .eq('id', body.quoteId)
+        .eq('requester_email', body.email.trim().toLowerCase())
+        .eq('requested_contact', false)
+        .select('id, quote_number')
+        .maybeSingle();
+
+      if (errUpd) {
+        console.error('Error actualizando cotizacion retail:', errUpd);
+      } else if (actualizada) {
+        return await responderConNotificacion(actualizada, esSolicitud);
+      }
+      // Si no matcheo ninguna fila se cae al insert de abajo: mejor duplicar
+      // que perder el lead.
+    }
+
     const { data: quote, error } = await supabase
       .from('public_quotes')
       .insert({
-        // Solicitante
-        requester_name: requesterName,
-        requester_company: requesterCompany,
-        requester_email: body.email.trim().toLowerCase(),
-        requester_phone: body.telefono.replace(/\D/g, ''),
-        requester_cuit: body.cuit?.replace(/\D/g, '') || null,
-        requester_tax_condition: taxCondition,
-
-        // Dirección
-        address: body.direccion?.trim() || null,
-        city: body.ciudad?.trim() || null,
-        province: body.provincia || 'Buenos Aires',
-        postal_code: body.codigoPostal?.trim() || null,
-        delivery_lat: body.lat || null,
-        delivery_lng: body.lng || null,
-
-        // Primera caja (campo obligatorio del schema)
-        length_mm: primaryBox.largo,
-        width_mm: primaryBox.ancho,
-        height_mm: primaryBox.alto,
-        quantity: primaryBox.cantidad,
+        ...datosCotizacion,
         has_printing: false,
         printing_colors: 0,
-
-        // Cálculos
-        sheet_width_mm: unfolded.unfoldedWidth,
-        sheet_length_mm: unfolded.unfoldedLength,
-        sqm_per_box: unfolded.m2,
-        total_sqm: totalSqm,
-        price_per_m2: totalSqm > 0 ? Math.round(totalSubtotal / totalSqm) : 0,
-        unit_price: primaryBox.precioUnitario,
-        subtotal: totalSubtotal,
         estimated_days: 5,
-
-        // Tracking
         source_ip: sourceIp,
         source_user_agent: sourceUserAgent,
-        message: fullMessage,
-
-        // Estado
         status: 'pending',
-        requested_contact: true,
-        shipping_method: body.shippingMethod || null,
-        shipping_cost: shippingCost,
         fulfillment_status: 'pending_payment',
       })
       .select('id, quote_number')
@@ -290,38 +353,7 @@ export async function POST(request: NextRequest) {
     // que medidas puede prometer con entrega inmediata.
     // El descuento tiene que ocurrir cuando la venta se confirma.
 
-    // ═══════════════════════════════════════════════════════════
-    // NOTIFICAR POR TELEGRAM
-    // ═══════════════════════════════════════════════════════════
-
-    // Await para que no se corte en serverless
-    try {
-      await notifyNewRetailLead({
-        quoteId: quote.id,
-        quoteNumber: quote.quote_number,
-        clientType: body.clientType,
-        nombre: requesterName,
-        empresa: requesterCompany,
-        email: body.email.trim(),
-        telefono: body.telefono,
-        cuit: body.cuit || null,
-        boxes: cajas,
-        shippingMethod: body.shippingMethod || null,
-        shippingCost,
-        shippingCostConfirmed: shippingCost > 0,
-        direccion: body.direccion || null,
-        ciudad: body.ciudad || null,
-        provincia: body.provincia || null,
-        source: 'retail',
-      });
-    } catch (err) {
-      console.error('[Telegram] Error notificando:', err);
-    }
-
-    return NextResponse.json({
-      success: true,
-      quote_number: quote.quote_number,
-    }, { status: 201 });
+    return await responderConNotificacion(quote, esSolicitud);
 
   } catch (error) {
     console.error('Error in POST /api/public/retail-quotes:', error);

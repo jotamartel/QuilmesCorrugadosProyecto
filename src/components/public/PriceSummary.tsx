@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Package, Clock, Truck, Send, Loader2, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { BoxItemData, BoxCalculations } from './BoxItemForm';
@@ -15,6 +16,8 @@ interface PriceSummaryProps {
   onBelowMinimum?: () => void; // Callback para "¿Necesitas menos m²?"
   submitting?: boolean; // Estado de envío
   minM2PerModel?: number; // Mínimo m² por modelo para mostrar el botón
+  stockMaxM2?: number; // Debajo de esto se vende de stock desde /cajas
+  volumeThresholdM2?: number; // Desde acá aplica precio por volumen
 }
 
 export function PriceSummary({
@@ -26,6 +29,8 @@ export function PriceSummary({
   showPrice = true,
   onRequestContact,
   onBelowMinimum,
+  stockMaxM2 = 1000,
+  volumeThresholdM2 = 5000,
   submitting = false,
   minM2PerModel = 3000,
 }: PriceSummaryProps) {
@@ -35,9 +40,27 @@ export function PriceSummary({
   const totalSubtotal = validCalculations.reduce((sum, c) => sum + c.subtotal, 0);
   const totalQuantity = boxes.reduce((sum, b) => sum + b.quantity, 0);
 
-  const hasValidBoxes = validCalculations.length > 0;
-  const isBelowMinimum = totalSqm > 0 && totalSqm < 3000;
-  const hasVolumeDiscount = totalSqm >= 5000;
+  const hasValidBoxes = totalSqm > 0 && validCalculations.length > 0;
+  const isBelowMinimum = totalSqm > 0 && totalSqm < minM2PerModel;
+  const hasVolumeDiscount = totalSqm >= volumeThresholdM2;
+  // Volumen de stock: no se produce a medida, se compra hecho desde /cajas.
+  const esPedidoDeStock = totalSqm > 0 && totalSqm < stockMaxM2;
+
+  const panelStock = (
+    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+      <p className="text-amber-900 font-medium">Este volumen lo vendemos de stock</p>
+      <p className="text-sm text-amber-800 mt-1">
+        Son {totalSqm.toLocaleString('es-AR', { maximumFractionDigits: 0 })} m². Las medidas
+        estándar salen más rápido y se compran online desde 100 cajas.
+      </p>
+      <Link
+        href="/cajas"
+        className="mt-3 inline-block rounded-lg bg-[#002E55] px-4 py-2 text-sm font-medium text-white hover:bg-[#001a33] transition-colors"
+      >
+        Ver medidas en stock
+      </Link>
+    </div>
+  );
 
   if (!hasValidBoxes) {
     return (
@@ -122,18 +145,12 @@ export function PriceSummary({
         )}
       </div>
 
-      {/* Mensaje de mínimo no alcanzado */}
-      {isBelowMinimum && totalSqm < 1000 ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-          <p className="text-red-700 font-medium">
-            Pedido mínimo: 1.000 m²
-          </p>
-          <p className="text-sm text-red-600 mt-1">
-            Actualmente tenés {totalSqm.toLocaleString('es-AR', { minimumFractionDigits: 2 })} m².
-            Aumentá la cantidad de cajas para continuar.
-          </p>
-        </div>
-      ) : isBelowMinimum && totalSqm >= 1000 ? (
+      {/* Volumen de stock: ya no es un bloqueo, es una derivacion. Antes decia
+          "Aumentá la cantidad para continuar" y ahi se cortaba la visita.
+          Con el precio ya revelado se muestran los dos: precio y derivacion. */}
+      {esPedidoDeStock && !showPrice ? (
+        panelStock
+      ) : isBelowMinimum && !esPedidoDeStock ? (
         <div className="space-y-3">
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center text-sm">
             <p className="text-yellow-800 font-medium">
@@ -172,6 +189,9 @@ export function PriceSummary({
         </div>
       ) : (
         <>
+          {/* Ya vio el precio de stock: ahora se lo invita a comprarlo online */}
+          {esPedidoDeStock && panelStock}
+
           {/* Total */}
           <div className="border-t border-gray-100 pt-4">
             <div className="flex justify-between items-center">

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { ArrowLeft, ArrowRight, Loader2, Plus, Eye } from 'lucide-react';
 import { PriceSummary } from './PriceSummary';
@@ -246,10 +247,19 @@ export function QuoterForm() {
     };
   }, [boxCalculations, boxes]);
 
-  // Validación del paso 1 - debe cumplir mínimo de 1000 m² (3000 m² recomendado)
+  // Límite entre lo que se vende de stock y lo que se produce a medida.
+  // Sale de la config: no debe quedar escrito acá.
+  const wholesaleMinM2 = pricingConfig?.wholesale_min_m2 ?? 1000;
+
+  // Por debajo del límite no se produce a medida: se vende de stock desde
+  // /cajas. Igual se lo deja avanzar para tomarle los datos — antes el botón
+  // quedaba muerto en "Mínimo requerido" y ese visitante se perdía entero.
+  const esPedidoDeStock = totals.totalSqm > 0 && totals.totalSqm < wholesaleMinM2;
+
+  // Validación del paso 1: alcanza con que las cajas estén completas.
   const isStep1Valid = useMemo(() => {
-    return totals.totalSqm >= 1000 && boxes.length > 0;
-  }, [totals.totalSqm, boxes.length]);
+    return boxes.length > 0 && boxes.every((_, i) => !!boxCalculations[i]) && totals.totalSqm > 0;
+  }, [boxes, boxCalculations, totals.totalSqm]);
 
   // Validación del paso 2 - datos requeridos para ver cotización
   const isStep2DataComplete = useMemo(() => {
@@ -326,7 +336,7 @@ export function QuoterForm() {
 
   // Revelar precio y registrar lead
   const handleRevealPrice = async () => {
-    if (!isStep2DataComplete || totals.totalSqm < 1000) return;
+    if (!isStep2DataComplete || totals.totalSqm <= 0) return;
 
     setRevealingPrice(true);
     setError(null);
@@ -396,7 +406,7 @@ export function QuoterForm() {
   };
 
   const handleSubmit = async () => {
-    if (!isStep2Valid || totals.totalSqm < 1000) return;
+    if (!isStep2Valid || totals.totalSqm <= 0) return;
 
     setSubmitting(true);
     setError(null);
@@ -544,6 +554,29 @@ export function QuoterForm() {
               </div>
             )}
 
+            {/* Este volumen no se produce a medida: se vende de stock.
+                Se ofrece el autoservicio y se deja continuar para tomar el dato. */}
+            {esPedidoDeStock && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm text-amber-900 leading-relaxed">
+                  Para {totals.totalSqm.toLocaleString('es-AR', { maximumFractionDigits: 0 })} m² no
+                  hace falta producir a medida: tenemos <strong>medidas estándar en stock</strong>,
+                  con entrega más rápida y compra online desde 100 cajas.
+                </p>
+                <Link
+                  href="/cajas"
+                  onClick={() => trackEvent('quote_started', { section: 'derivacion_a_stock', totalSqm: totals.totalSqm })}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#002E55] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#001a33] transition-colors"
+                >
+                  Ver medidas en stock
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <p className="mt-3 text-xs text-amber-800">
+                  ¿Preferís que te contactemos? Seguí abajo y te pasamos el precio por email.
+                </p>
+              </div>
+            )}
+
             {/* Botón continuar */}
             <button
               type="button"
@@ -564,7 +597,7 @@ export function QuoterForm() {
               className="w-full px-4 py-3 bg-[#002E55] hover:bg-[#001a33] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
             >
               {!isStep1Valid ? (
-                totals.totalSqm > 0 && totals.totalSqm < 1000 ? 'Mínimo requerido: 1.000 m²' : 'Completá todas las cajas'
+                'Completá todas las cajas'
               ) : (
                 <>
                   Continuar
@@ -1003,6 +1036,8 @@ export function QuoterForm() {
           } : undefined}
           submitting={submitting}
           minM2PerModel={pricingConfig?.min_m2_per_model ?? 3000}
+          stockMaxM2={wholesaleMinM2}
+          volumeThresholdM2={pricingConfig?.volume_threshold_m2 ?? 5000}
         />
       </div>
       </div>

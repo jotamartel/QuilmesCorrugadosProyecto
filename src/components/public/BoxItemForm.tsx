@@ -30,6 +30,8 @@ export interface BoxCalculations {
   subtotal: number;
   minQuantityFor3000m2: number;
   meetsMinimum: boolean;
+  /** Por debajo del limite no se produce a medida: se vende de stock desde /cajas */
+  esDeStock: boolean;
 }
 
 interface BoxItemFormProps {
@@ -92,6 +94,7 @@ export function calculateBoxItem(box: BoxItemData, pricingConfig?: PricingConfig
     subtotal,
     minQuantityFor3000m2,
     meetsMinimum: totalSqm >= pricingConfig.min_m2_per_model,
+    esDeStock: totalSqm < (pricingConfig.wholesale_min_m2 ?? 1000),
   };
 }
 
@@ -366,15 +369,17 @@ export function BoxItemForm({
             </div>
           )}
 
-          {/* Mensaje de mínimo no alcanzado */}
-          {calculations && !calculations.meetsMinimum && (
+          {/* Mínimo recomendado para producción a medida. No aplica a los
+              pedidos de stock: esos los cubre el aviso de derivación a /cajas,
+              y mostrar los dos a la vez decía cosas contradictorias. */}
+          {calculations && !calculations.meetsMinimum && !calculations.esDeStock && (
             <div className="p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
               <p className="text-xs text-yellow-800">
                 <strong>Pedido menor al mínimo recomendado:</strong> Para alcanzar los 3.000 m² recomendados necesitás{' '}
                 <strong>{calculations.minQuantityFor3000m2.toLocaleString('es-AR')}</strong> unidades.
               </p>
               <p className="text-xs text-yellow-700 mt-1">
-                Podés cotizar desde 1.000 m², la producción estará sujeta a disponibilidad.
+                Podés cotizar igual, la producción estará sujeta a disponibilidad.
               </p>
             </div>
           )}

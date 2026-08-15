@@ -8,7 +8,8 @@ import { trackEvent } from '@/lib/utils/tracking';
 // Mismo numero que src/components/public/WhatsAppButton.tsx.
 export const WHATSAPP_NUMBER = '5491169249801';
 
-const APERTURA_MS = 900; // deja respirar la revelacion del precio antes de aparecer
+const APERTURA_MS = 900;    // deja respirar la revelacion del precio antes de aparecer
+const AUTOCIERRE_MS = 7000; // en mobile el globo tapa el CTA: se repliega solo
 
 interface WhatsAppBubbleProps {
   boxes: BoxQuoteLine[];
@@ -35,15 +36,25 @@ function formatMedidas(b: BoxQuoteLine): string {
 export default function WhatsAppBubble({ boxes }: WhatsAppBubbleProps) {
   const [abierto, setAbierto] = useState(false);
   const [cerradoPorUsuario, setCerradoPorUsuario] = useState(false);
+  const [aperturaManual, setAperturaManual] = useState(false);
   const [sugerencias, setSugerencias] = useState<StandardSuggestion[]>([]);
 
   // Abrir solo una vez, con un respiro despues de que se revela el precio.
   // Si el usuario ya lo cerro, no volver a insistir.
   useEffect(() => {
-    if (cerradoPorUsuario) return;
+    if (cerradoPorUsuario || aperturaManual) return;
     const t = setTimeout(() => setAbierto(true), APERTURA_MS);
     return () => clearTimeout(t);
-  }, [cerradoPorUsuario]);
+  }, [cerradoPorUsuario, aperturaManual]);
+
+  // El juego ocupa el viewport completo y no scrollea: en mobile el globo
+  // abierto tapa el boton principal. Se repliega solo al icono pasados unos
+  // segundos, salvo que lo haya abierto el usuario a proposito.
+  useEffect(() => {
+    if (!abierto || aperturaManual) return;
+    const t = setTimeout(() => setAbierto(false), AUTOCIERRE_MS);
+    return () => clearTimeout(t);
+  }, [abierto, aperturaManual]);
 
   // Buscar medidas estandar con stock suficiente para lo que pidio
   useEffect(() => {
@@ -220,7 +231,11 @@ export default function WhatsAppBubble({ boxes }: WhatsAppBubbleProps) {
 
         <button
           className="qc-wa-fab"
-          onClick={() => setAbierto((v) => !v)}
+          onClick={() => {
+            // Abrirlo a mano desactiva el autocierre: si lo pidio, que se quede.
+            setAperturaManual(true);
+            setAbierto((v) => !v);
+          }}
           aria-label={abierto ? 'Ocultar mensaje de WhatsApp' : 'Consultar por WhatsApp'}
           aria-expanded={abierto}
           style={{

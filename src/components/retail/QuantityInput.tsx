@@ -115,11 +115,9 @@ export default function QuantityInput({ value, onChange, visible, largo, ancho, 
         className="text-xs text-center"
         style={{
           fontFamily: 'var(--font-retail-sans), sans-serif',
-          color: belowMinimum
+          color: belowMinimum || isMayorista
             ? '#d97706'
-            : isMayorista
-              ? 'var(--retail-primary)'
-              : 'var(--retail-text-muted)',
+            : 'var(--retail-text-muted)',
           transition: 'color 300ms',
         }}
       >
@@ -130,9 +128,11 @@ export default function QuantityInput({ value, onChange, visible, largo, ancho, 
           </>
         ) : value > 0 ? (
           isMayorista ? (
-            <>Precio mayorista ({totalM2.toFixed(0)} m²)</>
+            // Paso el tope de stock: a este volumen se produce a medida y lo
+            // cotiza el mayorista, no este canal.
+            <>{totalM2.toFixed(0)} m² — supera el stock, se fabrica a medida</>
           ) : (
-            <>Con {qtyForWholesale.toLocaleString('es-AR')}+ uds. accedes al precio mayorista</>
+            <>Desde {qtyForWholesale.toLocaleString('es-AR')} uds. se fabrica a medida y el m² baja</>
           )
         ) : (
           <>Minimo {RETAIL_CONFIG.MIN_CANTIDAD.toLocaleString('es-AR')} unidades</>

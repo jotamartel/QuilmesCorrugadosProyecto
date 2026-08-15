@@ -181,8 +181,14 @@ export async function POST(request: NextRequest) {
     // sino de produccion a medida, y lo cotiza el mayorista con su propia
     // escalera. Sin este corte los dos canales se superponen y el mismo pedido
     // puede terminar con dos precios distintos segun por donde entre.
+    //
+    // El tope bloquea la VENTA, no la captura del contacto: si viene sin envio
+    // es un lead, y un lead de ese tamaño es de los mas valiosos que entran.
+    // Se guarda igual, marcado para que ventas lo recotice a medida.
     const m2Pedido = cajas.reduce((sum, b) => sum + b.totalM2, 0);
-    if (m2Pedido >= topeM2) {
+    const superaTope = m2Pedido >= topeM2;
+
+    if (superaTope && body.shippingMethod) {
       return NextResponse.json({
         error: `Este pedido supera los ${topeM2.toLocaleString('es-AR')} m² que vendemos de stock. A ese volumen lo producimos a medida: cotizalo en el cotizador mayorista.`,
         code: 'SUPERA_TOPE_STOCK',
@@ -217,7 +223,9 @@ export async function POST(request: NextRequest) {
     }[body.shippingMethod] : null;
 
     const fullMessage = [
-      `[Cotizacion Retail]`,
+      superaTope
+        ? `[LEAD MAYORISTA — entro por /cajas] Supera los ${topeM2.toLocaleString('es-AR')} m² de stock: hay que recotizarlo a medida. El precio de abajo es el de stock y NO es el que corresponde.`
+        : `[Cotizacion Retail]`,
       `Tipo: ${body.clientType === 'empresa' ? 'Empresa' : 'Particular'}`,
       body.clientType === 'empresa' && body.cuit ? `CUIT: ${body.cuit}` : null,
       body.clientType === 'particular' && body.dni ? `DNI: ${body.dni}` : null,

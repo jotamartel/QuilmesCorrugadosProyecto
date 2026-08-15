@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import Link from 'next/link';
 import type { BoxQuoteLine } from '@/lib/retail/types';
 import type { RetailConfig } from '@/lib/retail/config';
 import { formatPrecio, calcularPrecioMinorista } from '@/lib/retail/pricing';
@@ -29,7 +30,10 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
 
   const precioTotal = boxes.reduce((sum, b) => sum + b.subtotal, 0);
   const totalM2 = boxes.reduce((sum, b) => sum + b.totalM2, 0);
-  const hasMayorista = boxes.some(b => b.isMayorista);
+  // Supera el tope del canal de stock: a este volumen ya se produce a medida
+  // y lo cotiza el mayorista, con su propia escalera de precios.
+  const superaTope = boxes.some(b => b.isMayorista);
+  const topeM2 = (retailConfig ?? RETAIL_CONFIG).WHOLESALE_THRESHOLD_M2;
   const belowMinimum = precioTotal < RETAIL_CONFIG.PRECIO_MINIMO_PEDIDO;
 
   // Standard box suggestions per box index (only for < 1000 m²)
@@ -275,8 +279,8 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
                 >
                   {formatPrecio(box.precioUnitario)} x unidad
                   {box.isMayorista && (
-                    <span style={{ color: 'var(--retail-primary)', marginLeft: '6px' }}>
-                      mayorista
+                    <span style={{ color: '#d97706', marginLeft: '6px' }}>
+                      supera stock
                     </span>
                   )}
                 </span>
@@ -328,12 +332,40 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
             className="text-xs mt-2 text-center tabular-nums"
             style={{
               fontFamily: 'var(--font-retail-mono), monospace',
-              color: hasMayorista ? 'var(--retail-primary)' : 'var(--retail-text-muted)',
+              color: superaTope ? '#d97706' : 'var(--retail-text-muted)',
             }}
           >
             {totalM2.toFixed(1)} m²
-            {hasMayorista && ' — precio mayorista'}
           </p>
+
+          {/* A este volumen ya no sale de stock: hay que derivar al mayorista */}
+          {superaTope && (
+            <div
+              className="max-w-sm mx-auto mt-4 rounded-xl p-4 text-center"
+              style={{ background: '#FBF2E0', border: '1px solid #E8C98A' }}
+            >
+              <p
+                className="text-sm leading-relaxed"
+                style={{ fontFamily: 'var(--font-retail-sans), sans-serif', color: '#7A4E00' }}
+              >
+                Este pedido pasa los <strong>{topeM2.toLocaleString('es-AR')} m²</strong> que
+                tenemos en stock. A ese volumen lo fabricamos a medida y el precio por m² baja.
+              </p>
+              <Link
+                href="/#cotizador"
+                className="inline-block mt-3 rounded-xl px-5 py-2.5 text-sm font-semibold"
+                style={{
+                  fontFamily: 'var(--font-retail-sans), sans-serif',
+                  background: 'var(--retail-primary)',
+                  color: '#fff',
+                  textDecoration: 'none',
+                }}
+              >
+                Cotizar a medida
+              </Link>
+            </div>
+          )}
+
           {belowMinimum && (
             <p
               className="text-xs mt-1 text-center"
@@ -465,8 +497,9 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
           transition: `all 400ms cubic-bezier(0.4, 0, 0.2, 1) ${300 + boxes.length * 100}ms`,
         }}
       >
-        {/* Only show COTIZAR ENVIO if user does NOT need to pick a standard box */}
-        {!mustSelectStandard && (
+        {/* Solo si no tiene que elegir estandar y no supera el tope de stock:
+            arriba del tope el servidor rechaza el pedido y hay que derivar. */}
+        {!mustSelectStandard && !superaTope && (
           <button
             onClick={onOrder}
             className="w-full rounded-2xl py-4 text-base font-semibold tracking-wide active:scale-95"

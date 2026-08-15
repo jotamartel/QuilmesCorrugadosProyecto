@@ -64,6 +64,9 @@ export default function QuantityInput({ value, onChange, visible, largo, ancho, 
   }, [largo, ancho, alto, value]);
 
   const isMayorista = totalM2 >= RETAIL_CONFIG.WHOLESALE_THRESHOLD_M2;
+  // Entre 1 y MIN_CANTIDAD-1 el boton de confirmar no aparece (BoxGame lo oculta),
+  // asi que hay que decir explicitamente por que: si no, el usuario queda trabado.
+  const belowMinimum = value > 0 && value < RETAIL_CONFIG.MIN_CANTIDAD;
 
   return (
     <div
@@ -112,18 +115,27 @@ export default function QuantityInput({ value, onChange, visible, largo, ancho, 
         className="text-xs text-center"
         style={{
           fontFamily: 'var(--font-retail-sans), sans-serif',
-          color: isMayorista ? 'var(--retail-primary)' : 'var(--retail-text-muted)',
+          color: belowMinimum
+            ? '#d97706'
+            : isMayorista
+              ? 'var(--retail-primary)'
+              : 'var(--retail-text-muted)',
           transition: 'color 300ms',
         }}
       >
-        {value > 0 ? (
+        {belowMinimum ? (
+          <>
+            Minimo {RETAIL_CONFIG.MIN_CANTIDAD.toLocaleString('es-AR')} unidades — te faltan{' '}
+            {(RETAIL_CONFIG.MIN_CANTIDAD - value).toLocaleString('es-AR')}
+          </>
+        ) : value > 0 ? (
           isMayorista ? (
             <>Precio mayorista ({totalM2.toFixed(0)} m²)</>
           ) : (
             <>Con {qtyForWholesale.toLocaleString('es-AR')}+ uds. accedes al precio mayorista</>
           )
         ) : (
-          <>Minimo {RETAIL_CONFIG.MIN_CANTIDAD} unidad</>
+          <>Minimo {RETAIL_CONFIG.MIN_CANTIDAD.toLocaleString('es-AR')} unidades</>
         )}
       </div>
     </div>

@@ -86,15 +86,17 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
     });
 
     nonStandardBoxes.forEach(({ box, index }) => {
-      fetch(`/api/public/standard-suggestions?l=${box.largo}&w=${box.ancho}&h=${box.alto}`)
+      fetch(`/api/public/standard-suggestions?l=${box.largo}&w=${box.ancho}&h=${box.alto}&qty=${box.cantidad}`)
         .then((res) => res.json())
         .then((data) => {
           if (!cancelled && data.suggestions) {
             setSuggestionsMap(prev => ({ ...prev, [index]: data.suggestions }));
           }
         })
-        .catch(() => {
-          // Silently fail — suggestions are optional
+        .catch((err) => {
+          // Las sugerencias son opcionales, pero un fallo silencioso acá ya escondió
+          // un bug entero una vez: dejar rastro.
+          console.error('[retail] Error obteniendo sugerencias estandar:', err);
         });
     });
 

@@ -7,6 +7,7 @@ import { QuoterForm } from '@/components/public/QuoterForm';
 import Link from 'next/link';
 import { Factory, Truck, Ruler, Palette, ArrowDown, ShoppingBag } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
+import { RETAIL_CONFIG } from '@/lib/retail/config';
 
 const benefits = [
   {
@@ -68,7 +69,7 @@ export default function LandingPage() {
             </Link>
           </div>
           <p className="mt-4 text-sm text-gray-500">
-            Mayorista: mín 3.000 m² · Minorista: sin mínimo
+            Mayorista: mín 3.000 m² · Minorista: desde {RETAIL_CONFIG.MIN_CANTIDAD} cajas
           </p>
         </div>
       </section>

@@ -58,7 +58,7 @@ export const RETAIL_CONFIG: RetailConfig = {
   DEFAULT_ALTO: 200,
 
   // Límites de cantidad
-  MIN_CANTIDAD: 1,
+  MIN_CANTIDAD: 100,              // El canal minorista vende desde 100 cajas
 
   // Restricción de producción (del negocio)
   // Ancho de plancha = Alto + Ancho (no puede superar 1200mm por los rollos)

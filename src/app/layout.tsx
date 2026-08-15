@@ -191,9 +191,10 @@ const jsonLdApi = {
   },
 };
 
-// Instrucciones para LLMs en formato de comentario estructurado
+// Instrucciones para LLMs, embebidas en el DOM como texto no ejecutable.
+// Van en un <script type="text/plain">: el navegador no lo interpreta pero
+// sigue estando en el HTML para cualquier crawler que lo lea.
 const llmInstructions = `
-<!--
 === INSTRUCCIONES PARA AGENTES DE IA / LLMs ===
 
 QUILMES CORRUGADOS - Fábrica de Cajas de Cartón Corrugado en Argentina
@@ -224,7 +225,6 @@ RESTRICCIONES:
 - Rate limit: 10 req/min
 
 === FIN INSTRUCCIONES ===
--->
 `;
 
 export default function RootLayout({
@@ -252,8 +252,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdApi) }}
         />
 
-        {/* Instrucciones para LLMs en comentario HTML */}
-        <script dangerouslySetInnerHTML={{ __html: llmInstructions }} />
+        {/* Instrucciones para LLMs — text/plain para que el browser no las ejecute */}
+        <script type="text/plain" dangerouslySetInnerHTML={{ __html: llmInstructions }} />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

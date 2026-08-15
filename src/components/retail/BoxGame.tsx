@@ -208,8 +208,7 @@ function useBoxGame() {
   }, [boxes, retailConfig]);
 
   // Submit order from SHIPPING step
-  // For confirmed-price methods: creates MercadoPago checkout and redirects
-  // For "a confirmar" methods: saves quote directly (no payment)
+  // Always saves as a lead/solicitud (no payment redirect)
   const submitOrder = useCallback(async (shipping: ShippingData) => {
     if (!formData) return;
     setShippingData(shipping);
@@ -237,27 +236,7 @@ function useBoxGame() {
       })),
     };
 
-    // If shipping cost is NOT confirmed (resto del país), skip payment — just save quote
-    if (!shipping.costConfirmed) {
-      const response = await fetch('/api/public/retail-quotes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Error al enviar');
-      }
-
-      const precioTotal = boxes.reduce((sum, b) => sum + b.subtotal, 0);
-      trackEvent('Lead', { value: precioTotal, currency: 'ARS' });
-      transition('ORDER_SENT');
-      return;
-    }
-
-    // For confirmed-price orders: create MercadoPago checkout
-    const response = await fetch('/api/public/retail-checkout', {
+    const response = await fetch('/api/public/retail-quotes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -265,39 +244,12 @@ function useBoxGame() {
 
     if (!response.ok) {
       const err = await response.json();
-      // If MP not configured, fall back to regular quote saving
-      if (response.status === 503) {
-        const fallback = await fetch('/api/public/retail-quotes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!fallback.ok) {
-          const fallbackErr = await fallback.json();
-          throw new Error(fallbackErr.error || 'Error al enviar');
-        }
-        const precioTotal = boxes.reduce((sum, b) => sum + b.subtotal, 0);
-        trackEvent('Lead', { value: precioTotal + shipping.cost, currency: 'ARS' });
-        transition('ORDER_SENT');
-        return;
-      }
-      throw new Error(err.error || 'Error al crear el pago');
+      throw new Error(err.error || 'Error al enviar');
     }
 
-    const data = await response.json();
-
-    // Track checkout initiation
     const precioTotal = boxes.reduce((sum, b) => sum + b.subtotal, 0);
-    trackEvent('InitiateCheckout', { value: precioTotal + shipping.cost, currency: 'ARS' });
-
-    // Redirect to MercadoPago checkout
-    // Use sandbox_init_point for test mode, init_point for production
-    const checkoutUrl = data.sandbox_init_point || data.init_point;
-    if (checkoutUrl) {
-      window.location.href = checkoutUrl;
-    } else {
-      throw new Error('No se pudo obtener el link de pago');
-    }
+    trackEvent('Lead', { value: precioTotal + shipping.cost, currency: 'ARS' });
+    transition('ORDER_SENT');
   }, [boxes, formData, transition]);
 
   // Validate ancho considering MAX_SHEET_WIDTH

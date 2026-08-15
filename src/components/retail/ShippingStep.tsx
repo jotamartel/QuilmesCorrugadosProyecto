@@ -30,7 +30,7 @@ const METHODS: {
     id: 'envio_caba_amba',
     label: 'Envio CABA / AMBA',
     description: 'Entrega a domicilio en zona CABA y Gran Buenos Aires',
-    priceLabel: null, // dynamic: formatPrecio(SHIPPING_CABA_AMBA_COST)
+    priceLabel: 'A confirmar',
   },
   {
     id: 'envio_resto_pais',
@@ -126,7 +126,7 @@ export default function ShippingStep({ boxes, visible, onSubmit, onBack, savedSh
   }, [errors.direccion]);
 
   const precioProductos = boxes.reduce((sum, b) => sum + b.subtotal, 0);
-  const shippingCost = selectedMethod === 'envio_caba_amba' ? RETAIL_CONFIG.SHIPPING_CABA_AMBA_COST : 0;
+  const shippingCostPending = selectedMethod === 'envio_caba_amba' || selectedMethod === 'envio_resto_pais';
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
@@ -158,8 +158,8 @@ export default function ShippingStep({ boxes, visible, onSubmit, onBack, savedSh
       const isPickup = selectedMethod === 'retiro_sucursal';
       await onSubmit({
         method: selectedMethod,
-        cost: isPickup ? 0 : isRestoDelPais ? 0 : RETAIL_CONFIG.SHIPPING_CABA_AMBA_COST,
-        costConfirmed: !isRestoDelPais,
+        cost: 0,
+        costConfirmed: isPickup,
         direccion: isPickup ? '' : direccion.trim(),
         ciudad: isPickup ? '' : ciudad.trim(),
         provincia: isPickup ? '' : provincia.trim(),
@@ -284,9 +284,7 @@ export default function ShippingStep({ boxes, visible, onSubmit, onBack, savedSh
                       fontFamily: 'var(--font-retail-mono), monospace',
                       color: method.id === 'retiro_sucursal'
                         ? '#16a34a'
-                        : method.id === 'envio_resto_pais'
-                          ? 'var(--retail-text-muted)'
-                          : 'var(--retail-primary)',
+                        : 'var(--retail-text-muted)',
                     }}
                   >
                     {method.priceLabel ?? formatPrecio(RETAIL_CONFIG.SHIPPING_CABA_AMBA_COST)}
@@ -389,8 +387,8 @@ export default function ShippingStep({ boxes, visible, onSubmit, onBack, savedSh
             </div>
           )}
 
-          {/* Note for resto del pais */}
-          {isRestoDelPais && (
+          {/* Note for delivery methods */}
+          {(isRestoDelPais || isCabaAmba) && (
             <div
               className="rounded-xl p-3 text-xs"
               style={{
@@ -449,16 +447,12 @@ export default function ShippingStep({ boxes, visible, onSubmit, onBack, savedSh
                     fontFamily: 'var(--font-retail-mono), monospace',
                     color: selectedMethod === 'retiro_sucursal'
                       ? '#16a34a'
-                      : isRestoDelPais
-                        ? 'var(--retail-text-muted)'
-                        : 'var(--retail-text)',
+                      : 'var(--retail-text-muted)',
                   }}
                 >
                   {selectedMethod === 'retiro_sucursal'
                     ? 'Gratis'
-                    : isRestoDelPais
-                      ? 'A confirmar'
-                      : formatPrecio(shippingCost)}
+                    : 'A confirmar'}
                 </span>
               </div>
 
@@ -482,9 +476,9 @@ export default function ShippingStep({ boxes, visible, onSubmit, onBack, savedSh
                     color: 'var(--retail-text)',
                   }}
                 >
-                  {isRestoDelPais
-                    ? `${formatPrecio(precioProductos)} + envio`
-                    : formatPrecio(precioProductos + shippingCost)}
+                  {selectedMethod === 'retiro_sucursal'
+                    ? formatPrecio(precioProductos)
+                    : `${formatPrecio(precioProductos)} + envio`}
                 </span>
               </div>
             </div>
@@ -525,9 +519,7 @@ export default function ShippingStep({ boxes, visible, onSubmit, onBack, savedSh
         >
           {submitting
             ? 'PROCESANDO...'
-            : isRestoDelPais
-              ? 'SOLICITAR PEDIDO'
-              : 'PAGAR'}
+            : 'ENVIAR SOLICITUD'}
         </button>
         <button
           onClick={onBack}

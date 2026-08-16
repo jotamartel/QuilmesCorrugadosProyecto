@@ -22,15 +22,17 @@ const DOMINIO_VERCEL = "quilmes-corrugados.vercel.app";
  * apex —que redirige— y el sitemap tambien, las señales se contradicen y
  * Google reparte la autoridad entre tres URLs para una sola pagina.
  *
- * Con el valor centralizado, mover el dominio canonico es cambiar una variable
- * de entorno y el dominio primario en el panel de Vercel, y todo lo demas
- * —canonical, sitemap, llms.txt, este redirect— sigue solo.
+ * El dominio canonico es www, por la razon que esta explicada en lib/site.ts:
+ * un apex solo se puede apuntar con un registro A —el spec de DNS prohibe CNAME
+ * en la raiz—, y esa IP escrita a mano se queda vieja, que es justo lo que
+ * habia pasado. Con www de primario, este redirect manda directo a la URL que
+ * responde 200, sin saltos intermedios.
  *
- * No se puede resolver del todo desde el codigo: el redirect apex↔www lo aplica
- * Vercel antes de que corra Next, asi que agregar aca la regla inversa haria un
- * bucle. La parte que falta es de panel.
+ * Lo unico que falta hacer en el panel de Vercel es que el redirect del apex a
+ * www sea 308 y no 307. Desde el codigo no se puede: ese salto lo aplica Vercel
+ * antes de que corra Next, y poner aca la regla inversa haria un bucle.
  */
-const FALLBACK = "https://quilmescorrugados.com.ar";
+const FALLBACK = "https://www.quilmescorrugados.com.ar";
 const crudo = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
 const DOMINIO_PROPIO = crudo && /^https?:\/\/[^\s]+$/.test(crudo) ? crudo : FALLBACK;
 

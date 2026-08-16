@@ -2,16 +2,34 @@
  * URL canónica del sitio.
  *
  * Está en un solo lugar a propósito: la usan el sitemap, robots.txt, llms.txt,
- * los metadatos canonical y todos los ejemplos que publica la API. Si viven
- * repetidas, se desincronizan y terminamos publicando dos dominios distintos.
+ * los metadatos canonical, next.config.ts y todos los ejemplos que publica la
+ * API. Si viven repetidas se desincronizan, y terminamos publicando un dominio
+ * distinto del que efectivamente sirve el sitio.
  *
- * Hoy el proyecto responde 200 tanto en quilmes-corrugados.vercel.app como en
- * www.quilmescorrugados.com.ar, con el mismo contenido. Eso parte la autoridad
- * entre dos dominios y hace que un asistente de IA cite la URL de Vercel en
- * lugar de la marca. Cuando se decida unificar, se cambia acá y hay que
- * configurar en Vercel que el dominio no canónico redirija al canónico.
+ * POR QUE www Y NO EL APEX
+ *
+ * El apex es el que se ve mejor escrito, pero técnicamente es el peor de los
+ * dos, y no por una cuestión de gusto: el spec de DNS prohíbe usar CNAME en un
+ * dominio raíz. Un apex sólo puede apuntarse con un registro A, o sea con una
+ * IP escrita a mano. Cuando el proveedor mueve su infraestructura, esa IP
+ * queda vieja y hay que ir a cambiarla; hasta que alguien se acuerde, el
+ * dominio sigue resolviendo a donde ya no conviene.
+ *
+ * Eso es exactamente lo que estaba pasando acá: el apex apuntaba a la IP vieja
+ * de Vercel (76.76.21.21) y el panel marcaba "DNS Change Recommended", mientras
+ * que www —que es un CNAME— se había mantenido al día solo, sin que nadie
+ * tocara nada. Es también lo que recomienda Vercel, porque un CNAME le permite
+ * mover el tráfico ante un ataque o para optimizar latencia sin depender de
+ * que el dueño del dominio actualice un registro.
+ *
+ * El apex sigue funcionando: redirige a www con 308 permanente.
+ *
+ * Este valor se puede sobreescribir con NEXT_PUBLIC_SITE_URL, pero conviene NO
+ * definirla: tenerla en el código la deja versionada y revisable, y evita el
+ * problema de que un valor mal pegado en un panel rompa el SEO del sitio
+ * entero, que ya pasó una vez (ver normalizar()).
  */
-const FALLBACK = 'https://quilmes-corrugados.vercel.app';
+const FALLBACK = 'https://www.quilmescorrugados.com.ar';
 
 /**
  * Sanea el valor de la variable de entorno.

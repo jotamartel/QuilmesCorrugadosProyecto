@@ -9,8 +9,9 @@
  * al cliente con total seguridad.
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
 import type { PricingConfig } from '@/lib/types/database';
 
 const BASE_URL = 'https://quilmes-corrugados.vercel.app';
@@ -36,11 +37,26 @@ const m2 = (n: number) => Number(n).toLocaleString('es-AR') + ' m²';
 
 export const revalidate = 900; // 15 min
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   let c: typeof RESPALDO | PricingConfig = RESPALDO;
 
   try {
     const supabase = createAdminClient();
+
+    // Registrar quién lee este archivo. Es la señal más temprana de que un
+    // asistente encontró la empresa: pasa antes de que llegue a cotizar, así
+    // que sirve para saber si el trabajo de GEO está rindiendo aunque todavía
+    // no haya consultas de precio.
+    const userAgent = request.headers.get('user-agent') || 'unknown';
+    supabase.from('api_requests').insert({
+      endpoint: '/llms.txt',
+      method: 'GET',
+      user_agent: userAgent.substring(0, 500),
+      response_status: 200,
+      source_type: getSourceType(userAgent, null),
+      llm_detected: detectLLM(userAgent),
+    }).then(undefined, (err) => console.error('[llms.txt] Error registrando lectura:', err));
+
     const { data } = await supabase
       .from('pricing_config')
       .select('*')

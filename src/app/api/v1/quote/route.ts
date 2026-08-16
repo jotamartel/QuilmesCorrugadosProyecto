@@ -15,6 +15,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { getPricePerM2, calculateSubtotal, getProductionDays } from '@/lib/utils/pricing';
 import { sendNotification } from '@/lib/notifications';
+import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
 import type { PricingConfig } from '@/lib/types/database';
 import crypto from 'crypto';
 
@@ -212,27 +213,9 @@ function checkRateLimit(key: string, limit: number): { allowed: boolean; remaini
   return { allowed: true, remaining: limit - entry.count, resetAt: new Date(entry.resetAt) };
 }
 
-function detectLLM(userAgent: string): string | null {
-  const ua = userAgent.toLowerCase();
-
-  if (ua.includes('gptbot') || ua.includes('chatgpt')) return 'gpt';
-  if (ua.includes('claude') || ua.includes('anthropic')) return 'claude';
-  if (ua.includes('perplexity')) return 'perplexity';
-  if (ua.includes('cohere')) return 'cohere';
-  if (ua.includes('gemini') || ua.includes('google-extended')) return 'gemini';
-  if (ua.includes('bingbot')) return 'bing';
-
-  return null;
-}
-
-function getSourceType(userAgent: string, apiKey: string | null): string {
-  if (detectLLM(userAgent)) return 'llm';
-  if (apiKey) return 'api_client';
-  if (userAgent.includes('Mozilla') || userAgent.includes('Chrome') || userAgent.includes('Safari')) {
-    return 'browser';
-  }
-  return 'unknown';
-}
+// Se movieron a lib/utils/ai-agents.ts para compartirlos con /llms.txt: la
+// version que vivia aca no reconocia OAI-SearchBot, que es el crawler que
+// alimenta las respuestas de ChatGPT y el que mas nos interesa medir.
 
 const SITIO = 'https://quilmes-corrugados.vercel.app';
 

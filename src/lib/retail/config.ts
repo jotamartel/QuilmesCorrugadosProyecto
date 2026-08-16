@@ -26,6 +26,7 @@ export interface RetailConfig {
   // Precio mayorista (>= 1000 m²)
   WHOLESALE_THRESHOLD_M2: number;
   WHOLESALE_PRICE_PER_M2: number;
+  VOLUME_PRICE_PER_M2: number;
 
   // Interacción
   DRAG_SENSITIVITY: number;
@@ -76,6 +77,10 @@ export const RETAIL_CONFIG: RetailConfig = {
   // produccion a medida, y se deriva al cotizador mayorista.
   WHOLESALE_THRESHOLD_M2: 1000,   // m² — pricing_config.wholesale_min_m2
   WHOLESALE_PRICE_PER_M2: 900,    // ARS por m² — solo para mostrar a cuanto sale al derivar
+  // Piso de la escalera, para poder mostrar "desde $X/m²" en paginas que son
+  // componentes cliente y no pueden leer la base. La fuente de verdad sigue
+  // siendo pricing_config.price_per_m2_volume; /precios muestra la tabla real.
+  VOLUME_PRICE_PER_M2: 700,       // ARS por m² — pricing_config.price_per_m2_volume
 
   // Interacción
   DRAG_SENSITIVITY: 2,           // mm por pixel

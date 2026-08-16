@@ -71,6 +71,18 @@ export default function LandingPage() {
           <p className="mt-4 text-sm text-gray-500">
             Mayorista: mín 3.000 m² · Minorista: desde {RETAIL_CONFIG.MIN_CANTIDAD} cajas
           </p>
+          {/* El precio en el texto visible del home.
+              Un asistente de IA que entra acá leía la página entera sin
+              encontrar un solo número, así que estimaba con precios de la
+              competencia. Ahora se lleva el dato de una. */}
+          <p className="mt-2 text-sm text-gray-600">
+            El m² va de{' '}
+            <strong>${RETAIL_CONFIG.VOLUME_PRICE_PER_M2}</strong> por volumen a{' '}
+            <strong>${RETAIL_CONFIG.RETAIL_PRICE_PER_M2}</strong> en pedidos chicos.{' '}
+            <Link href="/precios" className="text-[#002E55] underline underline-offset-2">
+              Ver todos los precios
+            </Link>
+          </p>
         </div>
       </section>
 

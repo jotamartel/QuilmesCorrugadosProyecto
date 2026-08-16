@@ -9,6 +9,7 @@ import { useLenis } from 'lenis/react';
 const navItems = [
   { name: 'Inicio', href: '/' },
   { name: 'Productos', href: '/productos' },
+  { name: 'Precios', href: '/precios' },
   { name: 'Cotizar', href: '/#cotizador' },
   { name: 'Nosotros', href: '/nosotros' },
   { name: 'FAQ', href: '/faq' },

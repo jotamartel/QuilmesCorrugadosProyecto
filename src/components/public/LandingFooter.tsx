@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { Phone, Mail, MapPin } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
 
@@ -59,9 +60,14 @@ export function LandingFooter() {
                 </a>
               </li>
               <li>
-                <a href="/#cotizador" className="hover:text-white">
+                <Link href="/precios" className="hover:text-white">
+                  Precios
+                </Link>
+              </li>
+              <li>
+                <Link href="/#cotizador" className="hover:text-white">
                   Cotizar online
-                </a>
+                </Link>
               </li>
               <li>
                 <a href="/nosotros" className="hover:text-white">
@@ -92,7 +98,29 @@ export function LandingFooter() {
           </div>
         </div>
 
-        <div className="border-t border-[#4F6D87]/30 mt-8 pt-8 text-center text-sm">
+        {/* La API existia pero era invisible: solo figuraba en un <link rel="api">
+            del head, que nadie sigue. Un asistente de IA que entraba al sitio
+            leia toda la pagina sin enterarse de que podia cotizar solo, y
+            terminaba estimando el precio con datos de la competencia. */}
+        <div className="border-t border-[#4F6D87]/30 mt-8 pt-6 text-sm">
+          <p className="text-[#B8C7D6]">
+            <span className="font-medium text-white">Cotización por API.</span>{' '}
+            Gratuita y sin registro, para sistemas de compras y asistentes de IA:{' '}
+            <a href="/api/v1/docs" className="underline underline-offset-2 hover:text-white">
+              documentación
+            </a>
+            {' · '}
+            <a href="/api/v1/quote" className="underline underline-offset-2 hover:text-white">
+              /api/v1/quote
+            </a>
+            {' · '}
+            <a href="/llms.txt" className="underline underline-offset-2 hover:text-white">
+              llms.txt
+            </a>
+          </p>
+        </div>
+
+        <div className="border-t border-[#4F6D87]/30 mt-6 pt-6 text-center text-sm">
           <p>&copy; {new Date().getFullYear()} Quilmes Corrugados. Todos los derechos reservados.</p>
         </div>
       </div>

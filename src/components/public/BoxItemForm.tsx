@@ -159,7 +159,10 @@ export function BoxItemForm({
             {index + 1}
           </span>
           <div>
-            <h4 className="font-medium text-gray-900">Caja {index + 1}</h4>
+            {/* h3, no h4: cuelga directo del h2 "Cotiza tu caja" y saltearse
+                un nivel rompe la navegacion por encabezados de un lector de
+                pantalla, ademas de confundir la jerarquia que lee un buscador. */}
+            <h3 className="font-medium text-gray-900">Caja {index + 1}</h3>
             <p className="text-sm text-gray-500">{headerSummary}</p>
           </div>
         </div>

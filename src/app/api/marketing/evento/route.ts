@@ -42,12 +42,6 @@ function ipDelRequest(req: NextRequest): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  // Sin CAPI configurada esto no tiene nada que hacer. Se responde 200 para
-  // que el navegador no reintente ni escriba errores en consola.
-  if (!metaEstaConfigurado()) {
-    return NextResponse.json({ ok: false, motivo: 'capi_sin_configurar' });
-  }
-
   let cuerpo: Record<string, unknown>;
   try {
     cuerpo = await req.json();
@@ -79,6 +73,14 @@ export async function POST(req: NextRequest) {
 
   const valorCrudo = Number(cuerpo.valor);
   const valor = Number.isFinite(valorCrudo) && valorCrudo > 0 ? valorCrudo : null;
+
+  // El chequeo de configuracion va DESPUES de validar, no antes: si sale
+  // primero, cortocircuita y no hay forma de comprobar desde afuera que el
+  // filtro de eventos y el de PII funcionan. Validar siempre deja el endpoint
+  // testeable con la CAPI apagada, que es como esta hoy.
+  if (!metaEstaConfigurado()) {
+    return NextResponse.json({ ok: false, motivo: 'capi_sin_configurar' });
+  }
 
   const resultado = await enviarEventoAMeta({
     nombre,

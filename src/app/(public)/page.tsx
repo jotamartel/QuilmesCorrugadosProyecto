@@ -5,6 +5,10 @@ import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { QuoterForm } from '@/components/public/QuoterForm';
 import { CotizarSinJavaScript } from '@/components/public/CotizarSinJavaScript';
+import { ResumenClave } from '@/components/public/ResumenClave';
+import { PreguntasFrecuentes } from '@/components/public/PreguntasFrecuentes';
+import { CtaMovilFijo } from '@/components/public/CtaMovilFijo';
+import { BotonCompartir } from '@/components/public/BotonCompartir';
 import Link from 'next/link';
 import { Factory, Truck, Ruler, Palette, ArrowDown, ShoppingBag } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
@@ -46,9 +50,12 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="pt-24 pb-16 px-4 bg-gradient-to-br from-blue-50 to-slate-100">
         <div className="max-w-7xl mx-auto text-center">
+          {/* El title dice "Fabrica de cajas de carton corrugado a medida".
+              El H1 agrega lo que el title no puede: que se cotiza solo y en el
+              momento, que es el diferencial y otra forma de buscar. */}
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
-            Cajas de cartón corrugado
-            <span className="text-[#002E55]"> a medida</span>
+            Cotizá cajas de cartón corrugado
+            <span className="text-[#002E55]"> a medida, al instante</span>
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Cotizá online en segundos. Fábrica en Quilmes, entregas en todo el país.
@@ -84,6 +91,40 @@ export default function LandingPage() {
               Ver todos los precios
             </Link>
           </p>
+
+          <div className="mt-6 flex justify-center">
+            <BotonCompartir
+              titulo="Quilmes Corrugados — cajas de cartón a medida"
+              texto="Cotizador online con precio al instante, fábrica en Quilmes."
+            />
+          </div>
+
+          <ResumenClave
+            className="mt-8"
+            puntos={[
+              {
+                rotulo: 'Qué hacemos',
+                valor: 'Fabricamos cajas de cartón corrugado a medida en Quilmes, Buenos Aires, desde hace más de 20 años.',
+              },
+              {
+                rotulo: 'Precio',
+                valor: `De $${RETAIL_CONFIG.VOLUME_PRICE_PER_M2} a $${RETAIL_CONFIG.RETAIL_PRICE_PER_M2} por m² de cartón, según el volumen. Publicado, sin pedir datos.`,
+              },
+              {
+                rotulo: 'Mínimos',
+                valor: `${RETAIL_CONFIG.MIN_CANTIDAD} cajas si sale de stock; 3.000 m² por modelo para producción a medida.`,
+              },
+              {
+                rotulo: 'Plazos',
+                valor: 'Stock en 24 a 48 horas. Producción a medida en 7 días hábiles.',
+              },
+              {
+                rotulo: 'Cómo cotizar',
+                valor: 'Online al instante en este sitio, o por API pública y gratuita sin registro.',
+              },
+            ]}
+            accion={{ texto: 'Ver la escalera de precios', href: '/precios' }}
+          />
         </div>
       </section>
 
@@ -150,7 +191,52 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <PreguntasFrecuentes
+        preguntas={[
+          {
+            pregunta: '¿Cuánto sale una caja de cartón corrugado?',
+            respuesta:
+              `El precio se calcula por metro cuadrado de cartón, así que depende de la ` +
+              `medida y de la cantidad. Va de $${RETAIL_CONFIG.VOLUME_PRICE_PER_M2} por m² ` +
+              `en pedidos de volumen a $${RETAIL_CONFIG.RETAIL_PRICE_PER_M2} por m² en ` +
+              `pedidos chicos. La escalera completa está publicada en /precios y el ` +
+              `cotizador da el número exacto de tu medida al instante, sin dejar datos.`,
+          },
+          {
+            pregunta: '¿Cuál es el pedido mínimo?',
+            respuesta:
+              `Depende del canal. Si la medida está en catálogo y sale de stock, desde ` +
+              `${RETAIL_CONFIG.MIN_CANTIDAD} cajas. Si querés una medida propia fabricada ` +
+              `a pedido, el mínimo es 3.000 m² de cartón por modelo de caja.`,
+          },
+          {
+            pregunta: '¿Puedo cotizar sin hablar con un vendedor?',
+            respuesta:
+              'Sí. El cotizador del sitio da el precio en el momento con las medidas y la ' +
+              'cantidad. También hay una API pública y gratuita, sin registro ni API key, ' +
+              'para que un sistema de compras o un asistente de IA pida el precio ' +
+              'directamente: GET /api/v1/quote.',
+          },
+          {
+            pregunta: '¿Hacen impresión con mi logo?',
+            respuesta:
+              'Sí, impresión flexográfica de hasta 3 colores. A partir de 1.000 m² generamos ' +
+              'el archivo troquelado con las medidas exactas de tu caja para que tu ' +
+              'diseñador arme el arte sobre esa plantilla.',
+          },
+          {
+            pregunta: '¿Hacen envíos? ¿Cuánto tardan?',
+            respuesta:
+              'Envío gratis hasta 60 km de la fábrica en Quilmes y a todo el país con costo ' +
+              'de flete. Lo que está en stock sale en 24 a 48 horas; la producción a medida ' +
+              'demora 7 días hábiles.',
+          },
+        ]}
+        className="bg-gray-50"
+      />
+
       <LandingFooter />
+      <CtaMovilFijo />
     </div>
   );
 }

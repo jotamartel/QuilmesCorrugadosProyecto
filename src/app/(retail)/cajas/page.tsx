@@ -22,7 +22,7 @@ const DESCRIPCION =
   `Configura la medida, mira el precio al instante y pagas online.`;
 
 export const metadata: Metadata = {
-  title: 'Comprar cajas de cartón por unidad | Desde 100 cajas | Quilmes Corrugados',
+  title: `Comprar cajas de cartón desde ${RETAIL_CONFIG.MIN_CANTIDAD} unidades`,
   description: DESCRIPCION,
   alternates: { canonical: `${SITE_URL}/cajas` },
   openGraph: {

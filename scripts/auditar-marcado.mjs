@@ -35,10 +35,16 @@ const PAGINAS = [
 ];
 
 // Marcas de agua de cada plataforma en el HTML servido.
+//
+// Cuidado con esta lista: next/script con strategy="afterInteractive" NO
+// inlinea el codigo en el HTML, lo inyecta despues de hidratar. Buscar el
+// snippet de fbq da un falso negativo y hace parecer que el pixel no existe
+// cuando esta perfectamente instalado. Lo que si queda en el HTML servido es
+// el <noscript> con facebook.com/tr, que es la marca confiable.
 const PIXELES = [
-  ['Meta Pixel', /connect\.facebook\.net|fbevents\.js|fbq\(/],
-  ['Google Analytics 4', /gtag\/js\?id=G-|gtag\('config',\s*'G-/],
-  ['Google Ads', /gtag\/js\?id=AW-|gtag\('config',\s*'AW-|googleadservices/],
+  ['Meta Pixel', /connect\.facebook\.net|fbevents\.js|fbq\(|facebook\.com\/tr\?id=\d+/],
+  ['Google Analytics 4', /gtag\/js\?id=G-|gtag\('config',\s*'G-|[?&]id=G-[A-Z0-9]{6,}/],
+  ['Google Ads', /gtag\/js\?id=AW-|gtag\('config',\s*'AW-|googleadservices|AW-\d{6,}/],
   ['Google Tag Manager', /googletagmanager\.com\/gtm\.js|GTM-[A-Z0-9]{4,}/],
   ['LinkedIn Insight', /snap\.licdn\.com|_linkedin_partner_id/],
   ['TikTok Pixel', /analytics\.tiktok\.com|ttq\.load/],
@@ -77,6 +83,37 @@ function tiposJsonLd(html) {
   return [...tipos];
 }
 
+/**
+ * Jerarquia de encabezados: detecta saltos (un H4 colgando de un H2) y si el
+ * H1 repite el title, que es desperdiciar el encabezado mas importante en
+ * decir dos veces lo mismo.
+ */
+function encabezados(html) {
+  const lista = [...html.matchAll(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi)].map((m) => ({
+    nivel: Number(m[1]),
+    texto: texto(m[2]),
+  }));
+  const saltos = [];
+  for (let i = 1; i < lista.length; i++) {
+    if (lista[i].nivel > lista[i - 1].nivel + 1) {
+      saltos.push(`H${lista[i - 1].nivel}→H${lista[i].nivel} (${lista[i].texto.slice(0, 40)})`);
+    }
+  }
+  return { lista, saltos };
+}
+
+function imagenes(html) {
+  const todas = [...html.matchAll(/<img\b[^>]*>/gi)].map((m) => m[0]);
+  // alt="" vacio es CORRECTO en una imagen decorativa o en un pixel de
+  // seguimiento: le dice al lector de pantalla que la saltee. Lo que hay que
+  // reportar es la ausencia del atributo, no un alt deliberadamente vacio.
+  const sinAlt = todas.filter((t) => !/\balt\s*=/i.test(t));
+  const nombresPobres = todas
+    .map((t) => t.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1] || '')
+    .filter((s) => s && /\/(img|image|foto|pic|IMG_)?[-_]?\d+\.(jpe?g|png|webp|avif)/i.test(s));
+  return { total: todas.length, sinAlt: sinAlt.length, nombresPobres: nombresPobres.length };
+}
+
 async function auditar(ruta, nombre) {
   const url = `${BASE}${ruta}`;
   let res, html;
@@ -93,8 +130,29 @@ async function auditar(ruta, nombre) {
   const plano = texto(html);
   const title = entre(html, /<title[^>]*>([\s\S]*?)<\/title>/i);
   const h1s = [...html.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi)].map((m) => texto(m[1]));
+  const enc = encabezados(html);
+  const img = imagenes(html);
+
+  // Enlaces internos: es lo que mide si la pagina participa de un cluster o
+  // esta colgada sola. Se descartan anclas y el propio path.
+  const internos = new Set(
+    [...html.matchAll(/href=["'](\/[^"'#?]*)["']/g)]
+      .map((m) => m[1].replace(/\/$/, ''))
+      .filter((h) => h && h !== ruta.replace(/\/$/, '')),
+  );
 
   return {
+    encabezados: enc.lista.map((h) => `H${h.nivel}`).join(''),
+    saltosDeNivel: enc.saltos,
+    h1IgualAlTitle: h1s.length > 0 && !!title && title.toLowerCase().includes(h1s[0].toLowerCase()),
+    imagenes: img.total,
+    imagenesSinAlt: img.sinAlt,
+    imagenesMalNombradas: img.nombresPobres,
+    enlacesInternos: internos.size,
+    // Un resumen arriba de todo es lo que un asistente cita textual.
+    tieneResumen: /en resumen|resumen rapido|lo importante|key takeaways|tl;dr|en corto/i.test(plano),
+    tablas: (html.match(/<table\b/gi) || []).length,
+    listas: (html.match(/<[uo]l\b/gi) || []).length,
     ruta,
     nombre,
     status: res.status,
@@ -183,15 +241,40 @@ if (todas.size === 0) {
 // Huecos accionables, ordenados por lo que mas cuesta en trafico.
 const huecos = [];
 const push = (sev, m) => huecos.push(`  [${sev}] ${m}`);
+
+// Titles y descriptions repetidos: Google elige una pagina y descarta el resto.
+const porTitle = new Map();
+const porDesc = new Map();
+for (const r of conError) {
+  if (r.title) porTitle.set(r.title, [...(porTitle.get(r.title) || []), r.ruta]);
+  if (r.description) porDesc.set(r.description, [...(porDesc.get(r.description) || []), r.ruta]);
+}
+for (const [t, rutas] of porTitle) {
+  if (rutas.length > 1) push('alta', `title repetido en ${rutas.join(' ')}: "${t.slice(0, 50)}"`);
+}
+for (const [, rutas] of porDesc) {
+  if (rutas.length > 1) push('alta', `meta description repetida en ${rutas.join(' ')}`);
+}
+
 for (const r of conError) {
   if (r.status !== 200) push('alta', `${r.ruta} responde ${r.status}`);
   if (!r.title) push('alta', `${r.ruta} sin <title>`);
   if (!r.description) push('alta', `${r.ruta} sin meta description`);
+  if (r.imagenesSinAlt > 0) push('alta', `${r.ruta}: ${r.imagenesSinAlt} de ${r.imagenes} imagenes sin alt`);
   if (!r.canonical) push('media', `${r.ruta} sin canonical`);
+  if (r.canonical && !r.canonical.startsWith(BASE)) {
+    push('alta', `${r.ruta} canonical apunta a otro dominio: ${r.canonical}`);
+  }
   if (!r.ogTitle) push('media', `${r.ruta} sin Open Graph (mal preview al compartir)`);
   if (r.h1.length === 0) push('media', `${r.ruta} sin H1`);
   if (r.h1.length > 1) push('baja', `${r.ruta} tiene ${r.h1.length} H1`);
+  if (r.h1IgualAlTitle) push('media', `${r.ruta}: el H1 repite el title, se pierde una variante de busqueda`);
+  if (r.saltosDeNivel.length) push('baja', `${r.ruta} saltea niveles: ${r.saltosDeNivel.join('; ')}`);
   if (r.jsonLd.length === 0) push('media', `${r.ruta} sin datos estructurados`);
+  if (!r.jsonLd.includes('FAQPage')) push('media', `${r.ruta} sin schema de FAQ`);
+  if (!r.tieneResumen) push('media', `${r.ruta} sin resumen arriba (lo que un asistente cita textual)`);
+  if (r.enlacesInternos < 8) push('media', `${r.ruta} enlaza a solo ${r.enlacesInternos} paginas internas`);
+  if (r.imagenesMalNombradas > 0) push('baja', `${r.ruta}: ${r.imagenesMalNombradas} imagenes con nombre generico`);
   if (r.palabras < 120) push('media', `${r.ruta} tiene ${r.palabras} palabras legibles sin JS`);
   if (r.largoTitle > 62) push('baja', `${r.ruta} title de ${r.largoTitle} chars (se corta en Google)`);
 }

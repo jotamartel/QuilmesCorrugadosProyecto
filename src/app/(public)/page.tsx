@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { QuoterForm } from '@/components/public/QuoterForm';
+import { CotizarSinJavaScript } from '@/components/public/CotizarSinJavaScript';
 import Link from 'next/link';
 import { Factory, Truck, Ruler, Palette, ArrowDown, ShoppingBag } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
@@ -115,6 +116,11 @@ export default function LandingPage() {
           </div>
 
           <QuoterForm />
+
+          {/* Salida para quien no puede ejecutar el formulario */}
+          <div className="mt-4 text-center">
+            <CotizarSinJavaScript />
+          </div>
         </div>
       </section>
 

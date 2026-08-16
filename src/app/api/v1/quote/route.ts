@@ -19,6 +19,7 @@ import { getPricePerM2, calculateSubtotal, getProductionDays } from '@/lib/utils
 import { sendNotification } from '@/lib/notifications';
 import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
 import { SITE_URL } from '@/lib/site';
+import { RETAIL_CONFIG } from '@/lib/retail/config';
 import type { PricingConfig } from '@/lib/types/database';
 import crypto from 'crypto';
 
@@ -78,6 +79,12 @@ interface QuoteResult {
   meets_minimum: boolean;
   /** Por qué canal corresponde este volumen */
   channel: 'stock' | 'made_to_order';
+  /**
+   * Si el cliente puede comprarlo solo desde la web. Ser del canal de stock no
+   * alcanza: hace falta llegar al mínimo de unidades y que la medida esté en
+   * el catálogo. Sin esto se derivaba a /cajas a chocarse con el mínimo.
+   */
+  can_buy_online: boolean;
   /** Explicación en castellano, pensada para que un asistente la lea al usuario */
   channel_note: string;
   /**
@@ -273,7 +280,12 @@ function validarCajas(boxes: BoxInput[]): string[] {
  * navega con GET tiene que obtener exactamente el mismo precio que un cliente
  * que postea desde el sitio.
  */
-function calcularCotizacion(boxes: BoxInput[], config: PricingConfig): QuoteResult {
+function calcularCotizacion(
+  boxes: BoxInput[],
+  config: PricingConfig,
+  /** Medidas del catálogo de stock, para saber si el pedido se puede despachar ya */
+  medidasEnStock: Array<{ length_mm: number; width_mm: number; height_mm: number; stock: number }> = [],
+): QuoteResult {
   const boxResults: BoxResult[] = [];
   let totalM2 = 0;
   let totalSubtotal = 0;
@@ -325,7 +337,34 @@ function calcularCotizacion(boxes: BoxInput[], config: PricingConfig): QuoteResu
   validUntil.setDate(validUntil.getDate() + config.quote_validity_days);
 
   // Por debajo de wholesale_min_m2 no se produce a medida: se vende de stock.
-  const esDeStock = totalM2 < config.wholesale_min_m2;
+  const volumenDeStock = totalM2 < config.wholesale_min_m2;
+
+  // Pero "canal de stock" no alcanza para poder comprarlo online. Hacen falta
+  // dos cosas mas, y si falta cualquiera hay que coordinar con un vendedor:
+  //   1. llegar al minimo de 100 cajas
+  //   2. que la medida este efectivamente en el catalogo, con stock
+  // Sin este chequeo mandabamos al cliente a /cajas a chocarse con el minimo,
+  // o a buscar una medida que no existe.
+  const cantidadTotal = boxResults.reduce((s, b) => s + b.quantity, 0);
+  const llegaAlMinimo = cantidadTotal >= RETAIL_CONFIG.MIN_CANTIDAD;
+
+  const hayCatalogo = medidasEnStock.length > 0;
+  const todasEnStock = hayCatalogo && boxResults.every((b) =>
+    medidasEnStock.some((m) =>
+      m.length_mm === b.length_mm && m.width_mm === b.width_mm &&
+      m.height_mm === b.height_mm && m.stock >= b.quantity,
+    ),
+  );
+
+  const sePuedeComprarOnline = volumenDeStock && llegaAlMinimo && todasEnStock;
+  const esDeStock = volumenDeStock;
+
+  const motivoNoOnline = !volumenDeStock ? null
+    : !llegaAlMinimo
+      ? `Son ${cantidadTotal} cajas y el autoservicio arranca en ${RETAIL_CONFIG.MIN_CANTIDAD}. Para esta cantidad lo coordinamos por WhatsApp.`
+      : !hayCatalogo
+        ? null
+        : `Esta medida no está entre las estándar que tenemos en stock, así que se fabrica a pedido. Escribinos y lo vemos.`;
 
   const ars = (n: number) => '$' + Math.round(n).toLocaleString('es-AR');
   const b0 = boxResults[0];
@@ -336,9 +375,11 @@ function calcularCotizacion(boxes: BoxInput[], config: PricingConfig): QuoteResu
   const summary =
     `Quilmes Corrugados: ${detalle}. Total ${ars(totalSubtotal)} ARS + IVA ` +
     `(${totalM2.toLocaleString('es-AR')} m²). ` +
-    (esDeStock
-      ? `Se vende de stock, entrega inmediata, se compra online en ${SITIO}/cajas.`
-      : `Producción a medida, ${maxEstimatedDays} días hábiles.`) +
+    (!esDeStock
+      ? `Producción a medida, ${maxEstimatedDays} días hábiles.`
+      : sePuedeComprarOnline
+        ? `Se vende de stock, entrega inmediata, se compra online en ${SITIO}/cajas.`
+        : `${motivoNoOnline ?? 'Se coordina directamente.'}`) +
     ` Fábrica en Lugones 219, Quilmes, Buenos Aires. WhatsApp +54 9 11 6924-9801.`;
 
   // La impresión se produce a medida, así que arranca en el mismo volumen que
@@ -392,9 +433,12 @@ function calcularCotizacion(boxes: BoxInput[], config: PricingConfig): QuoteResu
     minimum_m2: config.wholesale_min_m2,
     meets_minimum: !esDeStock,
     channel: esDeStock ? 'stock' : 'made_to_order',
-    channel_note: esDeStock
-      ? `Este volumen se vende de stock en medidas estándar, desde 100 cajas, con entrega más rápida. Comprar online en ${SITIO}/cajas`
-      : `Producción a medida. Cotización válida ${config.quote_validity_days} días.`,
+    can_buy_online: sePuedeComprarOnline,
+    channel_note: !esDeStock
+      ? `Producción a medida. Cotización válida ${config.quote_validity_days} días.`
+      : sePuedeComprarOnline
+        ? `Esta medida está en stock y el pedido llega al mínimo: se compra online, con entrega más rápida, en ${SITIO}/cajas`
+        : `${motivoNoOnline ?? 'Coordinamos este pedido directamente.'} El precio de arriba es el que corresponde.`,
   };
 }
 
@@ -574,7 +618,13 @@ export async function POST(request: NextRequest) {
 
     const config = pricingConfig as PricingConfig;
 
-    const quote = calcularCotizacion(body.boxes, config);
+    const { data: catalogo } = await supabase
+      .from('boxes')
+      .select('length_mm, width_mm, height_mm, stock')
+      .eq('is_standard', true)
+      .eq('is_active', true);
+
+    const quote = calcularCotizacion(body.boxes, config, catalogo || []);
     const boxResults = quote.boxes;
     const totalM2 = quote.total_m2;
     const totalSubtotal = quote.subtotal;
@@ -794,7 +844,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const quote = calcularCotizacion([box], pricingConfig as PricingConfig);
+    // El catalogo de stock decide si el cliente puede comprarlo online o hay
+    // que coordinarlo: sin esto lo mandabamos a /cajas aunque la medida no
+    // existiera o no llegara al minimo.
+    const { data: catalogo } = await supabase
+      .from('boxes')
+      .select('length_mm, width_mm, height_mm, stock')
+      .eq('is_standard', true)
+      .eq('is_active', true);
+
+    const quote = calcularCotizacion([box], pricingConfig as PricingConfig, catalogo || []);
 
     // Registrar la consulta: saber que asistentes cotizan y por cuanto es
     // justamente lo que hace medible este canal.
@@ -816,7 +875,9 @@ export async function GET(request: NextRequest) {
       success: true,
       quote,
       next_steps: {
-        comprar_online: quote.channel === 'stock' ? `${BASE_URL}/cajas` : null,
+        // Solo si realmente se puede comprar solo. Si no, el camino es
+        // WhatsApp, que esta abajo.
+        comprar_online: quote.can_buy_online ? `${BASE_URL}/cajas` : null,
         cotizador_web: `${BASE_URL}/#cotizador`,
         whatsapp: 'https://wa.me/5491169249801',
       },

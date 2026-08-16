@@ -173,6 +173,56 @@ async function auditar(ruta, nombre) {
   };
 }
 
+/**
+ * Sigue la cadena de redirects salto por salto.
+ *
+ * Existe porque este sitio tenia una cadena de dos saltos sin que se notara:
+ * el dominio de Vercel iba al apex con 308 y el apex iba a www con 307. Un 307
+ * es TEMPORAL: le dice al buscador que no consolide y que deje indexada la URL
+ * de origen. Con tres URLs sirviendo la misma pagina y el canonical apuntando
+ * al salto del medio, la autoridad se reparte y termina rankeando el dominio
+ * equivocado —que fue exactamente lo que paso.
+ */
+async function cadena(url) {
+  const saltos = [];
+  let actual = url;
+  for (let i = 0; i < 6; i++) {
+    let res;
+    try {
+      res = await fetch(actual, { redirect: 'manual', headers: { 'user-agent': 'QuilmesAudit/1.0' } });
+    } catch (e) {
+      saltos.push({ url: actual, status: 0, error: e.message });
+      break;
+    }
+    const destino = res.headers.get('location');
+    saltos.push({ url: actual, status: res.status, destino });
+    if (!destino || res.status < 300 || res.status >= 400) break;
+    actual = new URL(destino, actual).href;
+  }
+  return saltos;
+}
+
+const DOMINIOS = [
+  'https://quilmescorrugados.com.ar/',
+  'https://www.quilmescorrugados.com.ar/',
+  'https://quilmes-corrugados.vercel.app/',
+];
+
+console.log('\nCadenas de redirect entre dominios\n');
+for (const d of DOMINIOS) {
+  const saltos = await cadena(d);
+  const linea = saltos
+    .map((s) => `${s.url.replace(/^https:\/\//, '')} [${s.error || s.status}]`)
+    .join(' → ');
+  const final = saltos[saltos.length - 1];
+  const temporales = saltos.filter((s) => s.status === 302 || s.status === 307);
+  let aviso = '';
+  if (saltos.length > 2) aviso += `  ⚠ ${saltos.length - 1} saltos`;
+  if (temporales.length) aviso += `  ⚠ redirect TEMPORAL (${temporales.map((t) => t.status).join(',')}): el buscador no consolida`;
+  console.log(`  ${linea}${aviso}`);
+  if (final.status === 200 && saltos.length === 1) console.log('    ↑ sirve directo, sin saltos');
+}
+
 const resultados = [];
 for (const [ruta, nombre] of PAGINAS) resultados.push(await auditar(ruta, nombre));
 

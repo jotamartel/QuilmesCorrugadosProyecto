@@ -10,7 +10,7 @@ import { BoxItemForm, BoxItemData, BoxCalculations, calculateBoxItem } from './B
 import { BelowMinimumModal } from './BelowMinimumModal';
 import type { TaxCondition, BuenosAiresCity, PricingConfig } from '@/lib/types/database';
 import { ARGENTINE_PROVINCES, FREE_SHIPPING_MAX_KM } from '@/lib/types/database';
-import { trackEvent } from '@/lib/utils/tracking';
+import { trackEvent, identificar } from '@/lib/utils/tracking';
 import { getAtribucion } from '@/lib/utils/atribucion';
 
 // Importar BoxPreview3D dinámicamente para evitar SSR issues con Three.js
@@ -388,8 +388,27 @@ export function QuoterForm() {
       setLeadId(result.id);
       setPriceRevealed(true);
       
-      // Trackear evento
+      // Este es el momento en que el visitante deja de ser anonimo: ya dio
+      // nombre, mail y telefono a cambio de ver el precio. Identificarlo aca
+      // hace que todo lo que haga despues —incluso si vuelve dentro de una
+      // semana— viaje con su identidad hasheada, y lo habilita a entrar en las
+      // audiencias de retargeting. Antes, alguien que veia el precio y se iba
+      // era exactamente el mejor publico posible y no quedaba registrado en
+      // ninguna plataforma.
+      //
+      // Se manda el monto real del pedido para que los algoritmos puedan
+      // optimizar por facturacion y no solo por cantidad de formularios.
+      // Se espera antes de trackear para que el evento salga ya identificado.
+      await identificar({
+        email: clientData.requester_email,
+        telefono: clientData.requester_phone,
+        nombre: clientData.requester_name,
+        ciudad: clientData.city,
+      });
+
       trackEvent('price_revealed', {
+        value: totals.totalSubtotal,
+        currency: 'ARS',
         leadId: result.id,
         boxCount: boxes.length,
         totalSqm: totals.totalSqm,

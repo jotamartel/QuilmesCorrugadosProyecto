@@ -125,6 +125,92 @@ export async function reportarVentaAMeta(venta: VentaCerrada): Promise<{ ok: boo
 }
 
 /**
+ * Un evento del navegador espejado por servidor.
+ *
+ * `reportarVentaAMeta` cubre el final del embudo: la venta cerrada. Esto cubre
+ * todo lo anterior —quien vio un precio, quien dejo el telefono, quien pidio
+ * el troquel— que hasta ahora viajaba solo por el pixel del navegador y por lo
+ * tanto se perdia entre un tercio y la mitad de las veces.
+ *
+ * El `eventId` tiene que ser EL MISMO que uso el pixel en el navegador. Con
+ * eso Meta entiende que los dos envios son un unico evento y se queda con el
+ * que le llegue primero. Sin eso, prender las dos vias duplica conversiones.
+ */
+export interface EventoEspejado {
+  /** Nombre estandar de Meta: Lead, ViewContent, Contact, InitiateCheckout... */
+  nombre: string;
+  /** El mismo id que se le paso a fbq. De esto depende la deduplicacion. */
+  eventId: string;
+  /** user_data ya hasheado en el navegador. Aca nunca llega PII en claro. */
+  identidad: Record<string, string>;
+  /** Cookies que planta el pixel; suben mucho el match rate. */
+  fbp?: string | null;
+  fbc?: string | null;
+  /** IP y user-agent del visitante, tomados del request en el servidor. */
+  ip?: string | null;
+  userAgent?: string | null;
+  /** URL donde ocurrio. Meta la exige para eventos de tipo website. */
+  url?: string | null;
+  valor?: number | null;
+  moneda?: string;
+  contenido?: Record<string, unknown>;
+}
+
+export async function enviarEventoAMeta(
+  ev: EventoEspejado,
+): Promise<{ ok: boolean; detalle: string }> {
+  if (!metaEstaConfigurado()) {
+    return { ok: false, detalle: 'Meta CAPI sin configurar' };
+  }
+
+  const userData: Record<string, string> = { ...ev.identidad };
+  if (ev.fbp) userData.fbp = ev.fbp;
+  if (ev.fbc) userData.fbc = ev.fbc;
+  if (ev.ip) userData.client_ip_address = ev.ip;
+  if (ev.userAgent) userData.client_user_agent = ev.userAgent;
+
+  // Con IP y user-agent solos Meta ya puede intentar el cruce, asi que aca no
+  // se exige identidad como en la venta cerrada.
+  if (Object.keys(userData).length === 0) {
+    return { ok: false, detalle: 'sin ninguna senal de identidad' };
+  }
+
+  const customData: Record<string, unknown> = { ...(ev.contenido || {}) };
+  if (typeof ev.valor === 'number' && Number.isFinite(ev.valor)) {
+    customData.value = Math.round(ev.valor);
+    customData.currency = ev.moneda || 'ARS';
+  }
+
+  const payload = {
+    data: [
+      {
+        event_name: ev.nombre,
+        event_time: Math.floor(Date.now() / 1000),
+        event_id: ev.eventId,
+        action_source: 'website',
+        event_source_url: ev.url || undefined,
+        user_data: userData,
+        custom_data: Object.keys(customData).length ? customData : undefined,
+      },
+    ],
+  };
+
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${META_API_VERSION}/${META_PIXEL_ID}/events?access_token=${META_CAPI_TOKEN}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
+    );
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, detalle: `Meta respondio ${res.status}: ${JSON.stringify(json).slice(0, 200)}` };
+    }
+    return { ok: true, detalle: `${ev.nombre} recibido` };
+  } catch (err) {
+    return { ok: false, detalle: `Error llamando a Meta: ${(err as Error).message}` };
+  }
+}
+
+/**
  * Una fila del CSV de conversiones offline de Google Ads.
  *
  * Google Ads tiene dos caminos: la API (que necesita OAuth, developer token y

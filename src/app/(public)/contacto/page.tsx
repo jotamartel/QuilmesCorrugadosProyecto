@@ -14,9 +14,19 @@ const WHATSAPP_NUMBER = '5491169249801';
 export default function ContactoPage() {
   const whatsappMessage = 'Hola, me interesa cotizar cajas de cartón corrugado.';
 
-  // Trackear vista de página de contacto
+  // Esta pagina no tiene formulario: es la ficha con telefono, mail y
+  // direccion. Disparaba 'contact_form_submitted' al montar, o sea que cada
+  // visita entraba como Lead en GA4 y habria entrado como Lead en Meta.
+  //
+  // No es solo un numero inflado en un panel: la campaña aprende de las
+  // conversiones que recibe. Contando visitas como leads, el algoritmo optimiza
+  // para traer gente que mira el telefono y se va, y el costo por lead real
+  // queda escondido detras de un promedio que no existe.
+  //
+  // La conversion de verdad en esta pagina es el clic a WhatsApp, al telefono o
+  // al mail, que ya se trackean por separado mas abajo.
   useEffect(() => {
-    trackEvent('contact_form_submitted', { page: 'contacto' });
+    trackEvent('contact_page_view', { page: 'contacto' });
   }, []);
 
   return (

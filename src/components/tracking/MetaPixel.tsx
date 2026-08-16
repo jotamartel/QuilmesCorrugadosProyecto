@@ -3,27 +3,42 @@
 import Script from 'next/script';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { identidadRecordada } from '@/lib/marketing/identidad';
 
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 
 /**
- * Meta (Facebook) Pixel para campañas de Ads en Facebook/Instagram.
- * Carga fbq cuando NEXT_PUBLIC_META_PIXEL_ID está configurado.
+ * Meta Pixel para campañas en Facebook e Instagram.
+ * Carga fbq cuando NEXT_PUBLIC_META_PIXEL_ID esta configurado.
  *
- * Eventos mapeados (ver tracking.ts):
- * - PageView → automático en cada página
- * - ViewContent → quoter_viewed, product_page_view
- * - Lead → quote_submitted, contact_form_submitted, chat_message_sent
- * - Contact → whatsapp_click, phone_click, email_click
+ * Arranca con "advanced matching" manual: si el visitante ya se identifico en
+ * alguna visita anterior, el pixel se inicializa con su email y telefono
+ * hasheados. La diferencia no es cosmetica —Meta reporta match rates bastante
+ * mas altos con advanced matching—, y un match mas alto significa mas gente
+ * que efectivamente entra en las audiencias de retargeting y mas conversiones
+ * atribuidas a la campaña que las genero.
+ *
+ * A Meta nunca se le manda un dato en claro: lo que se pasa es el SHA-256 que
+ * calculo el navegador (ver src/lib/marketing/identidad.ts).
+ *
+ * Eventos mapeados: ver src/lib/utils/tracking.ts
  */
 export function MetaPixel() {
   const pathname = usePathname();
 
   useEffect(() => {
     if (!PIXEL_ID || typeof window === 'undefined') return;
-    if (typeof (window as any).fbq === 'function') {
-      (window as any).fbq('track', 'PageView');
+    const fbq = (window as unknown as { fbq?: (...a: unknown[]) => void }).fbq;
+    if (typeof fbq !== 'function') return;
+
+    // Si la persona se identifico despues de que cargo el script, re-inicializar
+    // con sus datos hace que los eventos siguientes ya viajen identificados.
+    const id = identidadRecordada();
+    if (id && Object.keys(id).length > 0) {
+      fbq('init', PIXEL_ID, id);
     }
+
+    fbq('track', 'PageView');
   }, [pathname]);
 
   if (!PIXEL_ID) return null;
@@ -40,7 +55,15 @@ export function MetaPixel() {
           t.src=v;s=b.getElementsByTagName(e)[0];
           s.parentNode.insertBefore(t,s)}(window, document,'script',
           'https://connect.facebook.net/en_US/fbevents.js');
-          fbq('init', '${PIXEL_ID}');
+          (function(){
+            var am = {};
+            try {
+              var g = localStorage.getItem('qc_identidad');
+              if (g) am = JSON.parse(g) || {};
+            } catch (e) {}
+            if (Object.keys(am).length) { fbq('init', '${PIXEL_ID}', am); }
+            else { fbq('init', '${PIXEL_ID}'); }
+          })();
           fbq('track', 'PageView');
         `}
       </Script>

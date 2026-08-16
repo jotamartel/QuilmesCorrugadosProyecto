@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { GoogleAnalytics } from "@/components/tracking/GoogleAnalytics";
+import { GoogleAds } from "@/components/tracking/GoogleAds";
 import { AtribucionTracker } from "@/components/tracking/AtribucionTracker";
 import { MetaPixel } from "@/components/tracking/MetaPixel";
 import "./globals.css";
@@ -273,6 +274,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <GoogleAnalytics />
+        <GoogleAds />
         <MetaPixel />
         <AtribucionTracker />
         {children}

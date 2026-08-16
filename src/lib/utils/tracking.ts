@@ -2,6 +2,16 @@
  * Utilidades para tracking de eventos de conversión
  */
 
+import {
+  construirIdentidad,
+  identidadRecordada,
+  recordarIdentidad,
+  leerCookie,
+  nuevoEventId,
+  paraGoogle,
+  type DatosDeContacto,
+} from '@/lib/marketing/identidad';
+
 export type ConversionEvent =
   | 'landing_page_view'
   | 'quoter_viewed'
@@ -14,6 +24,7 @@ export type ConversionEvent =
   | 'phone_click'
   | 'email_click'
   | 'contact_form_submitted'
+  | 'contact_page_view'
   | 'product_page_view'
   | 'faq_viewed'
   | 'chat_opened'
@@ -55,6 +66,7 @@ function mapToFbqEvent(
       };
     case 'quoter_viewed':
     case 'product_page_view':
+    case 'contact_page_view':
       return {
         event: 'ViewContent',
         params: { content_name: contentName, content_type: 'product', ...base },
@@ -124,10 +136,54 @@ function mapToGtagEvent(
 }
 
 /**
+ * Manda el mismo evento por servidor a la API de Conversiones de Meta.
+ *
+ * No es redundancia: entre bloqueadores, ITP de Safari y iOS, el pixel del
+ * navegador pierde una porcion grande de los eventos. Los dos caminos llevan
+ * el mismo event_id, asi que Meta se queda con el que le llegue y descarta el
+ * repetido. Es lo que hace que activar los dos sume cobertura en vez de
+ * duplicar conversiones.
+ *
+ * Falla en silencio a proposito: esto es telemetria, nunca puede interrumpir
+ * lo que la persona estaba haciendo.
+ */
+function espejarACapi(
+  nombre: string,
+  eventId: string,
+  params?: Record<string, unknown>,
+) {
+  const cuerpo = {
+    nombre,
+    eventId,
+    identidad: identidadRecordada() || {},
+    fbp: leerCookie('_fbp'),
+    fbc: leerCookie('_fbc'),
+    url: window.location.href,
+    valor: typeof params?.value === 'number' ? params.value : null,
+    contenido: params,
+  };
+
+  // keepalive para que el envio sobreviva si la persona navega o cierra justo
+  // despues: si no, se pierde exactamente el evento del que se va, que es el
+  // que mas interesa para retargeting.
+  fetch('/api/marketing/evento', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(cuerpo),
+    keepalive: true,
+  }).catch(() => {
+    /* telemetria: nunca romper la navegacion */
+  });
+}
+
+/**
  * Trackea un evento de conversión
  */
 export function trackEvent(eventType: ConversionEvent, eventData?: EventData) {
   if (typeof window === 'undefined') return;
+
+  // Un id por evento, compartido entre el pixel y la CAPI.
+  const eventId = nuevoEventId(eventType);
 
   // GA4 / Google Ads: enviar a gtag para conversiones y remarketing
   if (typeof (window as any).gtag === 'function') {
@@ -141,7 +197,8 @@ export function trackEvent(eventType: ConversionEvent, eventData?: EventData) {
   if (typeof (window as any).fbq === 'function') {
     const fbqEvent = mapToFbqEvent(eventType, eventData);
     if (fbqEvent) {
-      (window as any).fbq('track', fbqEvent.event, fbqEvent.params);
+      (window as any).fbq('track', fbqEvent.event, fbqEvent.params, { eventID: eventId });
+      espejarACapi(fbqEvent.event, eventId, fbqEvent.params);
     }
   }
 
@@ -173,6 +230,55 @@ export function trackEvent(eventType: ConversionEvent, eventData?: EventData) {
   }).catch(() => {
     // Silenciar errores de tracking
   });
+}
+
+/**
+ * Marca el momento en que un visitante anonimo pasa a ser una persona.
+ *
+ * Se llama apenas alguien deja email o telefono: al revelar el precio, al
+ * mandar el formulario, al pedir el troquel. Lo que hace:
+ *
+ *   1. Hashea los datos en el navegador y los guarda. A partir de aca TODO lo
+ *      que la persona haga —hoy y cuando vuelva en tres dias— viaja
+ *      identificado, no solo este evento.
+ *   2. Re-inicializa el pixel de Meta con advanced matching y le pasa a Google
+ *      el user_data para enhanced conversions. Ahi es donde sube el match rate
+ *      y donde la persona empieza a poder entrar en audiencias.
+ * No dispara ningun evento: solo deja la identidad puesta. El evento lo manda
+ * quien la llama, despues de esperarla, para que salga ya identificado y no se
+ * cuente dos veces.
+ *
+ * Devuelve si quedo identificada, por si el llamador quiere loguearlo.
+ */
+export async function identificar(datos: DatosDeContacto): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+
+  let identidad;
+  try {
+    identidad = await construirIdentidad(datos);
+  } catch {
+    // crypto.subtle no existe fuera de contexto seguro (http sin TLS).
+    // No es motivo para perder nada: se sigue sin identidad.
+    return false;
+  }
+
+  // Solo el pais no alcanza: si no hay ni email ni telefono, no hay identidad.
+  if (!identidad.em && !identidad.ph) return false;
+
+  recordarIdentidad(identidad);
+
+  const fbq = (window as any).fbq;
+  if (typeof fbq === 'function' && process.env.NEXT_PUBLIC_META_PIXEL_ID) {
+    fbq('init', process.env.NEXT_PUBLIC_META_PIXEL_ID, identidad);
+  }
+
+  const gtag = (window as any).gtag;
+  if (typeof gtag === 'function') {
+    const datosGoogle = paraGoogle(identidad);
+    if (Object.keys(datosGoogle).length) gtag('set', 'user_data', datosGoogle);
+  }
+
+  return true;
 }
 
 /**

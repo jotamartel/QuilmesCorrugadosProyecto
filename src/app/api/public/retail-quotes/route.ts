@@ -9,6 +9,7 @@ import { calculateUnfolded } from '@/lib/utils/box-calculations';
 import { calcularPrecioMinorista } from '@/lib/retail/pricing';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import { notifyNewRetailLead } from '@/lib/telegram/notifications';
+import { sanitizarAtribucion } from '@/lib/utils/atribucion';
 import type { TaxCondition } from '@/lib/types/database';
 
 interface RetailBox {
@@ -287,6 +288,9 @@ export async function POST(request: NextRequest) {
       shipping_method: body.shippingMethod || null,
       shipping_cost: shippingCost,
       updated_at: new Date().toISOString(),
+      // De donde vino este cliente. Sin esto no se puede saber que campania
+      // genera ventas, y cualquier inversion en pauta es a ciegas.
+      ...sanitizarAtribucion(body as unknown as Record<string, unknown>),
     };
 
     // Avisa por Telegram y responde. El id vuelve al front para que la segunda

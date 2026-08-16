@@ -10,6 +10,7 @@ import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculation
 import { getPricePerM2, calculateSubtotal } from '@/lib/utils/pricing';
 import { sendNotification } from '@/lib/notifications';
 import { notifyNewRetailLead } from '@/lib/telegram/notifications';
+import { sanitizarAtribucion } from '@/lib/utils/atribucion';
 import type { PricingConfig } from '@/lib/types/database';
 
 interface BoxData {
@@ -177,6 +178,8 @@ export async function POST(request: NextRequest) {
         source_user_agent: sourceUserAgent,
         message: body.message?.trim() || null,
         status: 'pending', // Lead que vio precio, pendiente de seguimiento
+        // De donde vino este cliente, para poder medir la pauta.
+        ...sanitizarAtribucion(body as unknown as Record<string, unknown>),
       })
       .select()
       .single();

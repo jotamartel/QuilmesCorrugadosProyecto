@@ -11,6 +11,7 @@ import { BelowMinimumModal } from './BelowMinimumModal';
 import type { TaxCondition, BuenosAiresCity, PricingConfig } from '@/lib/types/database';
 import { ARGENTINE_PROVINCES, FREE_SHIPPING_MAX_KM } from '@/lib/types/database';
 import { trackEvent } from '@/lib/utils/tracking';
+import { getAtribucion } from '@/lib/utils/atribucion';
 
 // Importar BoxPreview3D dinámicamente para evitar SSR issues con Three.js
 const BoxPreview3D = dynamic(
@@ -343,6 +344,9 @@ export function QuoterForm() {
 
     try {
       const payload = {
+        // De que campaña vino. Se manda al revelar el precio, que es el
+        // momento en que el lead queda registrado.
+        ...getAtribucion(),
         client_type: clientData.client_type,
         requester_name: clientData.requester_name,
         requester_company: clientData.client_type === 'empresa' ? clientData.requester_company : undefined,

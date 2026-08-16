@@ -5,6 +5,7 @@ import type { GameState, BoxQuoteLine, OrderFormData, ShippingData } from '@/lib
 import type { StandardSuggestion } from './QuoteResult';
 import { RETAIL_CONFIG, type RetailConfig } from '@/lib/retail/config';
 import { calcularPrecioMinorista } from '@/lib/retail/pricing';
+import { getAtribucion } from '@/lib/utils/atribucion';
 import { trackEvent } from '@/lib/retail/tracking';
 
 import Box3D from './Box3D';
@@ -201,6 +202,9 @@ function useBoxGame() {
           email: data.email,
           telefono: data.telefono,
           mensaje: data.mensaje,
+          // De que campaña vino: se guarda junto con el lead para poder medir
+          // que pauta genera ventas.
+          ...getAtribucion(),
           boxes: boxes.map(b => ({
             largo: b.largo, ancho: b.ancho, alto: b.alto, cantidad: b.cantidad,
             precioUnitario: b.precioUnitario, subtotal: b.subtotal,
@@ -259,6 +263,7 @@ function useBoxGame() {
 
     const payload = {
       ...formData,
+      ...getAtribucion(),
       // Completa la fila creada al revelar el precio en vez de duplicarla.
       quoteId: quoteId ?? undefined,
       direccion: shipping.direccion,

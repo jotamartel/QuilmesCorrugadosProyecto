@@ -64,6 +64,21 @@ function mapToFbqEvent(
         event: 'InitiateCheckout',
         params: { content_name: 'quote_started', ...base },
       };
+    case 'price_revealed':
+      // El mejor publico de remarketing que tenemos: alguien que dejo sus
+      // datos, vio el precio y no compro. Hasta ahora caia en el default y
+      // devolvia null, asi que nunca llegaba al Pixel.
+      // Se manda con el valor real del pedido para que Meta pueda optimizar
+      // por monto y no solo por cantidad de eventos.
+      return {
+        event: 'ViewContent',
+        params: {
+          content_name: 'price_revealed',
+          content_type: 'product',
+          currency: 'ARS',
+          ...base,
+        },
+      };
     case 'chat_opened':
       return {
         event: 'ViewContent',

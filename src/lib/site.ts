@@ -11,9 +11,28 @@
  * lugar de la marca. Cuando se decida unificar, se cambia acá y hay que
  * configurar en Vercel que el dominio no canónico redirija al canónico.
  */
-export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ||
-  'https://quilmes-corrugados.vercel.app';
+const FALLBACK = 'https://quilmes-corrugados.vercel.app';
+
+/**
+ * Sanea el valor de la variable de entorno.
+ *
+ * El .trim() no es decorativo: la variable en produccion venia con un salto de
+ * linea al final, y como solo se limpiaba la barra final, todas las URLs
+ * salieron partidas en dos ("https://dominio.com.ar\n/api/v1/quote"). Eso dejo
+ * el sitemap sin URLs validas y el robots.txt apuntando a un sitemap
+ * inexistente. Un valor mal cargado no puede romper el SEO del sitio entero.
+ */
+function normalizar(valor: string | undefined): string | null {
+  if (!valor) return null;
+  const limpio = valor.trim().replace(/\/+$/, '');
+  if (!/^https?:\/\/[^\s]+$/.test(limpio)) {
+    console.warn(`[site] NEXT_PUBLIC_SITE_URL invalida (${JSON.stringify(valor)}), se usa ${FALLBACK}`);
+    return null;
+  }
+  return limpio;
+}
+
+export const SITE_URL = normalizar(process.env.NEXT_PUBLIC_SITE_URL) || FALLBACK;
 
 /** Arma una URL absoluta sobre el dominio canónico. */
 export const siteUrl = (path = '') =>

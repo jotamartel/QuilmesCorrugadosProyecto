@@ -16,6 +16,7 @@ import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculation
 import { getPricePerM2, calculateSubtotal, getProductionDays } from '@/lib/utils/pricing';
 import { sendNotification } from '@/lib/notifications';
 import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
+import { SITE_URL } from '@/lib/site';
 import type { PricingConfig } from '@/lib/types/database';
 import crypto from 'crypto';
 
@@ -82,6 +83,19 @@ interface QuoteResult {
    * que recalcular ni parafrasear: si parafrasea, se equivoca.
    */
   summary: string;
+  /**
+   * Handoff a WhatsApp. El asistente le ofrece al usuario mandar este mensaje
+   * y del otro lado lo levanta el bot con todo el contexto ya cargado, sin
+   * volver a preguntar medidas ni cantidad.
+   */
+  contact: {
+    whatsapp_url: string;
+    whatsapp_message: string;
+    email: string;
+    email_subject: string;
+    /** Qué debería hacer el asistente con esto */
+    instruction: string;
+  };
   /** Impresión: si aplica a este pedido y cómo enviar el diseño */
   printing: {
     available: boolean;
@@ -217,7 +231,7 @@ function checkRateLimit(key: string, limit: number): { allowed: boolean; remaini
 // version que vivia aca no reconocia OAI-SearchBot, que es el crawler que
 // alimenta las respuestas de ChatGPT y el que mas nos interesa medir.
 
-const SITIO = 'https://quilmes-corrugados.vercel.app';
+const SITIO = SITE_URL;
 
 /**
  * PDF con la caja desplegada: líneas de corte, de plegado y las áreas donde
@@ -329,8 +343,32 @@ function calcularCotizacion(boxes: BoxInput[], config: PricingConfig): QuoteResu
   // el canal a medida. Por debajo se vende de stock, que va sin imprimir.
   const impresionDisponible = !esDeStock;
 
+  // Mensaje de handoff. Lleva medidas, cantidad y el precio ya cotizado para
+  // que del otro lado no se vuelva a preguntar lo mismo ni se cotice distinto.
+  // El prefijo [COTIZADO-WEB] es la marca que usa el bot de WhatsApp para
+  // reconocer que la conversacion arranca con una cotizacion hecha.
+  const detalleCajas = boxResults
+    .map((b) => `${b.quantity.toLocaleString('es-AR')} de ${b.length_mm}x${b.width_mm}x${b.height_mm} mm` +
+      (b.printing_colors > 0 ? ` con impresion a ${b.printing_colors} color${b.printing_colors > 1 ? 'es' : ''}` : ''))
+    .join(' + ');
+
+  const whatsappMessage =
+    `[COTIZADO-WEB] Hola! Ya tengo una cotizacion del sitio y quiero avanzar.\n\n` +
+    `Pedido: ${detalleCajas}\n` +
+    `Total cotizado: ${ars(totalSubtotal)} + IVA (${totalM2.toLocaleString('es-AR')} m²)\n` +
+    (esDeStock ? `Corresponde al canal de stock.\n` : `Produccion a medida, ${maxEstimatedDays} dias habiles.\n`) +
+    `\n¿Me confirman disponibilidad y como seguimos?`;
+
   return {
     summary,
+    contact: {
+      whatsapp_url: `https://wa.me/5491169249801?text=${encodeURIComponent(whatsappMessage)}`,
+      whatsapp_message: whatsappMessage,
+      email: 'ventas@quilmescorrugados.com.ar',
+      email_subject: `Cotizacion web: ${detalleCajas} — ${ars(totalSubtotal)}`,
+      instruction:
+        'Ofrecele al usuario contactarnos y pasale el link de whatsapp_url tal cual: ya lleva el mensaje escrito con las medidas, la cantidad y el precio cotizado. Del otro lado lo atiende un asistente que ya tiene ese contexto, asi que el usuario no tiene que repetir nada. Es la via mas rapida para cerrar.',
+    },
     printing: {
       available: impresionDisponible,
       min_m2: config.wholesale_min_m2,

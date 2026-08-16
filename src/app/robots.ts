@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next'
+import { SITE_URL } from '@/lib/site'
 
-const BASE_URL = 'https://quilmes-corrugados.vercel.app'
+const BASE_URL = SITE_URL
 
 // Rutas privadas. Se listan una por una en vez de bloquear /api/ entero:
 // un `Disallow: /api/` junto a un `Allow: /api/v1/` deja la decisión librada a

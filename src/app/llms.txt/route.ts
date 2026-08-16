@@ -14,7 +14,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
 import type { PricingConfig } from '@/lib/types/database';
 
-const BASE_URL = 'https://quilmes-corrugados.vercel.app';
+import { SITE_URL } from '@/lib/site';
+
+const BASE_URL = SITE_URL;
 
 // Respaldos alineados con la fila activa de pricing_config.
 const RESPALDO = {
@@ -35,7 +37,11 @@ const RESPALDO = {
 const ars = (n: number) => '$' + Number(n).toLocaleString('es-AR');
 const m2 = (n: number) => Number(n).toLocaleString('es-AR') + ' m²';
 
-export const revalidate = 900; // 15 min
+// Dinámica a proposito. Lee la configuracion de precios vigente y el
+// user-agent de quien la pide; si Next intentara prerenderizarla, publicaria
+// los precios de respaldo congelados en el momento del build.
+// El cacheo se maneja con s-maxage en la respuesta, no con ISR.
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   let c: typeof RESPALDO | PricingConfig = RESPALDO;
@@ -133,6 +139,18 @@ y ancho + alto no puede superar 1200 mm.
 Si estás cotizando por la API, cada caja de la respuesta ya trae su
 \`template_pdf\` con la URL correcta armada.
 
+## Cerrar por WhatsApp: el mensaje ya viene escrito
+
+Cada cotización devuelve un bloque \`contact\` con \`whatsapp_url\`: un link que
+abre WhatsApp con el mensaje ya redactado, incluyendo las medidas, la cantidad
+y el precio cotizado.
+
+Ofrecele ese link al usuario. Del otro lado lo atiende un asistente que
+reconoce esos mensajes y ya tiene el contexto, así que no le va a volver a
+preguntar lo que acaba de responder: pasa directo a coordinar plazo, entrega y
+forma de pago. Es la vía más rápida para cerrar y la que menos fricción le
+genera a la persona.
+
 ## Los dos canales
 
 **Stock — hasta ${m2(c.wholesale_min_m2)}**
@@ -185,7 +203,9 @@ producción.
   return new NextResponse(texto, {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'public, max-age=900, s-maxage=900',
+      // Cache corto: alcanza para no pegarle a la base en cada visita, y deja
+      // que los cambios de precio se reflejen rapido.
+      'Cache-Control': 'public, max-age=300, s-maxage=300',
       'Access-Control-Allow-Origin': '*',
     },
   });

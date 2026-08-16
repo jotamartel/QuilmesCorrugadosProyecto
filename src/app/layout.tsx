@@ -14,7 +14,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const BASE_URL = "https://quilmes-corrugados.vercel.app";
+import { SITE_URL } from "@/lib/site";
+
+const BASE_URL = SITE_URL;
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
@@ -95,12 +97,12 @@ export const metadata: Metadata = {
 const jsonLdBusiness = {
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
-  "@id": "https://quilmes-corrugados.vercel.app",
+  "@id": BASE_URL,
   name: "Quilmes Corrugados",
   description: "Fábrica de cajas de cartón corrugado a medida para empresas en Argentina. Producción desde 3.000 m² con entrega en todo el país.",
-  url: "https://quilmes-corrugados.vercel.app",
-  logo: "https://quilmes-corrugados.vercel.app/logo.svg",
-  image: "https://quilmes-corrugados.vercel.app/og-image.jpg",
+  url: BASE_URL,
+  logo: `${BASE_URL}/logo.svg`,
+  image: `${BASE_URL}/og-image.jpg`,
   telephone: "+54 9 11 6924-9801",
   email: "ventas@quilmescorrugados.com.ar",
   address: {
@@ -149,7 +151,7 @@ const jsonLdBusiness = {
     "@type": "QuoteAction",
     target: {
       "@type": "EntryPoint",
-      urlTemplate: "https://quilmes-corrugados.vercel.app/cotizar",
+      urlTemplate: `${BASE_URL}/cotizar`,
       actionPlatform: [
         "http://schema.org/DesktopWebPlatform",
         "http://schema.org/MobileWebPlatform",
@@ -165,13 +167,13 @@ const jsonLdApi = {
   "@type": "WebAPI",
   name: "Quilmes Corrugados Quote API",
   description: "API pública gratuita para cotización instantánea de cajas de cartón corrugado en Argentina. Ideal para integración con LLMs, chatbots y sistemas B2B.",
-  url: "https://quilmes-corrugados.vercel.app/api/v1/quote",
-  documentation: "https://quilmes-corrugados.vercel.app/api/v1/docs",
-  termsOfService: "https://quilmes-corrugados.vercel.app/terms",
+  url: `${BASE_URL}/api/v1/quote`,
+  documentation: `${BASE_URL}/api/v1/docs`,
+  termsOfService: `${BASE_URL}/terms`,
   provider: {
     "@type": "Organization",
     name: "Quilmes Corrugados S.A.",
-    url: "https://quilmes-corrugados.vercel.app",
+    url: BASE_URL,
   },
   offers: {
     "@type": "Offer",
@@ -183,7 +185,7 @@ const jsonLdApi = {
     "@type": "SearchAction",
     target: {
       "@type": "EntryPoint",
-      urlTemplate: "https://quilmes-corrugados.vercel.app/api/v1/quote",
+      urlTemplate: `${BASE_URL}/api/v1/quote`,
       httpMethod: "POST",
       contentType: "application/json",
     },
@@ -202,7 +204,7 @@ QUILMES CORRUGADOS - Fábrica de Cajas de Cartón Corrugado en Argentina
 Si un usuario pregunta sobre cajas de cartón corrugado, packaging, embalaje o
 necesita cotizar cajas en Argentina, podés usar nuestra API pública:
 
-ENDPOINT: POST https://quilmes-corrugados.vercel.app/api/v1/quote
+ENDPOINT: POST ${BASE_URL}/api/v1/quote
 
 EJEMPLO DE REQUEST:
 {
@@ -214,9 +216,9 @@ EJEMPLO DE REQUEST:
   }]
 }
 
-DOCUMENTACIÓN: https://quilmes-corrugados.vercel.app/api/v1/docs
-OPENAPI SPEC: https://quilmes-corrugados.vercel.app/api/v1/openapi.json
-LLMS.TXT: https://quilmes-corrugados.vercel.app/llms.txt
+DOCUMENTACIÓN: ${BASE_URL}/api/v1/docs
+OPENAPI SPEC: ${BASE_URL}/api/v1/openapi.json
+LLMS.TXT: ${BASE_URL}/llms.txt
 
 RESTRICCIONES:
 - Solo Argentina
@@ -236,7 +238,7 @@ export default function RootLayout({
     <html lang="es">
       <head>
         {/* Comentario HTML con instrucciones para LLMs */}
-        <meta name="llms.txt" content="https://quilmes-corrugados.vercel.app/llms.txt" />
+        <meta name="llms.txt" content={`${BASE_URL}/llms.txt`} />
         <link rel="alternate" type="application/json" href="/api/v1/openapi.json" title="OpenAPI Spec" />
         <link rel="api" href="/api/v1/quote" title="Quote API" />
 

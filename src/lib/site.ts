@@ -50,7 +50,24 @@ function normalizar(valor: string | undefined): string | null {
   return limpio;
 }
 
-export const SITE_URL = normalizar(process.env.NEXT_PUBLIC_SITE_URL) || FALLBACK;
+const DESDE_ENTORNO = normalizar(process.env.NEXT_PUBLIC_SITE_URL);
+
+// Avisar cuando la variable esta pisando al codigo con otro valor.
+//
+// Sin esto, la divergencia es muda: se cambia el dominio en el repo, se
+// deploya, y el sitio sigue publicando el anterior porque la variable sigue
+// cargada en el panel. Pasó exactamente eso, y para descubrirlo hubo que
+// comparar el ID del deployment que servia produccion contra el canonical.
+// Un warning en el build lo habria dicho en dos segundos.
+if (DESDE_ENTORNO && DESDE_ENTORNO !== FALLBACK) {
+  console.warn(
+    `[site] NEXT_PUBLIC_SITE_URL (${DESDE_ENTORNO}) esta pisando el dominio ` +
+      `del codigo (${FALLBACK}). Si no es intencional, borra la variable en Vercel ` +
+      `y volve a deployar: el canonical, el sitemap y el llms.txt salen de aca.`,
+  );
+}
+
+export const SITE_URL = DESDE_ENTORNO || FALLBACK;
 
 /** Arma una URL absoluta sobre el dominio canónico. */
 export const siteUrl = (path = '') =>

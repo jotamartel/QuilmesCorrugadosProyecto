@@ -26,6 +26,7 @@ import {
 } from '@/lib/whatsapp';
 import { sendNotification } from '@/lib/notifications';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
+import { SITE_URL } from '@/lib/site';
 import { getPricePerM2, getProductionDays, getActivePricingConfig } from '@/lib/utils/pricing';
 import { createClient } from '@/lib/supabase/server';
 import { classifyIntent, isGroqEnabled } from '@/lib/groq';
@@ -644,15 +645,11 @@ Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
     }
 
     if (boxTemplateDims) {
-      const baseUrl =
-        process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://quilmescorrugados.com.ar');
+      const baseUrl = SITE_URL;
       const templateUrl = `${baseUrl}/api/box-template?length=${boxTemplateDims.length}&width=${boxTemplateDims.width}&height=${boxTemplateDims.height}`;
       await sendWhatsAppDocument({ to: from, mediaUrl: templateUrl });
     } else if (boxTemplateToSend) {
-      const baseUrl =
-        process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://quilmescorrugados.com.ar');
+      const baseUrl = SITE_URL;
       const templateUrl = `${baseUrl}/api/box-template?length=${boxTemplateToSend.length}&width=${boxTemplateToSend.width}&height=${boxTemplateToSend.height}`;
       await sendWhatsAppDocument({ to: from, mediaUrl: templateUrl });
     }

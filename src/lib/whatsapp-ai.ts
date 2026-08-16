@@ -10,6 +10,7 @@ import {
   getProductionDays,
 } from '@/lib/utils/pricing';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
+import { SITE_URL } from '@/lib/site';
 import { parseBoxDimensions, validateDimensions } from '@/lib/whatsapp';
 import type { PricingConfig } from '@/lib/types/database';
 
@@ -469,9 +470,7 @@ export async function generateChatResponse(
     // Pedido de desplegado/plantilla PDF
     const templateResponse = await tryBoxTemplateRequest(userMessage, history);
     if (templateResponse) {
-      const baseUrl =
-        process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://quilmescorrugados.com.ar');
+      const baseUrl = SITE_URL;
       const templateUrl = `${baseUrl}/api/box-template?length=${templateResponse.boxTemplate.length}&width=${templateResponse.boxTemplate.width}&height=${templateResponse.boxTemplate.height}`;
       return { response: templateResponse.response, templateUrl };
     }
@@ -483,9 +482,7 @@ export async function generateChatResponse(
     );
     if (quoteResponse) {
       if (typeof quoteResponse === 'object' && 'boxTemplate' in quoteResponse) {
-        const baseUrl =
-          process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-          (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://quilmescorrugados.com.ar');
+        const baseUrl = SITE_URL;
         const templateUrl = `${baseUrl}/api/box-template?length=${quoteResponse.boxTemplate.length}&width=${quoteResponse.boxTemplate.width}&height=${quoteResponse.boxTemplate.height}`;
         return { response: quoteResponse.response, templateUrl };
       }

@@ -3,6 +3,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { SITE_URL } from '@/lib/site';
 
 // Cliente de Supabase con lock deshabilitado para evitar AbortError
 export function createAuthClient() {
@@ -47,41 +48,34 @@ export async function signInWithEmail(email: string, password: string) {
   return data;
 }
 
+/** Si estamos corriendo en la maquina del desarrollador. */
+function esLocal(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname;
+  return h.includes('localhost') || h.includes('127.0.0.1');
+}
+
 /**
- * Obtiene la URL base correcta para redirects
- * En producción usa la variable de entorno, en desarrollo usa window.location.origin
+ * URL base para los redirects de OAuth.
+ *
+ * En desarrollo usa el origin actual, para que el login funcione contra
+ * localhost. En cualquier otro lado usa SITE_URL, que es la MISMA constante
+ * que arma los canonical, el sitemap y el llms.txt.
+ *
+ * Antes leia NEXT_PUBLIC_SITE_URL por su cuenta y, si no estaba, caia a un
+ * apex escrito a mano. Eran dos fuentes de verdad para el mismo dato, con el
+ * agravante de que esta decide a donde vuelve el usuario despues de loguearse:
+ * si se desincronizaba de la lista de URLs permitidas de Supabase, el login se
+ * rompia sin que nada mas del sitio se viera afectado.
+ *
+ * IMPORTANTE: el valor que salga de aca tiene que estar en Supabase, en
+ * Authentication → URL Configuration → Redirect URLs, con el sufijo
+ * /auth/callback. Si se cambia el dominio canonico, hay que agregarlo ALLA
+ * ANTES de que este cambio llegue a produccion.
  */
 function getBaseUrl(): string {
-  // NEXT_PUBLIC_SITE_URL está disponible en el cliente porque tiene el prefijo NEXT_PUBLIC_
-  // Tiene prioridad absoluta si está configurada
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (siteUrl) {
-    return siteUrl;
-  }
-  
-  // En el cliente, detectar si estamos en producción
-  if (typeof window !== 'undefined') {
-    const origin = window.location.origin.trim();
-    const hostname = window.location.hostname;
-    
-    // Si estamos en producción (no localhost), usar el origin actual
-    if (!hostname.includes('localhost') && !hostname.includes('127.0.0.1')) {
-      return origin;
-    }
-    
-    // Si estamos en localhost, usar localhost (para desarrollo)
-    if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
-      return origin;
-    }
-  }
-  
-  // En el servidor, usar VERCEL_URL si está disponible
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`.trim();
-  }
-  
-  // Fallback por defecto para producción
-  return 'https://quilmescorrugados.com.ar';
+  if (esLocal()) return window.location.origin.trim();
+  return SITE_URL;
 }
 
 /**
@@ -90,41 +84,12 @@ function getBaseUrl(): string {
 export async function signInWithGoogle() {
   const supabase = createAuthClient();
   
-  // Determinar la URL base correcta - FORZAR URL DE PRODUCCIÓN si no es localhost
-  let baseUrl: string;
-  
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    const origin = window.location.origin;
-    
-    // SIEMPRE usar NEXT_PUBLIC_SITE_URL si está disponible (tiene prioridad absoluta)
-    if (process.env.NEXT_PUBLIC_SITE_URL?.trim()) {
-      baseUrl = process.env.NEXT_PUBLIC_SITE_URL.trim();
-    }
-    // Si estamos en localhost, usar localhost
-    else if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
-      baseUrl = origin.trim();
-    }
-    // Si estamos en producción (cualquier otro dominio), usar el origin actual
-    else {
-      baseUrl = origin.trim();
-    }
-  } else {
-    // En el servidor, usar NEXT_PUBLIC_SITE_URL o fallback
-    baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || 'https://quilmescorrugados.com.ar';
-  }
-  
-  // Limpiar la URL de cualquier espacio o salto de línea
-  const redirectUrl = `${baseUrl}/auth/callback`.replace(/\s+/g, '').trim();
+  // Esta funcion repetia entera la logica de getBaseUrl(), con la variable de
+  // entorno leida por su cuenta y el apex escrito a mano. Dos copias de la
+  // misma decision es como se desincronizan.
+  const redirectUrl = `${getBaseUrl()}/auth/callback`.replace(/\s+/g, '').trim();
 
-  // Log para debug (siempre activo para troubleshooting)
-  console.log('[Auth Debug] ========================================');
   console.log('[Auth Debug] Redirect URL:', redirectUrl);
-  console.log('[Auth Debug] Hostname:', typeof window !== 'undefined' ? window.location.hostname : 'server');
-  console.log('[Auth Debug] Origin:', typeof window !== 'undefined' ? window.location.origin : 'server');
-  console.log('[Auth Debug] NEXT_PUBLIC_SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL);
-  console.log('[Auth Debug] NODE_ENV:', process.env.NODE_ENV);
-  console.log('[Auth Debug] ========================================');
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',

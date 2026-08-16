@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { SITE_URL } from '@/lib/site';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -403,7 +404,7 @@ export default function ApiKeysPage() {
             Incluye la API key en el header <code className="bg-gray-100 px-1 rounded">X-API-Key</code> de tus requests:
           </p>
           <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-xs">
-{`curl -X POST https://quilmes-corrugados.vercel.app/api/v1/quote \\
+{`curl -X POST ${SITE_URL}/api/v1/quote \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: qc_live_xxxxxxxxxx" \\
   -d '{"boxes": [{"length_mm": 400, "width_mm": 300, "height_mm": 200, "quantity": 1000}]}'`}

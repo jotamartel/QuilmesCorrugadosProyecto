@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { SITE_URL } from '@/lib/site';
 import { Check, Copy, ExternalLink, Zap, Box, Calculator, Clock, Shield } from 'lucide-react';
 
 export default function ApiDocsPage() {
@@ -59,14 +60,14 @@ export default function ApiDocsPage() {
   }
 }`;
 
-  const curlExample = `curl -X POST https://quilmes-corrugados.vercel.app/api/v1/quote \\
+  const curlExample = `curl -X POST ${SITE_URL}/api/v1/quote \\
   -H "Content-Type: application/json" \\
   -d '${exampleRequest.replace(/\n/g, '').replace(/  /g, '')}'`;
 
   const pythonExample = `import requests
 
 response = requests.post(
-    "https://quilmes-corrugados.vercel.app/api/v1/quote",
+    "${SITE_URL}/api/v1/quote",
     json={
         "boxes": [{
             "length_mm": 400,
@@ -80,7 +81,7 @@ response = requests.post(
 quote = response.json()
 print(f"Total: ARS {quote['quote']['subtotal']:,.2f}")`;
 
-  const jsExample = `const response = await fetch('https://quilmes-corrugados.vercel.app/api/v1/quote', {
+  const jsExample = `const response = await fetch('${SITE_URL}/api/v1/quote', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -102,7 +103,7 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
       <header className="bg-[#002E55] text-white py-12">
         <div className="max-w-4xl mx-auto px-6">
           <div className="flex items-center gap-2 text-blue-200 text-sm mb-4">
-            <a href="https://quilmes-corrugados.vercel.app" className="hover:text-white">Quilmes Corrugados</a>
+            <a href="${SITE_URL}" className="hover:text-white">Quilmes Corrugados</a>
             <span>/</span>
             <span>API v1</span>
           </div>
@@ -202,7 +203,7 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
                   POST
                 </span>
                 <code className="text-gray-900 font-mono">
-                  https://quilmes-corrugados.vercel.app/api/v1/quote
+                  ${SITE_URL}/api/v1/quote
                 </code>
               </div>
             </div>
@@ -476,7 +477,7 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
         <div className="max-w-4xl mx-auto px-6 text-center text-sm text-gray-500">
           <p>© {new Date().getFullYear()} Quilmes Corrugados S.A. Todos los derechos reservados.</p>
           <p className="mt-2">
-            <a href="https://quilmes-corrugados.vercel.app" className="hover:text-gray-700">quilmes-corrugados.vercel.app</a>
+            <a href="${SITE_URL}" className="hover:text-gray-700">quilmes-corrugados.vercel.app</a>
             {' · '}
             <a href="/llms.txt" className="hover:text-gray-700">llms.txt</a>
             {' · '}

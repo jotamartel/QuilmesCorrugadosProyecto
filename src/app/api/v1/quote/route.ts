@@ -6,8 +6,10 @@
  * - Sin API key: 10 requests/minuto
  * - Con API key: 100 requests/minuto (según configuración)
  *
- * Documentación: https://quilmes-corrugados.vercel.app/api/v1/docs
- * OpenAPI Spec: https://quilmes-corrugados.vercel.app/api/v1/openapi.json
+ * Documentación: /api/v1/docs
+ * OpenAPI Spec: /api/v1/openapi.json
+ *
+ * El dominio sale de lib/site.ts (SITE_URL), nunca escrito a mano.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -335,7 +337,7 @@ function calcularCotizacion(boxes: BoxInput[], config: PricingConfig): QuoteResu
     `Quilmes Corrugados: ${detalle}. Total ${ars(totalSubtotal)} ARS + IVA ` +
     `(${totalM2.toLocaleString('es-AR')} m²). ` +
     (esDeStock
-      ? `Se vende de stock, entrega inmediata, se compra online en ${'https://quilmes-corrugados.vercel.app/cajas'}.`
+      ? `Se vende de stock, entrega inmediata, se compra online en ${SITIO}/cajas.`
       : `Producción a medida, ${maxEstimatedDays} días hábiles.`) +
     ` Fábrica en Lugones 219, Quilmes, Buenos Aires. WhatsApp +54 9 11 6924-9801.`;
 
@@ -391,7 +393,7 @@ function calcularCotizacion(boxes: BoxInput[], config: PricingConfig): QuoteResu
     meets_minimum: !esDeStock,
     channel: esDeStock ? 'stock' : 'made_to_order',
     channel_note: esDeStock
-      ? `Este volumen se vende de stock en medidas estándar, desde 100 cajas, con entrega más rápida. Comprar online en https://quilmes-corrugados.vercel.app/cajas`
+      ? `Este volumen se vende de stock en medidas estándar, desde 100 cajas, con entrega más rápida. Comprar online en ${SITIO}/cajas`
       : `Producción a medida. Cotización válida ${config.quote_validity_days} días.`,
   };
 }
@@ -660,7 +662,7 @@ export async function OPTIONS() {
   });
 }
 
-const BASE_URL = 'https://quilmes-corrugados.vercel.app';
+const BASE_URL = SITE_URL;
 
 /**
  * GET /api/v1/quote

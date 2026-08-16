@@ -1,3 +1,4 @@
+import { SITE_URL } from '@/lib/site';
 /**
  * Componentes de Schema Markup (JSON-LD) para SEO
  * Usar en pages que necesiten datos estructurados específicos
@@ -84,7 +85,7 @@ export function ProductSchema({
     manufacturer: {
       "@type": "Organization",
       name: "Quilmes Corrugados S.A.",
-      url: "https://quilmes-corrugados.vercel.app",
+      url: SITE_URL,
     },
     ...(offers && {
       offers: {
@@ -111,8 +112,8 @@ export function OrganizationSchema() {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "Quilmes Corrugados S.A.",
-    url: "https://quilmes-corrugados.vercel.app",
-    logo: "https://quilmes-corrugados.vercel.app/logo.svg",
+    url: SITE_URL,
+    logo: `${SITE_URL}/logo.svg`,
     description: "Fábrica de cajas de cartón corrugado a medida en Quilmes, Buenos Aires, Argentina.",
     address: {
       "@type": "PostalAddress",
@@ -145,7 +146,7 @@ export function WebSiteSchema() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "Quilmes Corrugados",
-    url: "https://quilmes-corrugados.vercel.app",
+    url: SITE_URL,
     description: "Fábrica de cajas de cartón corrugado a medida para empresas en Argentina.",
     publisher: {
       "@type": "Organization",
@@ -155,7 +156,7 @@ export function WebSiteSchema() {
       "@type": "SearchAction",
       target: {
         "@type": "EntryPoint",
-        urlTemplate: "https://quilmes-corrugados.vercel.app/#cotizador",
+        urlTemplate: `${SITE_URL}/#cotizador`,
       },
       "query-input": "required name=search_term_string",
     },

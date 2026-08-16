@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { SITE_URL } from '@/lib/site';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateUnfolded } from '@/lib/utils/box-calculations';
@@ -287,7 +288,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Base URL for callbacks
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quilmes-corrugados.vercel.app';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || SITE_URL;
 
     const preferenceData = await preference.create({
       body: {

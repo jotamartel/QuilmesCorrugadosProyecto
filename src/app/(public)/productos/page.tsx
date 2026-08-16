@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { SITE_URL } from '@/lib/site';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
@@ -52,8 +53,8 @@ export default function ProductosPage() {
 
       <BreadcrumbSchema
         items={[
-          { name: 'Inicio', url: 'https://quilmes-corrugados.vercel.app' },
-          { name: 'Productos', url: 'https://quilmes-corrugados.vercel.app/productos' },
+          { name: 'Inicio', url: SITE_URL },
+          { name: 'Productos', url: `${SITE_URL}/productos` },
         ]}
       />
       {products.map((product) => (

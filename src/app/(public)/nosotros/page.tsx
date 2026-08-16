@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SITE_URL } from '@/lib/site';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
@@ -9,12 +10,12 @@ export const metadata: Metadata = {
   title: 'Sobre Nosotros | Fábrica de Cajas de Cartón en Quilmes',
   description: 'Quilmes Corrugados: +20 años fabricando cajas de cartón corrugado a medida en Quilmes, Buenos Aires. Fábrica propia, +500 clientes activos. Conocé nuestra historia y valores.',
   alternates: {
-    canonical: 'https://quilmes-corrugados.vercel.app/nosotros',
+    canonical: `${SITE_URL}/nosotros`,
   },
   openGraph: {
     title: 'Sobre Quilmes Corrugados | Fábrica de Cartón Corrugado',
     description: '+20 años fabricando cajas de cartón corrugado a medida en Quilmes, Buenos Aires.',
-    url: 'https://quilmes-corrugados.vercel.app/nosotros',
+    url: `${SITE_URL}/nosotros`,
     type: 'website',
   },
 };
@@ -45,8 +46,8 @@ export default function NosotrosPage() {
       <OrganizationSchema />
       <BreadcrumbSchema
         items={[
-          { name: 'Inicio', url: 'https://quilmes-corrugados.vercel.app' },
-          { name: 'Nosotros', url: 'https://quilmes-corrugados.vercel.app/nosotros' },
+          { name: 'Inicio', url: SITE_URL },
+          { name: 'Nosotros', url: `${SITE_URL}/nosotros` },
         ]}
       />
 

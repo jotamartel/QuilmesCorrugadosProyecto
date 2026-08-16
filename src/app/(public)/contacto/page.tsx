@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { SITE_URL } from '@/lib/site';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
@@ -24,8 +25,8 @@ export default function ContactoPage() {
 
       <BreadcrumbSchema
         items={[
-          { name: 'Inicio', url: 'https://quilmes-corrugados.vercel.app' },
-          { name: 'Contacto', url: 'https://quilmes-corrugados.vercel.app/contacto' },
+          { name: 'Inicio', url: SITE_URL },
+          { name: 'Contacto', url: `${SITE_URL}/contacto` },
         ]}
       />
 

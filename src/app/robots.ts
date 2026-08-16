@@ -1,21 +1,96 @@
 import { MetadataRoute } from 'next'
 
-export default function robots(): MetadataRoute.Robots {
-  const baseUrl = 'https://quilmes-corrugados.vercel.app'
+const BASE_URL = 'https://quilmes-corrugados.vercel.app'
 
+// Rutas privadas. Se listan una por una en vez de bloquear /api/ entero:
+// un `Disallow: /api/` junto a un `Allow: /api/v1/` deja la decisión librada a
+// cómo cada crawler resuelve reglas que se pisan, y justamente /api/v1/ es la
+// que queremos que lean.
+const API_PRIVADA = [
+  '/api/config/',
+  '/api/admin/',
+  '/api/retail-sales',
+  '/api/public-quotes',
+  '/api/webhooks/',
+  '/api/whatsapp/',
+  '/api/telegram/',
+  '/api/retell/',
+  '/api/xubio/',
+  '/api/traffic/',
+  '/api/contacts/',
+]
+
+const PRIVADO = [...API_PRIVADA, '/dashboard/', '/admin/', '/_next/', '/static/', '/login', '/auth/']
+
+// Lo que sí queremos que un asistente de IA lea y use.
+const PUBLICO = [
+  '/',
+  '/productos',
+  '/nosotros',
+  '/contacto',
+  '/faq',
+  '/cajas',
+  '/cajas-ecommerce',
+  '/cajas-alimentos',
+  '/cajas-mudanza',
+  '/mayorista',
+  '/llms.txt',
+  '/api/v1/quote',
+  '/api/v1/docs',
+  '/api/v1/openapi.json',
+]
+
+/**
+ * Agentes de IA a los que les damos acceso explícito.
+ *
+ * OAI-SearchBot es el importante y faltaba: GPTBot sólo alimenta el
+ * entrenamiento de OpenAI, mientras que OAI-SearchBot es el que indexa para
+ * las respuestas de ChatGPT con búsqueda. Sin él, ChatGPT puede recomendar la
+ * empresa pero no llega al cotizador.
+ *
+ * Claude-Web y Anthropic-AI quedaron obsoletos; el crawler actual es ClaudeBot.
+ */
+const AGENTES_IA = [
+  // OpenAI
+  'GPTBot',            // entrenamiento
+  'OAI-SearchBot',     // indexación para ChatGPT Search
+  'ChatGPT-User',      // navegación en vivo cuando el usuario pregunta
+  // Anthropic
+  'ClaudeBot',
+  'Claude-SearchBot',
+  'Claude-User',
+  'Claude-Web',        // legacy, se deja por compatibilidad
+  'anthropic-ai',      // legacy
+  // Google (Gemini y AI Overviews)
+  'Google-Extended',
+  // Perplexity
+  'PerplexityBot',
+  'Perplexity-User',
+  // Otros asistentes
+  'Applebot-Extended',
+  'meta-externalagent',
+  'Amazonbot',
+  'DuckAssistBot',
+  'YouBot',
+  'cohere-ai',
+  'Bytespider',
+]
+
+export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/productos', '/nosotros', '/contacto', '/faq', '/cotizar', '/api/v1/'],
-        disallow: ['/api/', '/dashboard/', '/admin/', '/_next/', '/static/', '/login'],
+        allow: PUBLICO,
+        disallow: PRIVADO,
       },
       {
-        userAgent: ['GPTBot', 'ChatGPT-User', 'Claude-Web', 'Anthropic-AI', 'PerplexityBot', 'Cohere-AI'],
-        allow: ['/', '/productos', '/nosotros', '/faq', '/api/v1/', '/llms.txt'],
-        disallow: ['/api/', '/dashboard/', '/admin/', '/_next/', '/login'],
+        userAgent: AGENTES_IA,
+        allow: PUBLICO,
+        disallow: PRIVADO,
       },
     ],
-    sitemap: `${baseUrl}/sitemap.xml`,
+    sitemap: `${BASE_URL}/sitemap.xml`,
+    host: BASE_URL,
   }
 }

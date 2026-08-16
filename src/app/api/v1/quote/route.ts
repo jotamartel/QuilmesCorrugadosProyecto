@@ -70,6 +70,15 @@ interface QuoteResult {
   valid_until: string;
   minimum_m2: number;
   meets_minimum: boolean;
+  /** Por qué canal corresponde este volumen */
+  channel: 'stock' | 'made_to_order';
+  /** Explicación en castellano, pensada para que un asistente la lea al usuario */
+  channel_note: string;
+  /**
+   * Frase lista para leerle al usuario. Existe para que un asistente no tenga
+   * que recalcular ni parafrasear: si parafrasea, se equivoca.
+   */
+  summary: string;
 }
 
 interface ApiResponse {
@@ -211,6 +220,119 @@ function getSourceType(userAgent: string, apiKey: string | null): string {
     return 'browser';
   }
   return 'unknown';
+}
+
+/** Valida una lista de cajas. Devuelve los errores encontrados. */
+function validarCajas(boxes: BoxInput[]): string[] {
+  const errors: string[] = [];
+  boxes.forEach((box, index) => {
+    const prefix = `boxes[${index}]`;
+    if (!box.length_mm || box.length_mm < 100 || box.length_mm > 2000) {
+      errors.push(`${prefix}.length_mm must be between 100 and 2000`);
+    }
+    if (!box.width_mm || box.width_mm < 100 || box.width_mm > 2000) {
+      errors.push(`${prefix}.width_mm must be between 100 and 2000`);
+    }
+    if (!box.height_mm || box.height_mm < 50 || box.height_mm > 1500) {
+      errors.push(`${prefix}.height_mm must be between 50 and 1500`);
+    }
+    if (!box.quantity || box.quantity < 1 || !Number.isInteger(box.quantity)) {
+      errors.push(`${prefix}.quantity must be a positive integer`);
+    }
+    if (box.printing_colors !== undefined && (box.printing_colors < 0 || box.printing_colors > 4)) {
+      errors.push(`${prefix}.printing_colors must be between 0 and 4`);
+    }
+  });
+  return errors;
+}
+
+/**
+ * Calcula la cotización. Es la misma para GET y POST: un agente de IA que
+ * navega con GET tiene que obtener exactamente el mismo precio que un cliente
+ * que postea desde el sitio.
+ */
+function calcularCotizacion(boxes: BoxInput[], config: PricingConfig): QuoteResult {
+  const boxResults: BoxResult[] = [];
+  let totalM2 = 0;
+  let totalSubtotal = 0;
+  let maxEstimatedDays = 0;
+
+  for (const box of boxes) {
+    const printingColors = box.printing_colors || 0;
+    const boxHasPrinting = box.has_printing || printingColors > 0;
+
+    const unfolded = calculateUnfolded(box.length_mm, box.width_mm, box.height_mm);
+    const boxTotalSqm = calculateTotalM2(unfolded.m2, box.quantity);
+    totalM2 += boxTotalSqm;
+
+    const pricePerM2 = getPricePerM2(boxTotalSqm, config);
+
+    // +15% por cada color de impresión
+    const adjustedPricePerM2 = boxHasPrinting && printingColors > 0
+      ? pricePerM2 * (1 + printingColors * 0.15)
+      : pricePerM2;
+
+    const subtotal = calculateSubtotal(boxTotalSqm, adjustedPricePerM2);
+    totalSubtotal += subtotal;
+
+    const estimatedDays = getProductionDays(boxHasPrinting, config);
+    if (estimatedDays > maxEstimatedDays) maxEstimatedDays = estimatedDays;
+
+    boxResults.push({
+      length_mm: box.length_mm,
+      width_mm: box.width_mm,
+      height_mm: box.height_mm,
+      quantity: box.quantity,
+      has_printing: boxHasPrinting,
+      printing_colors: printingColors,
+      sheet_width_mm: unfolded.unfoldedWidth,
+      sheet_length_mm: unfolded.unfoldedLength,
+      sqm_per_box: unfolded.m2,
+      total_sqm: boxTotalSqm,
+      price_per_m2: adjustedPricePerM2,
+      unit_price: Math.round((subtotal / box.quantity) * 100) / 100,
+      subtotal,
+    });
+  }
+
+  totalM2 = Math.round(totalM2 * 100) / 100;
+  totalSubtotal = Math.round(totalSubtotal * 100) / 100;
+
+  const validUntil = new Date();
+  validUntil.setDate(validUntil.getDate() + config.quote_validity_days);
+
+  // Por debajo de wholesale_min_m2 no se produce a medida: se vende de stock.
+  const esDeStock = totalM2 < config.wholesale_min_m2;
+
+  const ars = (n: number) => '$' + Math.round(n).toLocaleString('es-AR');
+  const b0 = boxResults[0];
+  const detalle = boxResults.length === 1
+    ? `${b0.quantity.toLocaleString('es-AR')} cajas de ${b0.length_mm}x${b0.width_mm}x${b0.height_mm} mm a ${ars(b0.unit_price)} por caja`
+    : `${boxResults.length} medidas distintas, ${boxResults.reduce((s, b) => s + b.quantity, 0).toLocaleString('es-AR')} cajas en total`;
+
+  const summary =
+    `Quilmes Corrugados: ${detalle}. Total ${ars(totalSubtotal)} ARS + IVA ` +
+    `(${totalM2.toLocaleString('es-AR')} m²). ` +
+    (esDeStock
+      ? `Se vende de stock, entrega inmediata, se compra online en ${'https://quilmes-corrugados.vercel.app/cajas'}.`
+      : `Producción a medida, ${maxEstimatedDays} días hábiles.`) +
+    ` Fábrica en Lugones 219, Quilmes, Buenos Aires. WhatsApp +54 9 11 6924-9801.`;
+
+  return {
+    summary,
+    boxes: boxResults,
+    total_m2: totalM2,
+    subtotal: totalSubtotal,
+    currency: 'ARS',
+    estimated_days: maxEstimatedDays,
+    valid_until: validUntil.toISOString().split('T')[0],
+    minimum_m2: config.wholesale_min_m2,
+    meets_minimum: !esDeStock,
+    channel: esDeStock ? 'stock' : 'made_to_order',
+    channel_note: esDeStock
+      ? `Este volumen se vende de stock en medidas estándar, desde 100 cajas, con entrega más rápida. Comprar online en https://quilmes-corrugados.vercel.app/cajas`
+      : `Producción a medida. Cotización válida ${config.quote_validity_days} días.`,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -359,26 +481,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar cada caja
-    const errors: string[] = [];
-    body.boxes.forEach((box, index) => {
-      const prefix = `boxes[${index}]`;
-
-      if (!box.length_mm || box.length_mm < 100 || box.length_mm > 2000) {
-        errors.push(`${prefix}.length_mm must be between 100 and 2000`);
-      }
-      if (!box.width_mm || box.width_mm < 100 || box.width_mm > 2000) {
-        errors.push(`${prefix}.width_mm must be between 100 and 2000`);
-      }
-      if (!box.height_mm || box.height_mm < 50 || box.height_mm > 1500) {
-        errors.push(`${prefix}.height_mm must be between 50 and 1500`);
-      }
-      if (!box.quantity || box.quantity < 1 || !Number.isInteger(box.quantity)) {
-        errors.push(`${prefix}.quantity must be a positive integer`);
-      }
-      if (box.printing_colors !== undefined && (box.printing_colors < 0 || box.printing_colors > 4)) {
-        errors.push(`${prefix}.printing_colors must be between 0 and 4`);
-      }
-    });
+    const errors = validarCajas(body.boxes);
 
     if (errors.length > 0) {
       await logRequest(400);
@@ -407,85 +510,11 @@ export async function POST(request: NextRequest) {
     }
 
     const config = pricingConfig as PricingConfig;
-    const MINIMUM_M2 = 3000;
 
-    // Calcular cada caja
-    const boxResults: BoxResult[] = [];
-    let totalM2 = 0;
-    let totalSubtotal = 0;
-    let maxEstimatedDays = 0;
-    let hasPrinting = false;
-
-    for (const box of body.boxes) {
-      const printingColors = box.printing_colors || 0;
-      const boxHasPrinting = box.has_printing || printingColors > 0;
-
-      if (boxHasPrinting) hasPrinting = true;
-
-      // Calcular plancha desplegada
-      const unfolded = calculateUnfolded(box.length_mm, box.width_mm, box.height_mm);
-
-      // Calcular m² totales para esta caja
-      const boxTotalSqm = calculateTotalM2(unfolded.m2, box.quantity);
-      totalM2 += boxTotalSqm;
-
-      // Obtener precio por m² según volumen total
-      const pricePerM2 = getPricePerM2(boxTotalSqm, config);
-
-      // Aplicar incremento por impresión
-      let adjustedPricePerM2 = pricePerM2;
-      if (boxHasPrinting && printingColors > 0) {
-        // +15% por cada color de impresión
-        const printingMultiplier = 1 + (printingColors * 0.15);
-        adjustedPricePerM2 = pricePerM2 * printingMultiplier;
-      }
-
-      // Calcular subtotal
-      const subtotal = calculateSubtotal(boxTotalSqm, adjustedPricePerM2);
-      totalSubtotal += subtotal;
-
-      // Precio unitario
-      const unitPrice = Math.round((subtotal / box.quantity) * 100) / 100;
-
-      // Días de producción
-      const estimatedDays = getProductionDays(boxHasPrinting, config);
-      if (estimatedDays > maxEstimatedDays) maxEstimatedDays = estimatedDays;
-
-      boxResults.push({
-        length_mm: box.length_mm,
-        width_mm: box.width_mm,
-        height_mm: box.height_mm,
-        quantity: box.quantity,
-        has_printing: boxHasPrinting,
-        printing_colors: printingColors,
-        sheet_width_mm: unfolded.unfoldedWidth,
-        sheet_length_mm: unfolded.unfoldedLength,
-        sqm_per_box: unfolded.m2,
-        total_sqm: boxTotalSqm,
-        price_per_m2: adjustedPricePerM2,
-        unit_price: unitPrice,
-        subtotal: subtotal,
-      });
-    }
-
-    // Redondear totales
-    totalM2 = Math.round(totalM2 * 100) / 100;
-    totalSubtotal = Math.round(totalSubtotal * 100) / 100;
-
-    // Fecha de validez (30 días)
-    const validUntil = new Date();
-    validUntil.setDate(validUntil.getDate() + 30);
-
-    const quote: QuoteResult = {
-      boxes: boxResults,
-      total_m2: totalM2,
-      subtotal: totalSubtotal,
-      currency: 'ARS',
-      estimated_days: maxEstimatedDays,
-      valid_until: validUntil.toISOString().split('T')[0],
-      minimum_m2: MINIMUM_M2,
-      meets_minimum: totalM2 >= MINIMUM_M2,
-    };
+    const quote = calcularCotizacion(body.boxes, config);
+    const boxResults = quote.boxes;
+    const totalM2 = quote.total_m2;
+    const totalSubtotal = quote.subtotal;
 
     // Log exitoso
     await logRequest(200, totalM2, totalSubtotal, boxResults.length);
@@ -563,31 +592,178 @@ export async function OPTIONS() {
     status: 204,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
       'Access-Control-Max-Age': '86400',
     },
   });
 }
 
-// Handler para GET (documentación)
-export async function GET() {
-  return NextResponse.json({
-    api: 'Quilmes Corrugados Quote API',
-    version: '1.0',
-    documentation: 'https://quilmes-corrugados.vercel.app/api/v1/docs',
-    openapi: 'https://quilmes-corrugados.vercel.app/api/v1/openapi.json',
-    endpoints: {
-      'POST /api/v1/quote': 'Calculate quote for cardboard boxes',
-    },
-    rate_limits: {
-      anonymous: `${RATE_LIMIT_ANONYMOUS} requests/minute`,
-      with_api_key: `${RATE_LIMIT_DEFAULT_WITH_KEY} requests/minute (configurable)`,
-    },
-    authentication: {
-      header: 'X-API-Key',
-      description: 'Contact us for an API key with higher rate limits',
-    },
-    contact: 'info@quilmescorrugados.com.ar',
-  });
+const BASE_URL = 'https://quilmes-corrugados.vercel.app';
+
+/**
+ * GET /api/v1/quote
+ *
+ * Cotiza con query params, además de la documentación.
+ *
+ * Existe por una razón concreta: los asistentes de IA navegan haciendo GET a
+ * una URL, no POST con un cuerpo JSON. Con sólo POST, un usuario que le pide a
+ * ChatGPT "cotizame 3000 cajas de 40x60x60" recibía una estimación inventada
+ * a partir de precios minoristas de terceros, muy por encima del precio real.
+ * Ahora el asistente abre una URL y obtiene el precio de verdad.
+ *
+ *   /api/v1/quote?length_mm=400&width_mm=600&height_mm=600&quantity=3000
+ *   /api/v1/quote?length_cm=40&width_cm=60&height_cm=60&quantity=3000
+ */
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+
+  // Aceptar mm o cm, y alias cortos: un agente puede escribir el nombre que
+  // le parezca razonable y conviene que igual funcione.
+  const num = (...claves: string[]): number | null => {
+    for (const k of claves) {
+      const v = searchParams.get(k);
+      if (v !== null && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v);
+    }
+    return null;
+  };
+
+  const cm = (v: number | null) => (v === null ? null : Math.round(v * 10));
+
+  const largo = num('length_mm', 'largo_mm', 'l') ?? cm(num('length_cm', 'largo_cm', 'largo'));
+  const ancho = num('width_mm', 'ancho_mm', 'w') ?? cm(num('width_cm', 'ancho_cm', 'ancho'));
+  const alto = num('height_mm', 'alto_mm', 'h') ?? cm(num('height_cm', 'alto_cm', 'alto'));
+  const cantidad = num('quantity', 'cantidad', 'qty', 'q');
+  const colores = num('printing_colors', 'colores') ?? 0;
+
+  const pidioCotizacion = largo !== null || ancho !== null || alto !== null || cantidad !== null;
+
+  const headers = {
+    'X-API-Version': '1.0',
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'public, max-age=300',
+  };
+
+  // Sin parámetros: documentación, con el ejemplo de GET bien adelante.
+  if (!pidioCotizacion) {
+    return NextResponse.json({
+      api: 'Quilmes Corrugados Quote API',
+      version: '1.0',
+      description: 'Cotización instantánea de cajas de cartón corrugado a medida. Fábrica en Quilmes, Buenos Aires, Argentina.',
+      quick_start: {
+        method: 'GET',
+        example: `${BASE_URL}/api/v1/quote?length_mm=400&width_mm=600&height_mm=600&quantity=3000`,
+        example_cm: `${BASE_URL}/api/v1/quote?length_cm=40&width_cm=60&height_cm=60&quantity=3000`,
+        note: 'Devuelve el precio real, el mismo que ve un cliente en el sitio. No requiere API key ni registro.',
+      },
+      parameters: {
+        length_mm: 'Largo en mm (100-2000). Alias: largo_cm, l',
+        width_mm: 'Ancho en mm (100-2000). Alias: ancho_cm, w',
+        height_mm: 'Alto en mm (50-1500). Alias: alto_cm, h',
+        quantity: 'Cantidad de cajas (entero ≥ 1). Alias: cantidad, qty',
+        printing_colors: 'Colores de impresión (0-4, opcional). Cada color suma 15%',
+      },
+      batch: {
+        method: 'POST',
+        note: 'Para cotizar hasta 10 medidas distintas en una sola llamada, POST con {"boxes":[...]}',
+      },
+      documentation: `${BASE_URL}/api/v1/docs`,
+      openapi: `${BASE_URL}/api/v1/openapi.json`,
+      llms_txt: `${BASE_URL}/llms.txt`,
+      rate_limits: {
+        anonymous: `${RATE_LIMIT_ANONYMOUS} requests/minute`,
+        with_api_key: `${RATE_LIMIT_DEFAULT_WITH_KEY} requests/minute (configurable)`,
+      },
+      contact: {
+        whatsapp: '+54 9 11 6924-9801',
+        email: 'ventas@quilmescorrugados.com.ar',
+        address: 'Lugones 219, B1878 Quilmes, Buenos Aires, Argentina',
+      },
+    }, { headers });
+  }
+
+  // Rate limit igual que el POST: es el mismo recurso.
+  const rateLimitCheck = checkRateLimit(getRateLimitKey(request), RATE_LIMIT_ANONYMOUS);
+  if (!rateLimitCheck.allowed) {
+    return NextResponse.json(
+      { success: false, error: 'Rate limit exceeded. Please wait before making more requests.' },
+      { status: 429, headers },
+    );
+  }
+
+  const faltantes = [
+    largo === null && 'length_mm', ancho === null && 'width_mm',
+    alto === null && 'height_mm', cantidad === null && 'quantity',
+  ].filter(Boolean);
+
+  if (faltantes.length) {
+    return NextResponse.json({
+      success: false,
+      error: `Faltan parámetros: ${faltantes.join(', ')}`,
+      example: `${BASE_URL}/api/v1/quote?length_mm=400&width_mm=600&height_mm=600&quantity=3000`,
+    }, { status: 400, headers });
+  }
+
+  const box: BoxInput = {
+    length_mm: largo!, width_mm: ancho!, height_mm: alto!,
+    quantity: cantidad!, printing_colors: colores, has_printing: colores > 0,
+  };
+
+  const errors = validarCajas([box]);
+  if (errors.length) {
+    return NextResponse.json({ success: false, error: 'Validation failed', errors }, { status: 400, headers });
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const { data: pricingConfig, error } = await supabase
+      .from('pricing_config')
+      .select('*')
+      .eq('is_active', true)
+      .order('valid_from', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error || !pricingConfig) {
+      return NextResponse.json(
+        { success: false, error: 'Service temporarily unavailable' },
+        { status: 500, headers },
+      );
+    }
+
+    const quote = calcularCotizacion([box], pricingConfig as PricingConfig);
+
+    // Registrar la consulta: saber que asistentes cotizan y por cuanto es
+    // justamente lo que hace medible este canal.
+    const userAgent = request.headers.get('user-agent') || 'unknown';
+    supabase.from('api_requests').insert({
+      endpoint: '/api/v1/quote',
+      method: 'GET',
+      user_agent: userAgent.substring(0, 500),
+      response_status: 200,
+      source_type: getSourceType(userAgent, null),
+      llm_detected: detectLLM(userAgent),
+      total_m2: quote.total_m2,
+      total_amount: quote.subtotal,
+      boxes_count: 1,
+      rate_limit_remaining: rateLimitCheck.remaining,
+    }).then(undefined, (err) => console.error('Error logging GET quote:', err));
+
+    return NextResponse.json({
+      success: true,
+      quote,
+      next_steps: {
+        comprar_online: quote.channel === 'stock' ? `${BASE_URL}/cajas` : null,
+        cotizador_web: `${BASE_URL}/#cotizador`,
+        whatsapp: 'https://wa.me/5491169249801',
+      },
+      rate_limit: {
+        remaining: rateLimitCheck.remaining,
+        reset_at: rateLimitCheck.resetAt.toISOString(),
+      },
+    }, { headers });
+  } catch (err) {
+    console.error('Error in GET /api/v1/quote:', err);
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500, headers });
+  }
 }

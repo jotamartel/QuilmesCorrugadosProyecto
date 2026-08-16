@@ -2,11 +2,11 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Quilmes Corrugados Quote API",
-    "description": "API pública para cotización de cajas de cartón corrugado. Diseñada para integración con LLMs, agentes de IA y sistemas B2B.\n\n## Información del Negocio\n\nQuilmes Corrugados  es una fábrica argentina de cajas de cartón corrugado ubicada en Quilmes, Buenos Aires.\n\n## Restricciones\n\n- Pedido mínimo: 3.000 m²\n- Solo fabricamos para Argentina\n- Precios en ARS (Peso Argentino) sin IVA\n\n## Rate Limiting\n\n- Sin API key: 10 requests/minuto\n- Con API key: 100 requests/minuto",
-    "version": "1.0.0",
+    "description": "API pública para cotización de cajas de cartón corrugado. Diseñada para integración con LLMs, agentes de IA y sistemas B2B.\n\n## Información del Negocio\n\nQuilmes Corrugados es una fábrica argentina de cajas de cartón corrugado ubicada en Lugones 219, Quilmes, Buenos Aires.\n\n## Cómo cotizar\n\nGET con parámetros en la URL para una medida, POST para hasta 10 medidas juntas. Los dos devuelven el mismo precio, que es el que paga un cliente real.\n\n## Dos canales\n\n- Hasta 1.000 m²: medidas estándar de stock, desde 100 cajas, entrega más rápida. Se compra online en /cajas\n- Desde 1.000 m²: producción a medida, con precio por m² que baja según el volumen\n\nLa respuesta incluye el campo `channel` indicando cuál corresponde.\n\n## Restricciones\n\n- Solo fabricamos para Argentina\n- Solo cartón corrugado\n- Medida mínima por caja: 200 x 200 x 100 mm; ancho + alto no puede superar 1200 mm\n- Precios en ARS (Peso Argentino) sin IVA\n\n## Rate Limiting\n\n- Sin API key: 10 requests/minuto\n- Con API key: 100 requests/minuto",
+    "version": "1.1.0",
     "contact": {
-      "name": "Quilmes Corrugados - Soporte API",
-      "email": "info@quilmes-corrugados.vercel.app",
+      "name": "Quilmes Corrugados - Ventas",
+      "email": "ventas@quilmescorrugados.com.ar",
       "url": "https://quilmes-corrugados.vercel.app"
     },
     "license": {
@@ -165,27 +165,54 @@
         }
       },
       "get": {
-        "summary": "Información del endpoint",
-        "description": "Devuelve información sobre la API y enlaces a documentación.",
-        "operationId": "getQuoteInfo",
-        "tags": ["Información"],
+        "summary": "Cotizar una medida (query params)",
+        "description": "Devuelve el precio real de una medida usando parámetros en la URL. Pensado para asistentes de IA, que navegan con GET y no pueden enviar un cuerpo JSON. Sin parámetros devuelve la documentación del endpoint.\n\nEjemplo:\n`/api/v1/quote?length_cm=40&width_cm=60&height_cm=60&quantity=3000`\n\nPara cotizar varias medidas de una vez, usar POST.",
+        "operationId": "getQuote",
+        "tags": ["Cotización"],
+        "security": [{}, { "ApiKeyAuth": [] }],
+        "parameters": [
+          {
+            "name": "length_mm",
+            "in": "query",
+            "description": "Largo en milímetros. Alternativa: length_cm (o largo_cm) en centímetros.",
+            "schema": { "type": "integer", "minimum": 100, "maximum": 2000, "example": 400 }
+          },
+          {
+            "name": "width_mm",
+            "in": "query",
+            "description": "Ancho en milímetros. Alternativa: width_cm (o ancho_cm).",
+            "schema": { "type": "integer", "minimum": 100, "maximum": 2000, "example": 600 }
+          },
+          {
+            "name": "height_mm",
+            "in": "query",
+            "description": "Alto en milímetros. Alternativa: height_cm (o alto_cm).",
+            "schema": { "type": "integer", "minimum": 50, "maximum": 1500, "example": 600 }
+          },
+          {
+            "name": "quantity",
+            "in": "query",
+            "description": "Cantidad de cajas. Alias: cantidad, qty.",
+            "schema": { "type": "integer", "minimum": 1, "example": 3000 }
+          },
+          {
+            "name": "printing_colors",
+            "in": "query",
+            "description": "Colores de impresión. Cada color suma 15% al precio por m².",
+            "schema": { "type": "integer", "minimum": 0, "maximum": 4, "default": 0 }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Información de la API",
+            "description": "Cotización calculada, o la documentación del endpoint si no se pasaron parámetros",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "api": { "type": "string" },
-                    "version": { "type": "string" },
-                    "documentation": { "type": "string", "format": "uri" },
-                    "openapi": { "type": "string", "format": "uri" }
-                  }
-                }
+                "schema": { "$ref": "#/components/schemas/QuoteResponse" }
               }
             }
-          }
+          },
+          "400": { "description": "Faltan parámetros o están fuera de rango" },
+          "429": { "description": "Se superó el límite de consultas por minuto" }
         }
       }
     }

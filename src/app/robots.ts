@@ -19,6 +19,7 @@ const API_PRIVADA = [
   '/api/xubio/',
   '/api/traffic/',
   '/api/contacts/',
+  '/api/marketing/',
 ]
 
 const PRIVADO = [...API_PRIVADA, '/dashboard/', '/admin/', '/_next/', '/static/', '/login', '/auth/']

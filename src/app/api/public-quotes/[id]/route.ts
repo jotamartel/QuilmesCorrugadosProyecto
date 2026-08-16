@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { reportarVentaAMeta } from '@/lib/marketing/conversiones';
 import type { UpdatePublicQuoteRequest } from '@/lib/types/database';
 
 interface RouteParams {
@@ -88,6 +89,29 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         { error: 'Error al actualizar la cotización' },
         { status: 500 }
       );
+    }
+
+    // Venta cerrada: avisarle a Meta con el monto real. Sin esto, el algoritmo
+    // optimiza por formularios completados y no distingue una cotizacion de
+    // $80.000 que no cerro de una de $5 millones que si.
+    //
+    // No bloquea la respuesta ni la hace fallar: si el reporte no sale, la
+    // venta igual quedo registrada y se puede recuperar por el CSV de
+    // /api/marketing/conversiones-google.
+    if (updateData.status === 'converted' && quote) {
+      reportarVentaAMeta({
+        quoteId: quote.id,
+        quoteNumber: quote.quote_number,
+        monto: Number(quote.subtotal) || 0,
+        email: quote.requester_email,
+        telefono: quote.requester_phone,
+        gclid: quote.gclid,
+        fbclid: quote.fbclid,
+        cotizadoEn: quote.created_at,
+        cerradoEn: new Date().toISOString(),
+      })
+        .then((r) => console.log(`[conversiones] cotizacion #${quote.quote_number}: ${r.detalle}`))
+        .catch((err) => console.error('[conversiones] error reportando a Meta:', err));
     }
 
     return NextResponse.json(quote);

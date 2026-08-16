@@ -59,6 +59,8 @@ interface BoxResult {
   price_per_m2: number;
   unit_price: number;
   subtotal: number;
+  /** PDF con las líneas de corte, plegado y las áreas donde va el diseño */
+  template_pdf: string;
 }
 
 interface QuoteResult {
@@ -79,6 +81,16 @@ interface QuoteResult {
    * que recalcular ni parafrasear: si parafrasea, se equivoca.
    */
   summary: string;
+  /** Impresión: si aplica a este pedido y cómo enviar el diseño */
+  printing: {
+    available: boolean;
+    min_m2: number;
+    max_colors: number;
+    price_note: string;
+    /** Plantilla de la primera medida. Cada caja trae la suya en boxes[].template_pdf */
+    template_pdf: string;
+    how_it_works: string;
+  };
 }
 
 interface ApiResponse {
@@ -222,6 +234,17 @@ function getSourceType(userAgent: string, apiKey: string | null): string {
   return 'unknown';
 }
 
+const SITIO = 'https://quilmes-corrugados.vercel.app';
+
+/**
+ * PDF con la caja desplegada: líneas de corte, de plegado y las áreas donde
+ * puede ir el diseño. El cliente lo baja, ubica su arte encima y lo devuelve
+ * listo para producir. Se genera al vuelo, no hace falta pedirlo por mail.
+ */
+function urlPlantilla(largo: number, ancho: number, alto: number): string {
+  return `${SITIO}/api/box-template?length=${largo}&width=${ancho}&height=${alto}`;
+}
+
 /** Valida una lista de cajas. Devuelve los errores encontrados. */
 function validarCajas(boxes: BoxInput[]): string[] {
   const errors: string[] = [];
@@ -292,6 +315,7 @@ function calcularCotizacion(boxes: BoxInput[], config: PricingConfig): QuoteResu
       price_per_m2: adjustedPricePerM2,
       unit_price: Math.round((subtotal / box.quantity) * 100) / 100,
       subtotal,
+      template_pdf: urlPlantilla(box.length_mm, box.width_mm, box.height_mm),
     });
   }
 
@@ -318,8 +342,24 @@ function calcularCotizacion(boxes: BoxInput[], config: PricingConfig): QuoteResu
       : `Producción a medida, ${maxEstimatedDays} días hábiles.`) +
     ` Fábrica en Lugones 219, Quilmes, Buenos Aires. WhatsApp +54 9 11 6924-9801.`;
 
+  // La impresión se produce a medida, así que arranca en el mismo volumen que
+  // el canal a medida. Por debajo se vende de stock, que va sin imprimir.
+  const impresionDisponible = !esDeStock;
+
   return {
     summary,
+    printing: {
+      available: impresionDisponible,
+      min_m2: config.wholesale_min_m2,
+      max_colors: 4,
+      price_note: impresionDisponible
+        ? 'Cada color suma 15% al precio por m². Hasta 4 colores.'
+        : `La impresión se produce a medida, desde ${config.wholesale_min_m2.toLocaleString('es-AR')} m². Este pedido sale de stock, sin imprimir.`,
+      template_pdf: urlPlantilla(b0.length_mm, b0.width_mm, b0.height_mm),
+      how_it_works: impresionDisponible
+        ? 'Descargá el PDF de la plantilla: trae la caja desplegada con las líneas de corte, las de plegado y las áreas donde puede ir el diseño. Ubicá tu arte sobre esas áreas y mandá el archivo a ventas@quilmescorrugados.com.ar o por WhatsApp, y se produce con eso. No hace falta pedir la plantilla: se genera sola con las medidas.'
+        : 'Para imprimir hay que producir a medida. Si el pedido llega al mínimo, la plantilla se descarga de template_pdf.',
+    },
     boxes: boxResults,
     total_m2: totalM2,
     subtotal: totalSubtotal,

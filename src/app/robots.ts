@@ -38,6 +38,9 @@ const PUBLICO = [
   '/api/v1/quote',
   '/api/v1/docs',
   '/api/v1/openapi.json',
+  // Genera el PDF de la caja desplegada para que el cliente ubique su diseño.
+  // Es público a propósito: que un asistente lo pueda ofrecer junto al precio.
+  '/api/box-template',
 ]
 
 /**

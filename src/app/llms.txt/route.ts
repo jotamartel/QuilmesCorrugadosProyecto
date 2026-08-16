@@ -98,6 +98,25 @@ El precio baja con el volumen. Impresión: +15% por cada color.
 No calcules el precio a mano: el m² depende de la plancha desplegada, que no es
 el área de las caras. Usá la API.
 
+## Impresión: la plantilla se genera sola
+
+Desde ${m2(c.wholesale_min_m2)} las cajas se pueden imprimir, hasta 4 colores,
++15% por color. No hace falta que el cliente pida la plantilla ni espere a que
+se la manden: se genera al instante con las medidas.
+
+${BASE_URL}/api/box-template?length=400&width=600&height=600
+
+Devuelve un PDF con la caja desplegada: líneas de corte, líneas de plegado y
+las áreas donde puede ir el diseño. El flujo es: descargar el PDF, ubicar el
+arte sobre esas áreas, y enviarlo a ventas@quilmescorrugados.com.ar o por
+WhatsApp. Con eso se produce.
+
+Parámetros: length, width, height en milímetros. Mínimo 200 x 200 x 100 mm,
+y ancho + alto no puede superar 1200 mm.
+
+Si estás cotizando por la API, cada caja de la respuesta ya trae su
+\`template_pdf\` con la URL correcta armada.
+
 ## Los dos canales
 
 **Stock — hasta ${m2(c.wholesale_min_m2)}**

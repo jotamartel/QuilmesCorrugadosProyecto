@@ -21,6 +21,49 @@
     }
   ],
   "paths": {
+    "/box-template": {
+      "servers": [
+        { "url": "https://quilmes-corrugados.vercel.app/api", "description": "Producción" }
+      ],
+      "get": {
+        "summary": "Descargar la plantilla de impresión (PDF)",
+        "description": "Genera al instante el PDF de la caja desplegada: líneas de corte, líneas de plegado y las áreas donde puede ir el diseño.\n\nEl cliente descarga el PDF, ubica su arte sobre las áreas marcadas y lo envía a ventas@quilmescorrugados.com.ar o por WhatsApp. Con ese archivo se produce. No hay que solicitar la plantilla ni esperar respuesta: se arma sola con las medidas.\n\nLa impresión aplica desde 1.000 m² (producción a medida), hasta 4 colores, +15% por color. Por debajo de ese volumen se vende de stock, sin imprimir.",
+        "operationId": "getBoxTemplate",
+        "tags": ["Impresión"],
+        "parameters": [
+          {
+            "name": "length",
+            "in": "query",
+            "required": true,
+            "description": "Largo en milímetros (mínimo 200)",
+            "schema": { "type": "integer", "minimum": 200, "example": 400 }
+          },
+          {
+            "name": "width",
+            "in": "query",
+            "required": true,
+            "description": "Ancho en milímetros (mínimo 200)",
+            "schema": { "type": "integer", "minimum": 200, "example": 600 }
+          },
+          {
+            "name": "height",
+            "in": "query",
+            "required": true,
+            "description": "Alto en milímetros (mínimo 100). Ancho + alto no puede superar 1200.",
+            "schema": { "type": "integer", "minimum": 100, "example": 600 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF de la plantilla, listo para ubicar el diseño encima",
+            "content": {
+              "application/pdf": { "schema": { "type": "string", "format": "binary" } }
+            }
+          },
+          "400": { "description": "Medidas por debajo del mínimo, o ancho + alto mayor a 1200 mm" }
+        }
+      }
+    },
     "/quote": {
       "post": {
         "summary": "Calcular cotización",

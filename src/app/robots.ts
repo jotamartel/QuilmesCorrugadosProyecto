@@ -30,6 +30,7 @@ const PUBLICO = [
   '/nosotros',
   '/contacto',
   '/faq',
+  '/precios',
   '/cajas',
   '/cajas-ecommerce',
   '/cajas-alimentos',

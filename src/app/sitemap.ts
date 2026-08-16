@@ -27,6 +27,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
     },
     {
+      // La unica pagina que publica precios en el HTML. Es la que puede citar
+      // un asistente de IA sin tener que llamar a la API.
+      url: `${BASE_URL}/precios`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+    {
       url: `${BASE_URL}/cajas-ecommerce`,
       lastModified: now,
       changeFrequency: 'monthly',

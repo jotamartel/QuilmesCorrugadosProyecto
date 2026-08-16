@@ -192,6 +192,7 @@ producción.
 
 ## Links
 
+- Precios publicados (misma tabla que arriba, en HTML): ${BASE_URL}/precios
 - Comprar de stock online: ${BASE_URL}/cajas
 - Cotizador a medida: ${BASE_URL}/#cotizador
 - API (GET o POST): ${BASE_URL}/api/v1/quote

@@ -129,8 +129,15 @@ const jsonLdBusiness = {
     "@type": "OfferCatalog",
     name: "Cajas de Cartón Corrugado",
     itemListElement: [
+      // Las ofertas apuntan a /precios, que es la unica pagina que publica los
+      // valores en el HTML y los toma de la configuracion vigente. El layout no
+      // los repite: si los escribiera aca, quedarian congelados y contradiciendo
+      // a la pagina de precios en cuanto alguien cambie un valor.
       {
         "@type": "Offer",
+        url: `${BASE_URL}/precios`,
+        priceCurrency: "ARS",
+        availability: "https://schema.org/InStock",
         itemOffered: {
           "@type": "Product",
           name: "Cajas de cartón corrugado estándar",
@@ -139,6 +146,9 @@ const jsonLdBusiness = {
       },
       {
         "@type": "Offer",
+        url: `${BASE_URL}/precios`,
+        priceCurrency: "ARS",
+        availability: "https://schema.org/InStock",
         itemOffered: {
           "@type": "Product",
           name: "Cajas de cartón corrugado con impresión",
@@ -151,7 +161,7 @@ const jsonLdBusiness = {
     "@type": "QuoteAction",
     target: {
       "@type": "EntryPoint",
-      urlTemplate: `${BASE_URL}/cotizar`,
+      urlTemplate: `${BASE_URL}/#cotizador`,
       actionPlatform: [
         "http://schema.org/DesktopWebPlatform",
         "http://schema.org/MobileWebPlatform",

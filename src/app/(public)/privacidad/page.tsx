@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SITE_URL } from '@/lib/site';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 
@@ -8,7 +9,10 @@ export const metadata: Metadata = {
   title: 'Política de Privacidad',
   description: 'Política de privacidad de Quilmes Corrugados. Cómo protegemos y utilizamos la información personal de nuestros clientes.',
   alternates: {
-    canonical: 'https://quilmescorrugados.com.ar/privacidad',
+    // Era el unico canonical que habia quedado escrito a mano, apuntando al
+    // apex, que redirige. Un canonical hacia una URL que no responde 200 es
+    // peor que no tenerlo.
+    canonical: `${SITE_URL}/privacidad`,
   },
 };
 

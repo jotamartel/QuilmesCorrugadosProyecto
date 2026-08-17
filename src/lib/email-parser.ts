@@ -3,6 +3,8 @@
  * Quilmes Corrugados
  */
 
+import { SITE_URL } from '@/lib/site';
+
 export interface ParsedEmailData {
   dimensions?: { length: number; width: number; height: number };
   quantity?: number;
@@ -177,7 +179,7 @@ Equipo Quilmes Corrugados
 ---
 Quilmes Corrugados
 Fabrica de cajas de carton corrugado
-https://quilmescorrugados.com.ar`,
+${SITE_URL}`,
     };
   }
 
@@ -197,7 +199,7 @@ Para poder cotizarte necesitamos los siguientes datos:
 Ejemplo: "Necesito 500 cajas de 400x300x300mm sin impresion"
 
 Tambien podes usar nuestro cotizador online:
-https://quilmescorrugados.com.ar
+${SITE_URL}
 
 O contactarnos directamente:
 - WhatsApp: +54 9 11 6924-9801
@@ -209,7 +211,7 @@ Equipo Quilmes Corrugados
 ---
 Quilmes Corrugados
 Fabrica de cajas de carton corrugado
-https://quilmescorrugados.com.ar`,
+${SITE_URL}`,
   };
 }
 

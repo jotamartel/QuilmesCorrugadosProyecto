@@ -729,6 +729,7 @@ const BASE_URL = SITE_URL;
  *   /api/v1/quote?length_cm=40&width_cm=60&height_cm=60&quantity=3000
  */
 export async function GET(request: NextRequest) {
+  const inicio = Date.now();
   const { searchParams } = new URL(request.url);
 
   // Aceptar mm o cm, y alias cortos: un agente puede escribir el nombre que
@@ -869,6 +870,21 @@ export async function GET(request: NextRequest) {
       total_amount: quote.subtotal,
       boxes_count: 1,
       rate_limit_remaining: rateLimitCheck.remaining,
+      // Estos tres faltaban y el POST si los guardaba. Como las consultas de
+      // asistentes entran todas por GET, el panel mostraba la columna Tiempo
+      // vacia justo en el trafico que mas interesa medir.
+      response_time_ms: Date.now() - inicio,
+      ip_address: request.headers.get('x-forwarded-for')?.split(',')[0].trim() || null,
+      // Que medida y que cantidad pidieron. Es la pregunta de mercado que este
+      // canal contesta gratis: que esta buscando la gente que llega por un
+      // asistente, sin que nadie tenga que completar un formulario.
+      request_body: {
+        length_mm: box.length_mm,
+        width_mm: box.width_mm,
+        height_mm: box.height_mm,
+        quantity: box.quantity,
+        printing_colors: box.printing_colors,
+      },
     }).then(undefined, (err) => console.error('Error logging GET quote:', err));
 
     return NextResponse.json({

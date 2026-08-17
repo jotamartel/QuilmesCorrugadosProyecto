@@ -15,6 +15,9 @@ export interface RetailConfig {
   // Límites de cantidad
   MIN_CANTIDAD: number;
 
+  // Impresión
+  MAX_PRINTING_COLORS: number;
+
   // Restricción de producción
   MAX_SHEET_WIDTH: number;
 
@@ -60,6 +63,16 @@ export const RETAIL_CONFIG: RetailConfig = {
 
   // Límites de cantidad
   MIN_CANTIDAD: 100,              // El canal minorista vende desde 100 cajas
+
+  // Colores de impresión flexográfica.
+  //
+  // Estaba escrito en 17 lugares y no coincidian: 13 paginas decian 3 y la
+  // API validaba hasta 4, con max_colors: 4. Como el llms.txt toma ese valor
+  // de la API, a un asistente de IA le estabamos diciendo que imprimimos a 4
+  // colores y cotizandole un recargo del 60% por algo que la fabrica no hace.
+  // Es el peor tipo de error en este canal: sale de nuestra propia fuente y el
+  // asistente lo repite como dato verificado.
+  MAX_PRINTING_COLORS: 3,
 
   // Restricción de producción (del negocio)
   // Ancho de plancha = Alto + Ancho (no puede superar 1200mm por los rollos)

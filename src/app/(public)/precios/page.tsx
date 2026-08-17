@@ -4,6 +4,7 @@ import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { getActivePricingConfig } from '@/lib/utils/pricing';
 import { SITE_URL } from '@/lib/site';
+import { RETAIL_CONFIG } from '@/lib/retail/config';
 
 /**
  * Página pública de precios.
@@ -92,7 +93,7 @@ export default async function PreciosPage() {
         '@id': `${SITE_URL}/precios#producto`,
         name: 'Cajas de cartón corrugado a medida',
         description:
-          'Cajas de cartón corrugado fabricadas a medida en Quilmes, Buenos Aires. Onda C, con o sin impresión flexográfica de hasta 4 colores.',
+          `Cajas de cartón corrugado fabricadas a medida en Quilmes, Buenos Aires. Onda C, con o sin impresión flexográfica de hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores.`,
         brand: { '@type': 'Brand', name: 'Quilmes Corrugados' },
         category: 'Packaging y embalaje',
         offers: {
@@ -212,7 +213,7 @@ export default async function PreciosPage() {
             </table>
           </div>
           <p className="mt-3 text-sm text-gray-500">
-            Impresión flexográfica: +15% por cada color, hasta 4 colores. Precios en pesos
+            Impresión flexográfica: +15% por cada color, hasta {RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. Precios en pesos
             argentinos, sin IVA.
           </p>
         </div>

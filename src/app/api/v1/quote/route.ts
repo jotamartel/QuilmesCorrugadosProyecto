@@ -268,8 +268,8 @@ function validarCajas(boxes: BoxInput[]): string[] {
     if (!box.quantity || box.quantity < 1 || !Number.isInteger(box.quantity)) {
       errors.push(`${prefix}.quantity must be a positive integer`);
     }
-    if (box.printing_colors !== undefined && (box.printing_colors < 0 || box.printing_colors > 4)) {
-      errors.push(`${prefix}.printing_colors must be between 0 and 4`);
+    if (box.printing_colors !== undefined && (box.printing_colors < 0 || box.printing_colors > RETAIL_CONFIG.MAX_PRINTING_COLORS)) {
+      errors.push(`${prefix}.printing_colors must be between 0 and ${RETAIL_CONFIG.MAX_PRINTING_COLORS}`);
     }
   });
   return errors;
@@ -415,9 +415,9 @@ function calcularCotizacion(
     printing: {
       available: impresionDisponible,
       min_m2: config.wholesale_min_m2,
-      max_colors: 4,
+      max_colors: RETAIL_CONFIG.MAX_PRINTING_COLORS,
       price_note: impresionDisponible
-        ? 'Cada color suma 15% al precio por m². Hasta 4 colores.'
+        ? `Cada color suma 15% al precio por m². Hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores.`
         : `La impresión se produce a medida, desde ${config.wholesale_min_m2.toLocaleString('es-AR')} m². Este pedido sale de stock, sin imprimir.`,
       template_pdf: urlPlantilla(b0.length_mm, b0.width_mm, b0.height_mm),
       how_it_works: impresionDisponible
@@ -836,7 +836,7 @@ export async function GET(request: NextRequest) {
         width_mm: 'Ancho en mm (100-2000). Alias: ancho_cm, w',
         height_mm: 'Alto en mm (50-1500). Alias: alto_cm, h',
         quantity: 'Cantidad de cajas (entero ≥ 1). Alias: cantidad, qty',
-        printing_colors: 'Colores de impresión (0-4, opcional). Cada color suma 15%',
+        printing_colors: `Colores de impresión (0-${RETAIL_CONFIG.MAX_PRINTING_COLORS}, opcional). Cada color suma 15%`,
       },
       batch: {
         method: 'POST',

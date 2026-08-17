@@ -15,6 +15,7 @@ import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
 import type { PricingConfig } from '@/lib/types/database';
 
 import { SITE_URL } from '@/lib/site';
+import { RETAIL_CONFIG } from '@/lib/retail/config';
 
 const BASE_URL = SITE_URL;
 
@@ -122,7 +123,7 @@ el área de las caras. Usá la API.
 
 ## Impresión: la plantilla se genera sola
 
-Desde ${m2(c.wholesale_min_m2)} las cajas se pueden imprimir, hasta 4 colores,
+Desde ${m2(c.wholesale_min_m2)} las cajas se pueden imprimir, hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores,
 +15% por color. No hace falta que el cliente pida la plantilla ni espere a que
 se la manden: se genera al instante con las medidas.
 

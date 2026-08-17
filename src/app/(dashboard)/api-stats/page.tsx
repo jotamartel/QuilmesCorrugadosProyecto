@@ -57,7 +57,51 @@ interface ApiStats {
     boxes_count: number;
     rate_limited: boolean;
   }>;
+  demanda_sin_respuesta: Array<{
+    motivo: string;
+    veces: number;
+    desde_asistentes: number;
+    ejemplos: Array<{
+      cuando: string;
+      medida: string | null;
+      cantidad: number | null;
+      detalle: string;
+    }>;
+  }>;
 }
+
+/** Cómo se lee cada motivo, y qué conviene hacer con él. */
+const MOTIVOS: Record<string, { titulo: string; queHacer: string }> = {
+  medida_rechazada: {
+    titulo: 'Pidieron una medida que no fabricamos',
+    queHacer:
+      'El caso más valioso: hay demanda concreta fuera de lo que ofrecemos. Vale una página que explique el límite y proponga la alternativa más cercana.',
+  },
+  cotizado_bajo_minimo: {
+    titulo: 'Cotizó bien pero no llega al mínimo',
+    queHacer:
+      'El precio salió correcto y aun así no se puede vender. Si se repite mucho, es la señal para revisar el mínimo o empujar más fuerte el canal de stock.',
+  },
+  faltan_parametros: {
+    titulo: 'No supieron armar la consulta',
+    queHacer:
+      'Un asistente encontró la API y no pudo usarla. Si un mismo parámetro se repite, la documentación no es clara en ese punto.',
+  },
+  sin_parametros_devolvio_documentacion: {
+    titulo: 'Encontraron la API y no cotizaron',
+    queHacer:
+      'Llegaron hasta la puerta y se fueron. Comparado con las que sí cotizan, mide qué tan fácil es dar el paso siguiente.',
+  },
+  limite_de_velocidad: {
+    titulo: 'Frenados por el límite de requests',
+    queHacer:
+      'Demanda perdida en la puerta. Si aparece seguido, conviene subir el límite anónimo o entregar una API key.',
+  },
+  sin_configuracion_de_precios: {
+    titulo: 'Falla nuestra: no se pudo leer la configuración',
+    queHacer: 'No es demanda insatisfecha, es un error del sistema. Cualquier aparición merece revisarse.',
+  },
+};
 
 const periodOptions = [
   { value: '7', label: 'Últimos 7 días' },
@@ -435,6 +479,76 @@ export default function ApiStatsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Demanda sin respuesta: las consultas que no se pudieron contestar,
+          que es de donde salen las preguntas frecuentes que faltan escribir. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Demanda sin respuesta</CardTitle>
+          <p className="mt-1 text-sm text-gray-500">
+            Consultas que el negocio no pudo contestar. Cada grupo es una pregunta que hoy
+            no tiene respuesta publicada.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {(stats.demanda_sin_respuesta ?? []).length === 0 ? (
+            <div className="py-6 text-center text-gray-500">
+              Todas las consultas del período se pudieron contestar.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {stats.demanda_sin_respuesta.map((g) => {
+                const info = MOTIVOS[g.motivo];
+                return (
+                  <div key={g.motivo} className="rounded-lg border border-gray-200 p-4">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <h3 className="font-semibold text-gray-900">
+                        {info?.titulo ?? g.motivo}
+                      </h3>
+                      <span className="text-sm tabular-nums text-gray-600">
+                        {g.veces} {g.veces === 1 ? 'vez' : 'veces'}
+                        {g.desde_asistentes > 0 && (
+                          <span className="ml-2 rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            {g.desde_asistentes} de asistentes de IA
+                          </span>
+                        )}
+                      </span>
+                    </div>
+
+                    {info && (
+                      <p className="mt-1 text-sm text-gray-600">{info.queHacer}</p>
+                    )}
+
+                    {g.ejemplos.some((e) => e.medida || e.detalle) && (
+                      <ul className="mt-3 space-y-1 border-t border-gray-100 pt-3 text-sm text-gray-700">
+                        {g.ejemplos.map((e, i) => (
+                          <li key={i} className="flex flex-wrap gap-x-3">
+                            <span className="tabular-nums text-gray-400">
+                              {new Date(e.cuando).toLocaleDateString('es-AR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                              })}
+                            </span>
+                            {e.medida && <span className="font-medium">{e.medida}</span>}
+                            {e.cantidad != null && (
+                              <span className="tabular-nums">
+                                {e.cantidad.toLocaleString('es-AR')} u.
+                              </span>
+                            )}
+                            {e.detalle && (
+                              <span className="text-gray-500">{e.detalle}</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Últimas requests */}
       <Card>

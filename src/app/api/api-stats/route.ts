@@ -91,6 +91,72 @@ export async function GET(request: NextRequest) {
       rate_limited: r.rate_limited,
     }));
 
+    /**
+     * DEMANDA SIN RESPUESTA
+     *
+     * Las consultas que el negocio no pudo contestar, agrupadas por motivo.
+     *
+     * Es lo mismo que hace una tienda cuando mira las busquedas internas que
+     * no devolvieron resultados: cada una es alguien que queria algo y se fue
+     * con las manos vacias. Acá la fuente es mejor que una caja de busqueda,
+     * porque la consulta viene estructurada: sabemos la medida exacta y la
+     * cantidad que pidieron.
+     *
+     * Cuentan como sin respuesta:
+     *  - las que fallaron (400/429/500)
+     *  - las que cotizaron bien pero no llegan al minimo, o sea que el precio
+     *    salio correcto y aun asi no se puede vender
+     *  - las que encontraron la API y se fueron sin cotizar
+     *
+     * Cada grupo trae ejemplos concretos para poder escribir una respuesta:
+     * si veinte piden cajas mas anchas que la bobina, falta una pagina que
+     * explique el limite y ofrezca la alternativa.
+     */
+    const SIN_RESPUESTA = new Set([
+      'faltan_parametros', 'medida_rechazada', 'limite_de_velocidad',
+      'sin_configuracion_de_precios', 'cotizado_bajo_minimo',
+      'sin_parametros_devolvio_documentacion',
+    ]);
+
+    const grupos: Record<string, {
+      motivo: string;
+      veces: number;
+      desde_asistentes: number;
+      ejemplos: Array<{ cuando: string; medida: string | null; cantidad: number | null; detalle: string }>;
+    }> = {};
+
+    for (const r of allRequests) {
+      const cuerpo = (r.request_body || {}) as Record<string, unknown>;
+      const motivoCompleto = typeof cuerpo.motivo === 'string' ? cuerpo.motivo : null;
+      if (!motivoCompleto) continue;
+
+      // "medida_rechazada:length_mm must be..." se agrupa por la parte de
+      // antes de los dos puntos; el detalle va en los ejemplos.
+      const familia = motivoCompleto.split(':')[0];
+      if (!SIN_RESPUESTA.has(familia)) continue;
+
+      if (!grupos[familia]) {
+        grupos[familia] = { motivo: familia, veces: 0, desde_asistentes: 0, ejemplos: [] };
+      }
+      const g = grupos[familia];
+      g.veces++;
+      if (r.source_type === 'llm') g.desde_asistentes++;
+
+      if (g.ejemplos.length < 5) {
+        const l = cuerpo.length_mm as number | null;
+        const w = cuerpo.width_mm as number | null;
+        const h = cuerpo.height_mm as number | null;
+        g.ejemplos.push({
+          cuando: r.created_at,
+          medida: l && w && h ? `${l}x${w}x${h} mm` : null,
+          cantidad: (cuerpo.quantity as number | null) ?? null,
+          detalle: motivoCompleto.includes(':') ? motivoCompleto.slice(motivoCompleto.indexOf(':') + 1) : '',
+        });
+      }
+    }
+
+    const demandaSinRespuesta = Object.values(grupos).sort((a, b) => b.veces - a.veces);
+
     return NextResponse.json({
       period: {
         days,
@@ -102,6 +168,7 @@ export async function GET(request: NextRequest) {
       by_llm: byLLM,
       daily_stats: dailyStats,
       recent_requests: recentRequests,
+      demanda_sin_respuesta: demandaSinRespuesta,
     });
 
   } catch (error) {

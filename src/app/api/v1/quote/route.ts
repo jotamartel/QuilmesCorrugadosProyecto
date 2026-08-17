@@ -758,8 +758,69 @@ export async function GET(request: NextRequest) {
     'Cache-Control': 'public, max-age=300',
   };
 
+  /**
+   * Registra TODAS las salidas, no solo la exitosa.
+   *
+   * Antes solo se guardaba la cotización que salía bien. Las cinco salidas de
+   * error no dejaban rastro, y esas son justamente las mas informativas: una
+   * medida que no podemos fabricar, una cantidad por debajo del minimo, un
+   * parametro que el asistente no supo armar. Cada una es una pregunta que el
+   * negocio no supo contestar, y no quedaba ninguna.
+   *
+   * El `motivo` es lo que convierte una lista de errores en material para
+   * escribir. Agrupando por motivo se ve el patron: si veinte consultas piden
+   * cajas mas grandes que el ancho de bobina, eso no es un bug, es demanda de
+   * un producto que hoy no ofrecemos, o una pagina que falta explicando el
+   * limite.
+   *
+   * Nunca tira: es telemetria y no puede hacer fallar una cotizacion.
+   */
+  const userAgent = request.headers.get('user-agent') || 'unknown';
+  const registrar = (
+    status: number,
+    motivo: string,
+    datos?: { total_m2?: number; total_amount?: number; rateLimitRemaining?: number },
+  ) => {
+    try {
+      createAdminClient()
+        .from('api_requests')
+        .insert({
+          endpoint: '/api/v1/quote',
+          method: 'GET',
+          user_agent: userAgent.substring(0, 500),
+          response_status: status,
+          source_type: getSourceType(userAgent, null),
+          llm_detected: detectLLM(userAgent),
+          total_m2: datos?.total_m2 ?? null,
+          total_amount: datos?.total_amount ?? null,
+          boxes_count: 1,
+          rate_limit_remaining: datos?.rateLimitRemaining ?? null,
+          response_time_ms: Date.now() - inicio,
+          ip_address: request.headers.get('x-forwarded-for')?.split(',')[0].trim() || null,
+          // El motivo viaja junto a lo que se pidio, para poder leer la
+          // consulta completa: "querian esta caja y no se pudo por esto".
+          request_body: {
+            motivo,
+            length_mm: largo,
+            width_mm: ancho,
+            height_mm: alto,
+            quantity: cantidad,
+            printing_colors: colores,
+            query: searchParams.toString().slice(0, 300),
+          },
+        })
+        .then(undefined, (err) => console.error('[quote GET] no se pudo registrar:', err));
+    } catch (err) {
+      console.error('[quote GET] no se pudo registrar:', err);
+    }
+  };
+
   // Sin parámetros: documentación, con el ejemplo de GET bien adelante.
   if (!pidioCotizacion) {
+    // Tambien se registra: es un asistente que encontro la API y todavia no
+    // cotizo. Saber cuantos llegan hasta aca y no siguen es un escalon del
+    // embudo que antes era invisible.
+    registrar(200, 'sin_parametros_devolvio_documentacion');
     return NextResponse.json({
       api: 'Quilmes Corrugados Quote API',
       version: '1.0',
@@ -799,6 +860,8 @@ export async function GET(request: NextRequest) {
   // Rate limit igual que el POST: es el mismo recurso.
   const rateLimitCheck = checkRateLimit(getRateLimitKey(request), RATE_LIMIT_ANONYMOUS);
   if (!rateLimitCheck.allowed) {
+    // Un asistente frenado por el limite es demanda que se pierde en la puerta.
+    registrar(429, 'limite_de_velocidad');
     return NextResponse.json(
       { success: false, error: 'Rate limit exceeded. Please wait before making more requests.' },
       { status: 429, headers },
@@ -811,6 +874,8 @@ export async function GET(request: NextRequest) {
   ].filter(Boolean);
 
   if (faltantes.length) {
+    // Que parametro no supo armar dice si la documentacion es clara.
+    registrar(400, `faltan_parametros:${faltantes.join('+')}`);
     return NextResponse.json({
       success: false,
       error: `Faltan parámetros: ${faltantes.join(', ')}`,
@@ -825,6 +890,9 @@ export async function GET(request: NextRequest) {
 
   const errors = validarCajas([box]);
   if (errors.length) {
+    // El caso mas valioso del registro: pidieron una caja concreta y no la
+    // podemos hacer. Ahi esta la demanda que hoy se va sin respuesta.
+    registrar(400, `medida_rechazada:${errors[0].slice(0, 90)}`);
     return NextResponse.json({ success: false, error: 'Validation failed', errors }, { status: 400, headers });
   }
 
@@ -839,6 +907,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (error || !pricingConfig) {
+      registrar(500, 'sin_configuracion_de_precios');
       return NextResponse.json(
         { success: false, error: 'Service temporarily unavailable' },
         { status: 500, headers },
@@ -856,36 +925,18 @@ export async function GET(request: NextRequest) {
 
     const quote = calcularCotizacion([box], pricingConfig as PricingConfig, catalogo || []);
 
-    // Registrar la consulta: saber que asistentes cotizan y por cuanto es
-    // justamente lo que hace medible este canal.
-    const userAgent = request.headers.get('user-agent') || 'unknown';
-    supabase.from('api_requests').insert({
-      endpoint: '/api/v1/quote',
-      method: 'GET',
-      user_agent: userAgent.substring(0, 500),
-      response_status: 200,
-      source_type: getSourceType(userAgent, null),
-      llm_detected: detectLLM(userAgent),
+    // Misma funcion que las salidas de error, para que todas las consultas
+    // queden con el mismo formato y se puedan comparar entre si.
+    //
+    // El motivo distingue el caso mas interesante del embudo: una cotizacion
+    // que sale bien pero NO llega al minimo. El asistente recibe un precio
+    // correcto y aun asi el negocio no puede vender eso, asi que cuenta como
+    // demanda no atendida aunque el status sea 200.
+    registrar(200, quote.meets_minimum ? 'cotizado' : 'cotizado_bajo_minimo', {
       total_m2: quote.total_m2,
       total_amount: quote.subtotal,
-      boxes_count: 1,
-      rate_limit_remaining: rateLimitCheck.remaining,
-      // Estos tres faltaban y el POST si los guardaba. Como las consultas de
-      // asistentes entran todas por GET, el panel mostraba la columna Tiempo
-      // vacia justo en el trafico que mas interesa medir.
-      response_time_ms: Date.now() - inicio,
-      ip_address: request.headers.get('x-forwarded-for')?.split(',')[0].trim() || null,
-      // Que medida y que cantidad pidieron. Es la pregunta de mercado que este
-      // canal contesta gratis: que esta buscando la gente que llega por un
-      // asistente, sin que nadie tenga que completar un formulario.
-      request_body: {
-        length_mm: box.length_mm,
-        width_mm: box.width_mm,
-        height_mm: box.height_mm,
-        quantity: box.quantity,
-        printing_colors: box.printing_colors,
-      },
-    }).then(undefined, (err) => console.error('Error logging GET quote:', err));
+      rateLimitRemaining: rateLimitCheck.remaining,
+    });
 
     return NextResponse.json({
       success: true,

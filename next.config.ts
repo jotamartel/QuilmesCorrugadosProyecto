@@ -32,9 +32,10 @@ const DOMINIO_VERCEL = "quilmes-corrugados.vercel.app";
  * www sea 308 y no 307. Desde el codigo no se puede: ese salto lo aplica Vercel
  * antes de que corra Next, y poner aca la regla inversa haria un bucle.
  */
-const FALLBACK = "https://www.quilmescorrugados.com.ar";
-const crudo = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
-const DOMINIO_PROPIO = crudo && /^https?:\/\/[^\s]+$/.test(crudo) ? crudo : FALLBACK;
+// Igual que en lib/site.ts: no se lee de una variable de entorno. Cuando se
+// leia, el valor cargado en el panel mandaba este redirect al apex, que a su
+// vez redirige, y cada visita desde el dominio de Vercel pagaba dos saltos.
+const DOMINIO_PROPIO = "https://www.quilmescorrugados.com.ar";
 
 const soloDesdeVercel = [{ type: "host" as const, value: DOMINIO_VERCEL }];
 

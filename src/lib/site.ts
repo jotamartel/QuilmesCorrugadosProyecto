@@ -50,24 +50,38 @@ function normalizar(valor: string | undefined): string | null {
   return limpio;
 }
 
-const DESDE_ENTORNO = normalizar(process.env.NEXT_PUBLIC_SITE_URL);
+/**
+ * El dominio canonico NO se puede sobreescribir por variable de entorno.
+ *
+ * Lo era, y costo caro. La variable quedo cargada con el apex, piso al codigo,
+ * y el llms.txt salio publicando URLs del apex. El apex responde 308, asi que
+ * un asistente que pide una cotizacion recibe el texto "Redirecting..." en vez
+ * del JSON. ChatGPT lo reporto tal cual: "su API no esta devolviendo el
+ * resultado desde aca". Tenia razon.
+ *
+ * O sea que un valor mal puesto en un panel no rompia un detalle de
+ * posicionamiento: apagaba el cotizador para IA, que es el diferencial del
+ * negocio. Un dato asi tiene que estar versionado, revisable en un diff y no
+ * poder cambiarse sin que quede registro.
+ *
+ * Si algun dia hay que mover el dominio, se cambia esta constante.
+ */
+export const SITE_URL = FALLBACK;
 
-// Avisar cuando la variable esta pisando al codigo con otro valor.
-//
-// Sin esto, la divergencia es muda: se cambia el dominio en el repo, se
-// deploya, y el sitio sigue publicando el anterior porque la variable sigue
-// cargada en el panel. Pasó exactamente eso, y para descubrirlo hubo que
-// comparar el ID del deployment que servia produccion contra el canonical.
-// Un warning en el build lo habria dicho en dos segundos.
-if (DESDE_ENTORNO && DESDE_ENTORNO !== FALLBACK) {
-  console.warn(
-    `[site] NEXT_PUBLIC_SITE_URL (${DESDE_ENTORNO}) esta pisando el dominio ` +
-      `del codigo (${FALLBACK}). Si no es intencional, borra la variable en Vercel ` +
-      `y volve a deployar: el canonical, el sitemap y el llms.txt salen de aca.`,
-  );
-}
-
-export const SITE_URL = DESDE_ENTORNO || FALLBACK;
+/**
+ * Origen para los redirects de OAuth. Este SI respeta la variable.
+ *
+ * Parece el mismo dato que SITE_URL, pero no lo es, y mezclarlos es peligroso:
+ * este valor tiene que coincidir EXACTAMENTE con la lista de Redirect URLs de
+ * Supabase. Si el canonico se mueve y este lo sigue solo, el login con Google
+ * deja de funcionar de golpe, sin que nada mas del sitio se vea afectado.
+ *
+ * Por eso queda atado a la variable: mientras NEXT_PUBLIC_SITE_URL siga
+ * cargada con el apex, el login sigue yendo al apex, que es lo que Supabase
+ * tiene aprobado hoy. Cuando se agregue el callback de www alla, se borra la
+ * variable y este valor pasa a seguir al canonico sin ningun otro cambio.
+ */
+export const AUTH_ORIGIN = normalizar(process.env.NEXT_PUBLIC_SITE_URL) || SITE_URL;
 
 /** Arma una URL absoluta sobre el dominio canónico. */
 export const siteUrl = (path = '') =>

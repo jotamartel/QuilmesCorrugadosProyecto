@@ -3,7 +3,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { SITE_URL } from '@/lib/site';
+import { AUTH_ORIGIN } from '@/lib/site';
 
 // Cliente de Supabase con lock deshabilitado para evitar AbortError
 export function createAuthClient() {
@@ -59,8 +59,7 @@ function esLocal(): boolean {
  * URL base para los redirects de OAuth.
  *
  * En desarrollo usa el origin actual, para que el login funcione contra
- * localhost. En cualquier otro lado usa SITE_URL, que es la MISMA constante
- * que arma los canonical, el sitemap y el llms.txt.
+ * localhost. En cualquier otro lado usa AUTH_ORIGIN.
  *
  * Antes leia NEXT_PUBLIC_SITE_URL por su cuenta y, si no estaba, caia a un
  * apex escrito a mano. Eran dos fuentes de verdad para el mismo dato, con el
@@ -75,7 +74,7 @@ function esLocal(): boolean {
  */
 function getBaseUrl(): string {
   if (esLocal()) return window.location.origin.trim();
-  return SITE_URL;
+  return AUTH_ORIGIN;
 }
 
 /**

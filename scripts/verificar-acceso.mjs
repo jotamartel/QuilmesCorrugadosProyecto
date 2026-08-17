@@ -60,7 +60,17 @@ const CERRADAS = [
   ['POST', '/api/arba/generate-cot', 'integracion impositiva'],
 ];
 
-/** Páginas del dashboard: sin sesión tienen que mandar al login. */
+/**
+ * Páginas del dashboard.
+ *
+ * La compuerta NO las cubre a propósito: eso puso el riesgo de quedarse afuera
+ * del panel en la misma pieza que protege los datos, y son riesgos de tamaño
+ * muy distinto. Las protege AuthGuard del lado cliente, y sin sesión son un
+ * cascarón porque cada fetch que hacen contra esta API vuelve 401.
+ *
+ * Se verifican igual, pero al revés: tienen que RESPONDER, no bloquear. Si un
+ * día devuelven 401 o 403, alguien volvió a ponerlas detrás de la compuerta.
+ */
 const PAGINAS = ['/inicio', '/clientes', '/ventas-retail', '/reportes', '/configuracion'];
 
 /** Páginas públicas: no se pueden haber cerrado por accidente. */
@@ -109,12 +119,17 @@ for (const [metodo, ruta, nota] of CERRADAS) {
   console.log(`  ${bien ? 'ok  ' : 'MAL '} ${pad(`${metodo} ${ruta}`, 62)} ${error || status}${nota ? `  (${nota})` : ''}`);
 }
 
-console.log('\nPAGINAS DEL DASHBOARD — tienen que mandar al login\n');
+console.log('\nPAGINAS DEL DASHBOARD — las cuida AuthGuard, no la compuerta\n');
 for (const ruta of PAGINAS) {
-  const { status, location, error } = await pedir('GET', ruta);
-  const bien = status >= 300 && status < 400 && (location || '').includes('/login');
-  if (!bien) fallos.push(`GET ${ruta} devolvio ${error || status} en vez de redirigir al login`);
-  console.log(`  ${bien ? 'ok  ' : 'MAL '} ${pad(ruta, 62)} ${error || status}${location ? ` → ${location.replace(BASE, '')}` : ''}`);
+  const { status, error } = await pedir('GET', ruta, true);
+  const bien = status === 200;
+  if (!bien) {
+    fallos.push(
+      `GET ${ruta} devolvio ${error || status}: la compuerta volvio a cubrir las paginas` +
+        ' y puede dejar afuera a un usuario legitimo',
+    );
+  }
+  console.log(`  ${bien ? 'ok  ' : 'MAL '} ${pad(ruta, 62)} ${error || status}`);
 }
 
 console.log('\nPAGINAS PUBLICAS — tienen que seguir abiertas\n');

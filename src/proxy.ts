@@ -80,22 +80,29 @@ const PUBLICO: Array<{ patron: RegExp; metodos?: string[]; nota: string }> = [
   { patron: /^\/api\/email\/inbound$/, nota: 'correo entrante, con API key' },
 ];
 
-/** Páginas del dashboard. Todo lo que cuelgue de acá pide sesión. */
-const PAGINAS_PRIVADAS = [
-  '/inicio', '/clientes', '/cotizaciones', '/cotizaciones-web', '/ordenes',
-  '/pagos', '/cheques', '/costos', '/reportes', '/configuracion', '/catalogo',
-  '/funnels', '/leads-web', '/trafico', '/ventas-retail', '/whatsapp',
-  '/api-keys', '/api-stats',
-];
-
+/**
+ * ALCANCE: solo la API. Las paginas del dashboard NO pasan por aca.
+ *
+ * En una version anterior tambien las cubria, y fue un error de criterio: puso
+ * la posibilidad de quedarse afuera del panel en la misma pieza que protege
+ * los datos, cuando son dos riesgos de tamaño muy distinto. Si la compuerta se
+ * equivoca con una ruta de API, alguien ve un 401 de mas; si se equivoca con
+ * las paginas, el dueño del negocio no puede entrar a trabajar.
+ *
+ * Y la proteccion que agregaba era en buena medida redundante: las paginas del
+ * dashboard ya estan envueltas en AuthGuard, que valida la sesion del lado
+ * cliente, y todo lo que muestran lo piden a esta misma API. Sin sesion, una
+ * pagina del dashboard es un cascaron: cada fetch que hace vuelve 401.
+ *
+ * Lo que se pierde es defensa en profundidad, no la defensa. Los datos siguen
+ * cerrados, que es lo que habia que cerrar.
+ */
 function necesitaSesion(pathname: string, metodo: string): boolean {
-  if (pathname.startsWith('/api/')) {
-    const abierta = PUBLICO.some(
-      (r) => r.patron.test(pathname) && (!r.metodos || r.metodos.includes(metodo)),
-    );
-    return !abierta;
-  }
-  return PAGINAS_PRIVADAS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (!pathname.startsWith('/api/')) return false;
+  const abierta = PUBLICO.some(
+    (r) => r.patron.test(pathname) && (!r.metodos || r.metodos.includes(metodo)),
+  );
+  return !abierta;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -171,24 +178,19 @@ export async function proxy(request: NextRequest) {
   const pasa = !!email && (await estaAutorizado(email, Date.now()));
 
   if (!pasa) {
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json(
-        { error: email ? 'Usuario no autorizado' : 'Necesitás iniciar sesión' },
-        { status: email ? 403 : 401 },
-      );
-    }
-    const login = request.nextUrl.clone();
-    login.pathname = '/login';
-    login.search = `?volver=${encodeURIComponent(pathname)}`;
-    return NextResponse.redirect(login);
+    return NextResponse.json(
+      { error: email ? 'Usuario no autorizado' : 'Necesitás iniciar sesión' },
+      { status: email ? 403 : 401 },
+    );
   }
 
   return respuesta;
 }
 
 export const config = {
-  // Se excluyen los assets estáticos para no correr esto en cada imagen.
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpe?g|gif|webp|svg|ico|woff2?|txt|xml|json)$).*)',
-  ],
+  // Solo la API. Antes el matcher abarcaba todo el sitio y descartaba assets
+  // con una expresión larga; acotarlo acá es más simple, más barato —no corre
+  // en ninguna página ni imagen— y hace imposible que esto interfiera con una
+  // navegación.
+  matcher: ['/api/:path*'],
 };

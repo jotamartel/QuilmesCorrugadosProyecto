@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,13 +10,27 @@ import { signInWithEmail, signInWithGoogle } from '@/lib/auth/client';
 import { AlertCircle, Mail, Lock, Package } from 'lucide-react';
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * A donde ir despues de entrar.
+   *
+   * La compuerta agrega ?volver=/loquesea cuando rebota a alguien que iba a
+   * una pagina del dashboard, asi que despues de loguearse vuelve a donde
+   * queria ir y no al inicio.
+   *
+   * Solo se aceptan rutas internas: tiene que empezar con una barra y no con
+   * dos. Sin esa condicion, un "?volver=//sitio-ajeno.com" convertiria al
+   * login en un trampolin para mandar gente a otro dominio, que es el patron
+   * clasico de una redireccion abierta.
+   */
+  const volver = searchParams.get('volver');
+  const destino = volver && /^\/(?!\/)/.test(volver) ? volver : '/inicio';
 
   // Obtener mensaje de error de la URL
   const urlError = searchParams.get('error');
@@ -33,8 +47,18 @@ export function LoginForm() {
 
     try {
       await signInWithEmail(email, password);
-      router.push('/inicio');
-      router.refresh();
+
+      // Navegacion dura, no router.push.
+      //
+      // Con router.push la navegacion la resuelve el cliente pidiendo el RSC
+      // de /inicio, y esa request tiene que llevar la cookie de sesion que
+      // acaba de escribirse. Si sale antes de que la cookie este disponible,
+      // la compuerta de src/proxy.ts no ve sesion y devuelve al login: la
+      // persona se autentico bien y aun asi parece que no. Una carga completa
+      // garantiza que el navegador mande la cookie ya escrita.
+      //
+      // Cuesta una carga de pagina, una sola vez, al entrar.
+      window.location.href = destino;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error al iniciar sesion';
       setError(message);

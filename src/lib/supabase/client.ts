@@ -20,8 +20,31 @@ import { createBrowserClient } from '@supabase/ssr';
  * El `lock` en bypass viene del cliente anterior, donde se agrego para evitar
  * un AbortError del lock de navegador. Se conserva por las dudas.
  */
+/**
+ * UNA sola instancia por pestaña.
+ *
+ * Cada llamada a createBrowserClient construye un GoTrueClient nuevo, y varios
+ * clientes compartiendo la misma clave de storage se pisan entre si. La consola
+ * lo dice con todas las letras:
+ *
+ *   "Multiple GoTrueClient instances detected in the same browser context...
+ *    may produce undefined behavior when used concurrently under the same
+ *    storage key"
+ *
+ * En produccion se llegaron a contar CINCO. Con esa cantidad, que la sesion
+ * quede bien escrita pasa a ser cuestion de suerte: uno la guarda, otro la
+ * refresca, y el que gana la carrera decide. Memorizar la instancia lo
+ * convierte en determinista.
+ *
+ * La variable vive a nivel de modulo, asi que hay una por pestaña y se limpia
+ * sola al cerrarla.
+ */
+let instancia: ReturnType<typeof createBrowserClient> | null = null;
+
 export function createClient() {
-  return createBrowserClient(
+  if (instancia) return instancia;
+
+  instancia = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -31,4 +54,6 @@ export function createClient() {
       },
     },
   );
+
+  return instancia;
 }

@@ -80,8 +80,11 @@ export default function AuthCallbackPage() {
         return;
       }
 
-      // Usuario autorizado - redirigir al dashboard
-      router.push('/inicio');
+      // Navegacion dura, igual que en LoginForm: con router.push la request
+      // del RSC de /inicio puede salir antes de que la cookie de sesion este
+      // disponible, y la compuerta devuelve al login a alguien que acaba de
+      // autenticarse bien.
+      window.location.href = '/inicio';
     } catch (err) {
       console.error('Callback error:', err);
       setError('Error procesando la autenticacion');

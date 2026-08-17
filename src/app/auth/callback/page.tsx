@@ -2,25 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
 import { LoadingPage } from '@/components/ui/loading';
 
-// Cliente de Supabase con lock deshabilitado
-function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        lock: async <R,>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => {
-          return fn();
-        },
-        persistSession: true,
-        autoRefreshToken: true,
-      },
-    }
-  );
-}
+// Este es el paso donde la sesion queda guardada, asi que es donde mas importa
+// usar el cliente que escribe en cookies y no en localStorage. Si la sesion no
+// queda en una cookie, el servidor no la ve y el dashboard rebota al login.
+const getSupabaseClient = createClient;
 
 export default function AuthCallbackPage() {
   const router = useRouter();

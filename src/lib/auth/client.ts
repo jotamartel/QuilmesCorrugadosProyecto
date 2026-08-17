@@ -2,25 +2,20 @@
  * Funciones de autenticacion del lado cliente
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
 import { AUTH_ORIGIN } from '@/lib/site';
 
-// Cliente de Supabase con lock deshabilitado para evitar AbortError
+/**
+ * Cliente para autenticar.
+ *
+ * Construia su propio cliente con createClient de @supabase/supabase-js, que
+ * guarda la sesion en localStorage. Ahora reusa el unico cliente de navegador
+ * del proyecto, que la guarda en cookies para que el servidor pueda leerla.
+ * Ver el comentario en lib/supabase/client.ts: tener los dos conviviendo fue
+ * lo que rompio el login al agregar la compuerta de acceso.
+ */
 export function createAuthClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        lock: async <R,>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => {
-          // Bypass del lock - ejecutar directamente
-          return fn();
-        },
-        persistSession: true,
-        autoRefreshToken: true,
-      },
-    }
-  );
+  return createClient();
 }
 
 /**

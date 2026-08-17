@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { LoadingPage } from '@/components/ui/loading';
 import { checkUserAuthorized } from '@/lib/auth/client';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -15,23 +15,9 @@ interface UserInfo {
   name?: string;
 }
 
-// Cliente de Supabase con lock deshabilitado
-function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        lock: async <R,>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => {
-          // Bypass del lock - ejecutar directamente
-          return fn();
-        },
-        persistSession: true,
-        autoRefreshToken: true,
-      },
-    }
-  );
-}
+// Tiene que ser el mismo cliente que usa el login, o lee la sesion de un lugar
+// distinto del que la escribieron. Ver lib/supabase/client.ts.
+const getSupabaseClient = createClient;
 
 export function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();

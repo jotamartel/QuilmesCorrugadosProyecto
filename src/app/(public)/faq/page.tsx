@@ -46,7 +46,7 @@ const faqs = [
   },
   {
     question: '¿Puedo cotizar online?',
-    answer: 'Sí, nuestro cotizador online te permite obtener un precio al instante. Solo necesitás ingresar las dimensiones de la caja (largo, ancho y alto en milímetros), la cantidad, y si querés impresión. El sistema calcula automáticamente el precio con IVA incluido y el plazo de entrega estimado.',
+    answer: 'Sí, nuestro cotizador online te permite obtener un precio al instante. Solo necesitás ingresar las dimensiones de la caja (largo, ancho y alto en milímetros), la cantidad, y si querés impresión. El sistema calcula automáticamente el precio sin IVA y el plazo de entrega estimado.',
   },
   {
     question: '¿Dónde están ubicados?',

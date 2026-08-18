@@ -15,6 +15,9 @@ export interface RetailConfig {
   // Límites de cantidad
   MIN_CANTIDAD: number;
 
+  // Mínimos
+  MIN_M2_A_MEDIDA: number;
+
   // Impresión
   MAX_PRINTING_COLORS: number;
 
@@ -64,6 +67,11 @@ export const RETAIL_CONFIG: RetailConfig = {
   // Límites de cantidad
   MIN_CANTIDAD: 100,              // El canal minorista vende desde 100 cajas
 
+  // Minimo de una tirada a medida. Espeja pricing_config.min_m2_per_model.
+  // Existe como constante porque los metadatos y el JSON-LD son estaticos y no
+  // pueden leer la base.
+  MIN_M2_A_MEDIDA: 3000,
+
   // Colores de impresión flexográfica.
   //
   // Estaba escrito en 17 lugares y no coincidian: 13 paginas decian 3 y la
@@ -110,3 +118,28 @@ export const RETAIL_CONFIG: RetailConfig = {
     NE: { lat: -34.3, lng: -58.1 },  // Nordeste
   },
 };
+
+/**
+ * Como se enuncian los minimos, en un solo lugar.
+ *
+ * Habia seis textos distintos declarando "pedido minimo 3.000 m²" sin nombrar
+ * el canal de stock. No era falso, pero era la mitad de la verdad, y la mitad
+ * que espanta: un comprador de 500 cajas leia eso y se descartaba solo.
+ *
+ * Paso de verdad en una prueba con ChatGPT: le dijo a un cliente de 4.000
+ * cajas "tu pedido probablemente este por debajo de ese minimo", cuando tenia
+ * dos caminos disponibles. La frase corta espantaba una venta real.
+ *
+ * Nombrar los dos canales cuesta seis palabras mas y cambia quien se queda.
+ */
+export const MINIMOS = {
+  /** Para metadatos y descripciones cortas. */
+  corto: `desde ${RETAIL_CONFIG.MIN_CANTIDAD} cajas de stock o ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² a medida`,
+  /** Para respuestas y textos donde hay lugar para explicar. */
+  largo:
+    `Depende del canal. Si la medida está en catálogo, se compra de stock desde ` +
+    `${RETAIL_CONFIG.MIN_CANTIDAD} cajas, con entrega en 24 a 48 horas. Si querés una medida ` +
+    `propia fabricada a pedido, el mínimo es de ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² ` +
+    `de cartón por modelo, que son entre 1.000 y 5.000 cajas según el tamaño: por ejemplo, una ` +
+    `caja de 400x300x300 mm requiere unas 2.800 unidades.`,
+} as const;

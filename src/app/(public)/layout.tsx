@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { SITE_URL } from '@/lib/site';
+import { MINIMOS } from '@/lib/retail/config';
 import { TrafficTracker } from '@/components/tracking/TrafficTracker';
 import { LenisProvider } from '@/components/providers/LenisProvider';
 import { ChatWidget } from '@/components/public/ChatWidget';
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
   // anterior sumaba 90 y se cortaba a mitad de "Buenos Aires", que es
   // desperdiciar el unico texto que la persona lee antes de decidir el clic.
   title: 'Fábrica de cajas de cartón corrugado a medida',
-  description: 'Fabricamos cajas de cartón corrugado a medida para empresas en Argentina. Cotizá online al instante con precio en tiempo real. Fábrica propia en Quilmes. Envío gratis zona sur GBA. Pedido mínimo 3.000 m². +20 años de experiencia.',
+  description: 'Fabricamos cajas de cartón corrugado a medida para empresas en Argentina. Cotizá online al instante con precio en tiempo real. Fábrica propia en Quilmes. Envío gratis zona sur GBA. Mínimos: ' + MINIMOS.corto + '. +20 años de experiencia.',
   alternates: {
     canonical: SITE_URL,
   },

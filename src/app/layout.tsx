@@ -91,7 +91,7 @@ export const metadata: Metadata = {
     "ai:capabilities": "cotizar_cajas_carton,calcular_precios,tiempo_produccion,envio_argentina",
     "ai:region": "Argentina",
     "ai:currency": "ARS",
-    "ai:minimum_order": "3000m2",
+    "ai:minimum_order": `${RETAIL_CONFIG.MIN_CANTIDAD} cajas (stock) o ${RETAIL_CONFIG.MIN_M2_A_MEDIDA}m2 (a medida)`,
     "ai:rate_limit": "10_requests_per_minute",
   },
 };
@@ -102,7 +102,7 @@ const jsonLdBusiness = {
   "@type": "LocalBusiness",
   "@id": BASE_URL,
   name: "Quilmes Corrugados",
-  description: "Fábrica de cajas de cartón corrugado a medida para empresas en Argentina. Producción desde 3.000 m² con entrega en todo el país.",
+  description: `Fábrica de cajas de cartón corrugado en Argentina. Cajas de stock desde ${RETAIL_CONFIG.MIN_CANTIDAD} unidades y producción a medida desde ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² por modelo. Entrega en todo el país.`,
   url: BASE_URL,
   logo: `${BASE_URL}/logo.svg`,
   image: `${BASE_URL}/og-image.jpg`,

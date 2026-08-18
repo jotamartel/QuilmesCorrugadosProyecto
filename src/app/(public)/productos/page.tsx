@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { SITE_URL } from '@/lib/site';
+import { MINIMOS } from '@/lib/retail/config';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
@@ -17,7 +18,7 @@ const products = [
     icon: Package,
     title: 'Cajas de Cartón Corrugado Estándar',
     slug: 'cajas-medida',
-    description: 'Cajas a medida en cartón corrugado onda C, ideales para embalaje, almacenamiento y transporte. Fabricadas con papel kraft marrón o blanco. Disponibles en cualquier medida con pedido mínimo de 3.000 m².',
+    description: 'Cajas a medida en cartón corrugado onda C, ideales para embalaje, almacenamiento y transporte. Fabricadas con papel kraft marrón o blanco. Disponibles en cualquier medida, ' + MINIMOS.corto + '.',
     features: ['Cartón onda C (4mm)', 'Papel kraft marrón o blanco', 'Cualquier medida personalizada', 'Pedido mínimo 3.000 m²'],
   },
   {

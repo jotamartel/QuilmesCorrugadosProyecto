@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { SITE_URL } from '@/lib/site';
+import { MINIMOS } from '@/lib/retail/config';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
@@ -14,7 +15,7 @@ import { trackEvent } from '@/lib/utils/tracking';
 const faqs = [
   {
     question: '¿Cuál es el pedido mínimo de cajas?',
-    answer: 'El pedido mínimo es de 3.000 m² de cartón por modelo de caja. Esto equivale aproximadamente a 1.000-5.000 cajas dependiendo del tamaño. Por ejemplo, una caja de 400x300x300mm requiere un pedido mínimo de aproximadamente 2.800 unidades.',
+    answer: MINIMOS.largo,
   },
   {
     question: '¿Hacen envíos a todo el país?',

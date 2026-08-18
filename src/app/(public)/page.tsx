@@ -28,7 +28,7 @@ const benefits = [
   {
     icon: Ruler,
     title: 'Pedido mínimo',
-    description: '3.000 m² por modelo de caja',
+    description: `${RETAIL_CONFIG.MIN_CANTIDAD} cajas de stock o ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² a medida`,
   },
   {
     icon: Palette,
@@ -77,7 +77,8 @@ export default function LandingPage() {
             </Link>
           </div>
           <p className="mt-4 text-sm text-gray-500">
-            Mayorista: mín 3.000 m² · Minorista: desde {RETAIL_CONFIG.MIN_CANTIDAD} cajas
+            Mayorista: mín {RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² · Minorista: desde{' '}
+            {RETAIL_CONFIG.MIN_CANTIDAD} cajas
           </p>
           {/* El precio en el texto visible del home.
               Un asistente de IA que entra acá leía la página entera sin
@@ -112,7 +113,7 @@ export default function LandingPage() {
               },
               {
                 rotulo: 'Mínimos',
-                valor: `${RETAIL_CONFIG.MIN_CANTIDAD} cajas si sale de stock; 3.000 m² por modelo para producción a medida.`,
+                valor: `${RETAIL_CONFIG.MIN_CANTIDAD} cajas si sale de stock; ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² por modelo para producción a medida.`,
               },
               {
                 rotulo: 'Plazos',
@@ -207,7 +208,7 @@ export default function LandingPage() {
             respuesta:
               `Depende del canal. Si la medida está en catálogo y sale de stock, desde ` +
               `${RETAIL_CONFIG.MIN_CANTIDAD} cajas. Si querés una medida propia fabricada ` +
-              `a pedido, el mínimo es 3.000 m² de cartón por modelo de caja.`,
+              `a pedido, el mínimo es ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² de cartón por modelo de caja.`,
           },
           {
             pregunta: '¿Puedo cotizar sin hablar con un vendedor?',

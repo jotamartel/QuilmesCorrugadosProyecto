@@ -3,7 +3,10 @@ import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { getActivePricingConfig } from '@/lib/utils/pricing';
+import { calcularCotizacion } from '@/lib/cotizacion/motor';
+import { EJEMPLOS, rutaEjemplo } from '@/lib/cotizacion/ejemplos';
 import { SITE_URL } from '@/lib/site';
+import type { PricingConfig } from '@/lib/types/database';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 
 /**
@@ -249,6 +252,81 @@ export default async function PreciosPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      </section>
+
+      {/* Cotizaciones concretas, con el precio calculado de verdad.
+          Existe para dos lectores. A una persona le ahorra tener que imaginar
+          cuanto sale su caja. A un asistente le da lo que mas le sirve: enlaces
+          a paginas cuyo titulo ya trae el numero, en vez de un patron de URL
+          que tendria que aprender y armar. Viendo tres, deduce la cuarta. */}
+      <section className="py-12 px-4">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Cuánto sale, en casos reales</h2>
+          <p className="text-gray-600 mb-6">
+            Precios calculados con la escalera de arriba. Entrá a cualquiera para ver el
+            detalle, la plantilla de impresión y cómo seguir.
+          </p>
+
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th scope="col" className="px-4 py-3 font-medium">Caso</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Medida</th>
+                  <th scope="col" className="px-4 py-3 font-medium text-right">Por caja</th>
+                  <th scope="col" className="px-4 py-3 font-medium text-right">Total sin IVA</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {EJEMPLOS.map((e) => {
+                  const q = calcularCotizacion(
+                    [{
+                      length_mm: e.mm.largo,
+                      width_mm: e.mm.ancho,
+                      height_mm: e.mm.alto,
+                      quantity: e.unidades,
+                      printing_colors: e.colores,
+                      has_printing: e.colores > 0,
+                    }],
+                    // RESPALDO no trae los campos administrativos del tipo
+                    // (id, valid_from...) y el motor no los usa: solo lee
+                    // precios y cortes, que si estan. El cast evita duplicar
+                    // esos campos con valores inventados.
+                    config as PricingConfig,
+                  );
+                  return (
+                    <tr key={rutaEjemplo(e)} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <Link
+                          href={rutaEjemplo(e)}
+                          className="text-[#002E55] underline underline-offset-2"
+                        >
+                          {e.titulo}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 tabular-nums text-gray-600">
+                        {e.mm.largo}×{e.mm.ancho}×{e.mm.alto} mm
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums">
+                        {ars(q.boxes[0].unit_price)}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">{ars(q.subtotal)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="mt-4 text-sm text-gray-500">
+            ¿Otra medida? Cambiá los números en la dirección:{' '}
+            <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">
+              /cotizar/LARGOxANCHOxALTO/CANTIDAD
+            </code>{' '}
+            en milímetros, o agregá <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">cm</code>{' '}
+            para centímetros. Para impresión, sumá los colores después de un guion.
+          </p>
         </div>
       </section>
 

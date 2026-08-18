@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next'
 import { SITE_URL } from '@/lib/site'
+import { EJEMPLOS, rutaEjemplo } from '@/lib/cotizacion/ejemplos'
 
 const BASE_URL = SITE_URL
 
@@ -82,5 +83,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'yearly',
       priority: 0.5,
     },
+
+    // Cotizaciones concretas, con el precio en el title.
+    //
+    // Estan en el sitemap para que se indexen como paginas normales. Es la
+    // diferencia entre que un asistente tenga que ARMAR una URL siguiendo un
+    // patron documentado —que solo ve si lee llms.txt— y que encuentre la
+    // respuesta ya hecha buscando "cuanto salen 500 cajas de mudanza".
+    //
+    // Prioridad alta a proposito: son las paginas que contestan la pregunta
+    // con un numero, que es lo unico que el que pregunta queria.
+    ...EJEMPLOS.map((e) => ({
+      url: `${BASE_URL}${rutaEjemplo(e)}`,
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.8,
+    })),
   ]
 }

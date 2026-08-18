@@ -86,10 +86,14 @@ export const EJEMPLOS: EjemploCotizacion[] = [
     colores: 0,
   },
   {
-    medidas: '320x320x40',
+    // 50 mm, no 40: el alto minimo de fabricacion es 50 y con 40 esta pagina
+    // caia en el cartel de "no la podemos fabricar". Un ejemplo del sitemap
+    // que devuelve un error es peor que no tenerlo: se indexa una pagina que
+    // le dice al que busca que no podemos hacer lo que pidio.
+    medidas: '320x320x50',
     cantidad: '5000',
-    titulo: 'Caja de pizza, 5.000 unidades',
-    mm: { largo: 320, ancho: 320, alto: 40 },
+    titulo: 'Caja chata tipo pizza, 5.000 unidades',
+    mm: { largo: 320, ancho: 320, alto: 50 },
     unidades: 5000,
     colores: 0,
   },

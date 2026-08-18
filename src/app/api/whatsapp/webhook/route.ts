@@ -27,6 +27,7 @@ import {
 import { sendNotification } from '@/lib/notifications';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { SITE_URL } from '@/lib/site';
+import { firmaTwilioValida, urlsPosibles } from '@/lib/webhooks/firmas';
 import { getPricePerM2, getProductionDays, getActivePricingConfig } from '@/lib/utils/pricing';
 import { createClient } from '@/lib/supabase/server';
 import { classifyIntent, isGroqEnabled } from '@/lib/groq';
@@ -195,6 +196,65 @@ function hasMediaContent(formData: FormData): boolean {
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Verificar que la llamada viene de Twilio.
+    //
+    // Sin esto, el destinatario del mensaje sale de `From`, que es un campo
+    // de un formulario sin autenticar. Cualquiera podia hacer un POST con el
+    // numero que quisiera y esta cuenta le mandaba —y pagaba— un WhatsApp.
+    // Repetido, ademas de la factura, expone el numero a que Meta lo marque
+    // por spam, y ese numero es el canal de ventas.
+    //
+    // Se valida contra las dos formas del dominio porque Twilio firma la URL
+    // exacta que tiene cargada en su panel, y el apex responde 308 hacia www:
+    // si alla quedo la del apex, la request llega por www con una firma que
+    // corresponde al apex.
+    // ─────────────────────────────────────────────────────────────────────
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const firma = request.headers.get('x-twilio-signature');
+
+    if (authToken) {
+      const params: Record<string, string> = {};
+      formData.forEach((valor, clave) => {
+        if (typeof valor === 'string') params[clave] = valor;
+      });
+
+      // La query string va incluida: Twilio firma la URL completa, y si en el
+      // panel quedo cargada con parametros, sin esto la firma nunca coincide.
+      const candidatas = urlsPosibles(request.nextUrl.pathname, request.nextUrl.search.slice(1));
+      const valida = !!firma && candidatas.some((url) => firmaTwilioValida(authToken, firma, url, params));
+
+      if (!valida) {
+        // MODO OBSERVACION, a proposito y por poco tiempo.
+        //
+        // Bloquear de entrada arriesga el canal de ventas a que yo haya
+        // reconstruido mal la URL: Twilio firma la que tiene cargada en su
+        // panel, que puede diferir en dominio o en query de la que llega. Si
+        // me equivoco, los mensajes de clientes reales se caen en silencio.
+        //
+        // Entonces primero se mide. Este log dice si la validacion habria
+        // pasado con mensajes de verdad; cuando se confirme que si, se
+        // reemplaza este bloque por el 403 y queda cerrado.
+        console.error(
+          '[whatsapp][firma] NO VALIDA — se dejo pasar. firma=%s urls=%s params=%s',
+          firma ? firma.slice(0, 12) + '...' : '(ausente)',
+          candidatas.join(' | '),
+          Object.keys(params).sort().join(','),
+        );
+      } else {
+        console.log('[whatsapp][firma] valida');
+      }
+    } else {
+      // Sin token no se puede verificar nada. Se sigue atendiendo para no
+      // cortar el servicio, pero queda registrado: es una configuracion
+      // incompleta, no una decision.
+      console.error(
+        '[whatsapp] TWILIO_AUTH_TOKEN no configurado: el webhook esta ' +
+          'aceptando mensajes sin verificar su origen',
+      );
+    }
+
     const from = formData.get('From') as string;
     const body = (formData.get('Body') as string || '').trim();
     const phoneNumber = from.replace('whatsapp:', '');

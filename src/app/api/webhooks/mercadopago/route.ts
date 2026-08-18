@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { firmaMercadoPagoValida } from '@/lib/webhooks/firmas';
 
 const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN || '';
 
@@ -23,6 +24,40 @@ export async function POST(request: NextRequest) {
     const paymentId = body.data?.id;
     if (!paymentId) {
       return NextResponse.json({ received: true });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Verificar que la notificacion viene de MercadoPago.
+    //
+    // El riesgo real aca es mas chico de lo que parece: mas abajo el estado
+    // del pago NO se toma del cuerpo, se vuelve a consultar contra la API de
+    // MercadoPago con el access token. O sea que nadie puede inventar un pago
+    // aprobado mandando un JSON.
+    //
+    // Lo que si podia hacer cualquiera era disparar el endpoint con ids
+    // arbitrarios y forzar una consulta a MercadoPago y una escritura en la
+    // base por cada request. Abuso de recursos, y ruido en el historial.
+    //
+    // Solo se exige la firma si el secreto esta configurado. Si no lo esta,
+    // se sigue atendiendo y se avisa: cortar los pagos por una variable que
+    // falta seria peor que el problema que se esta tapando.
+    // ─────────────────────────────────────────────────────────────────────
+    const secretoMP = process.env.MERCADOPAGO_WEBHOOK_SECRET;
+    if (secretoMP) {
+      const cabecera = request.headers.get('x-signature');
+      const requestId = request.headers.get('x-request-id');
+      const valida =
+        !!cabecera && firmaMercadoPagoValida(secretoMP, cabecera, requestId, String(paymentId));
+
+      if (!valida) {
+        console.warn('[mercadopago] firma invalida, se descarta la notificacion');
+        return NextResponse.json({ error: 'Firma invalida' }, { status: 403 });
+      }
+    } else {
+      console.warn(
+        '[mercadopago] MERCADOPAGO_WEBHOOK_SECRET no configurado: las ' +
+          'notificaciones se procesan sin verificar su origen',
+      );
     }
 
     if (!MP_ACCESS_TOKEN || MP_ACCESS_TOKEN.includes('0000000000')) {

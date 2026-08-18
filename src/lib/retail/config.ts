@@ -167,7 +167,9 @@ export const MINIMOS = {
  * superficies que lee un asistente de IA se repite como dato verificado.
  */
 export const ENVIO = {
-  /** Para metadatos y textos cortos. */
+  /** Para meta descriptions y otros lugares con limite duro de caracteres. */
+  micro: `gratis desde ${RETAIL_CONFIG.ENVIO_GRATIS_MIN_M2.toLocaleString('es-AR')} m²`,
+  /** Para resumenes y fichas, donde entra la condicion completa. */
   corto: `gratis desde ${RETAIL_CONFIG.ENVIO_GRATIS_MIN_M2.toLocaleString('es-AR')} m² dentro de ${RETAIL_CONFIG.ENVIO_GRATIS_KM} km de Quilmes; pedidos menores, retiro en fábrica o envío a cargo del comprador`,
   /** Para respuestas y donde hay lugar para explicar. */
   largo:

@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     default: "Quilmes Corrugados | Fábrica de Cajas de Cartón Corrugado a Medida",
     template: "%s | Quilmes Corrugados",
   },
-  description: "Fábrica de cajas de cartón corrugado a medida en Quilmes, Buenos Aires. Cotizá online al instante. Envío gratis en pedidos mayoristas de zona sur GBA. +20 años de experiencia. Pedido mínimo 3.000 m².",
+  description: "Fábrica de cajas de cartón corrugado a medida en Quilmes, Buenos Aires. Cotizá online con precio real al instante. Envío gratis desde 3.000 m². +20 años. Pedido mínimo 3.000 m².",
   keywords: ["cajas de cartón corrugado", "cajas de cartón a medida", "fábrica cajas cartón", "embalaje", "packaging Argentina", "cajas e-commerce", "cartón corrugado Buenos Aires", "cajas impresas personalizadas", "cotizar cajas cartón", "Quilmes", "packaging industrial", "cajas corrugado precios"],
   authors: [{ name: "Quilmes Corrugados S.A." }],
   creator: "Quilmes Corrugados S.A.",

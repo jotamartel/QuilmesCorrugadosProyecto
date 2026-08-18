@@ -218,7 +218,7 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       return resultado(
         `No se puede fabricar: ancho + alto suman ${ancho + alto} mm y el máximo es ` +
           `${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho de la bobina. Probá con una ` +
-          'caja más baja o más angosta, o escribinos por WhatsApp al +54 9 11 6924-9801.',
+          'caja más baja o más angosta, o escribinos por WhatsApp al +54 9 11 3341-1781.',
         undefined,
         true,
       );
@@ -229,7 +229,7 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       `Plantilla lista para ${largo}x${ancho}x${alto} mm: ${url}\n\n` +
         'Es un PDF con la caja desplegada: trae las líneas de corte, las de plegado y las áreas ' +
         'donde puede ir el diseño. El flujo es bajarlo, ubicar el arte sobre esas áreas y ' +
-        'mandarlo a ventas@quilmescorrugados.com.ar o por WhatsApp al +54 9 11 6924-9801. ' +
+        'mandarlo a ventas@quilmescorrugados.com.ar o por WhatsApp al +54 9 11 3341-1781. ' +
         `Se imprime hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores, +15% por color.`,
       { template_pdf: url, max_colores: RETAIL_CONFIG.MAX_PRINTING_COLORS },
     );
@@ -264,7 +264,7 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       return resultado(
         `Esa caja no la podemos fabricar: ${errores.join('; ')}. ` +
           'Si el usuario necesita algo fuera de estos límites, que nos escriba por WhatsApp al ' +
-          '+54 9 11 6924-9801 y lo vemos.',
+          '+54 9 11 3341-1781 y lo vemos.',
         undefined,
         true,
       );

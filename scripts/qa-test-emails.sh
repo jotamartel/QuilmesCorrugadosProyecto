@@ -62,7 +62,7 @@ test_endpoint "Lead con contacto" "POST" "$API_URL" '{
   "contact": {
     "name": "Test QA",
     "email": "test@example.com",
-    "phone": "+541169249801",
+    "phone": "+541133411781",
     "company": "Empresa Test"
   },
   "origin": "QA Test"
@@ -87,7 +87,7 @@ echo "📨 Test 3: Email entrante (webhook)"
 test_endpoint "Email inbound" "POST" "$BASE_URL/api/email/inbound" '{
   "from": "cliente@example.com",
   "subject": "Necesito cotizar cajas de 40x30x20 cm, cantidad 500",
-  "text": "Hola, necesito cotizar cajas de 40x30x20 cm, cantidad 500 unidades. Mi teléfono es +541169249801"
+  "text": "Hola, necesito cotizar cajas de 40x30x20 cm, cantidad 500 unidades. Mi teléfono es +541133411781"
 }'
 echo ""
 
@@ -96,7 +96,7 @@ echo "📞 Test 4: Lead desde Retell AI"
 test_endpoint "Retell lead" "POST" "$BASE_URL/api/retell/registrar-lead" '{
   "nombre": "Cliente Test",
   "email": "cliente@example.com",
-  "telefono": "+541169249801",
+  "telefono": "+541133411781",
   "consulta": "Cotización de cajas",
   "cotizacion_id": "test-123"
 }'

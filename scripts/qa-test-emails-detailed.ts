@@ -78,7 +78,7 @@ async function runTests() {
       contact: {
         name: 'Test QA',
         email: 'test@example.com',
-        phone: '+541169249801',
+        phone: '+541133411781',
         company: 'Empresa Test',
       },
       origin: 'QA Test - Lead con contacto',
@@ -117,7 +117,7 @@ async function runTests() {
     {
       from: 'cliente@example.com',
       subject: 'Necesito cotizar cajas de 40x30x20 cm, cantidad 500',
-      text: 'Hola, necesito cotizar cajas de 40x30x20 cm, cantidad 500 unidades. Mi teléfono es +541169249801',
+      text: 'Hola, necesito cotizar cajas de 40x30x20 cm, cantidad 500 unidades. Mi teléfono es +541133411781',
     }
   );
   results.push(test3);
@@ -133,7 +133,7 @@ async function runTests() {
     {
       nombre: 'Cliente Test',
       email: 'cliente@example.com',
-      telefono: '+541169249801',
+      telefono: '+541133411781',
       consulta: 'Cotización de cajas',
       cotizacion_id: 'test-123',
     }

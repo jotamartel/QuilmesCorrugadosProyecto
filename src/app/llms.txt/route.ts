@@ -225,7 +225,7 @@ producción.
 
 ## Contacto
 
-- WhatsApp: +54 9 11 6924-9801 — https://wa.me/5491169249801
+- WhatsApp: +54 9 11 3341-1781 — https://wa.me/5491133411781
 - Email: ventas@quilmescorrugados.com.ar
 - Dirección: Lugones 219, B1878 Quilmes, Buenos Aires, Argentina
 - Horario: lunes a viernes, 7:00 a 16:00 (hora de Argentina)

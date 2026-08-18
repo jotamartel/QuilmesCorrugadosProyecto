@@ -33,8 +33,8 @@ export function LandingFooter() {
             <ul className="space-y-3">
               <li className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-[#4F6D87]" />
-                <a href="tel:+5491169249801" onClick={() => trackEvent('phone_click', { source: 'footer' })} className="hover:text-white">
-                  +54 9 11 6924-9801
+                <a href="tel:+5491133411781" onClick={() => trackEvent('phone_click', { source: 'footer' })} className="hover:text-white">
+                  +54 9 11 3341-1781
                 </a>
               </li>
               <li className="flex items-center gap-2">

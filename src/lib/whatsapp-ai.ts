@@ -48,7 +48,7 @@ function getFallbackPricingConfig(): PricingConfig {
   };
 }
 
-const BUSINESS_PHONE = process.env.WHATSAPP_BUSINESS_NUMBER || '+5491169249801';
+const BUSINESS_PHONE = process.env.WHATSAPP_BUSINESS_NUMBER || '+5491133411781';
 
 /** Prompt del sistema con todo el conocimiento del negocio */
 const KNOWLEDGE_PROMPT = `Sos el asistente de WhatsApp de Quilmes Corrugados, una fábrica argentina de cajas de cartón corrugado en Quilmes, Buenos Aires.

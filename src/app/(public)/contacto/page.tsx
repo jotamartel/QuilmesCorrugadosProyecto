@@ -9,7 +9,7 @@ import { BreadcrumbSchema } from '@/components/public/SchemaMarkup';
 import { Phone, Mail, MapPin, Clock, MessageCircle, ArrowRight } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
 
-const WHATSAPP_NUMBER = '5491169249801';
+const WHATSAPP_NUMBER = '5491133411781';
 
 export default function ContactoPage() {
   const whatsappMessage = 'Hola, me interesa cotizar cajas de cartón corrugado.';
@@ -63,11 +63,11 @@ export default function ContactoPage() {
                   <div>
                     <h3 className="font-semibold text-gray-900">Teléfono</h3>
                     <a 
-                      href="tel:+5491169249801" 
+                      href="tel:+5491133411781" 
                       onClick={() => trackEvent('phone_click')}
                       className="text-gray-600 hover:text-[#002E55]"
                     >
-                      +54 9 11 6924-9801
+                      +54 9 11 3341-1781
                     </a>
                   </div>
                 </div>

@@ -170,7 +170,7 @@ Validez de la cotizacion: 7 dias
 
 ${quote.m2_total < 3000 ? 'Nota: Este pedido esta por debajo del minimo recomendado de 3.000 m2.\n' : ''}
 Para confirmar tu pedido o si tenes alguna consulta, responde este email o contactanos:
-- WhatsApp: +54 9 11 6924-9801
+- WhatsApp: +54 9 11 3341-1781
 - Telefono: Lunes a Viernes 7:00 - 16:00
 
 Saludos!
@@ -202,7 +202,7 @@ Tambien podes usar nuestro cotizador online:
 ${SITE_URL}
 
 O contactarnos directamente:
-- WhatsApp: +54 9 11 6924-9801
+- WhatsApp: +54 9 11 3341-1781
 - Horario: Lunes a Viernes 7:00 - 16:00
 
 Saludos!

@@ -6,7 +6,7 @@ import type { StandardSuggestion } from './QuoteResult';
 import { trackEvent } from '@/lib/utils/tracking';
 
 // Mismo numero que src/components/public/WhatsAppButton.tsx.
-export const WHATSAPP_NUMBER = '5491169249801';
+export const WHATSAPP_NUMBER = '5491133411781';
 
 const APERTURA_MS = 900;    // deja respirar la revelacion del precio antes de aparecer
 const AUTOCIERRE_MS = 7000; // en mobile el globo tapa el CTA: se repliega solo

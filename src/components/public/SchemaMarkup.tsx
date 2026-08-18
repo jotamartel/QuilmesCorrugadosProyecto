@@ -123,7 +123,7 @@ export function OrganizationSchema() {
     },
     contactPoint: {
       "@type": "ContactPoint",
-      telephone: "+54 9 11 6924-9801",
+      telephone: "+54 9 11 3341-1781",
       contactType: "sales",
       availableLanguage: "Spanish",
       areaServed: "AR",

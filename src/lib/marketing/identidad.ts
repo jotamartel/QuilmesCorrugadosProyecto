@@ -35,8 +35,8 @@ async function sha256(valor: string): Promise<string> {
 
 /**
  * Normaliza el telefono a E.164 sin el "+", que es como lo esperan las dos
- * plataformas. Un numero argentino escrito como "11 6924-9801" y otro como
- * "+5491169249801" tienen que producir el mismo hash o no cruzan con nada.
+ * plataformas. Un numero argentino escrito como "11 3341-1781" y otro como
+ * "+5491133411781" tienen que producir el mismo hash o no cruzan con nada.
  */
 export function normalizarTelefono(tel: string | null | undefined): string | null {
   if (!tel) return null;

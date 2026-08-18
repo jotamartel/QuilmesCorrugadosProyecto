@@ -7,7 +7,7 @@ const client = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
   : null;
 
 const TWILIO_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
-const BUSINESS_PHONE = process.env.WHATSAPP_BUSINESS_NUMBER || '+5491169249801';
+const BUSINESS_PHONE = process.env.WHATSAPP_BUSINESS_NUMBER || '+5491133411781';
 
 // Timeout de conversación (30 minutos por defecto, configurable)
 const CONVERSATION_TIMEOUT_MS = 30 * 60 * 1000;

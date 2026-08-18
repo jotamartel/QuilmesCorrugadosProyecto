@@ -3,7 +3,7 @@
 import { MessageCircle } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
 
-const WHATSAPP_NUMBER = '5491169249801';
+const WHATSAPP_NUMBER = '5491133411781';
 const DEFAULT_MESSAGE = 'Hola, quiero consultar por cajas de cartón';
 
 interface WhatsAppButtonProps {

@@ -19,7 +19,7 @@ interface QuotesResponse {
   total: number;
 }
 
-const WHATSAPP_NUMBER = '5491169249801';
+const WHATSAPP_NUMBER = '5491133411781';
 
 export default function BelowMinimumLeadsPage() {
   const [data, setData] = useState<QuotesResponse | null>(null);

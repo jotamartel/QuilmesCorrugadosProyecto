@@ -82,7 +82,7 @@ export default function PrivacidadPage() {
           <section>
             <h2 className="text-xl font-semibold text-slate-900 mb-3">6. Contacto</h2>
             <p>
-              Para consultas sobre esta política o sobre tus datos personales: ventas@quilmescorrugados.com.ar o WhatsApp +54 11 6924-9801.
+              Para consultas sobre esta política o sobre tus datos personales: ventas@quilmescorrugados.com.ar o WhatsApp +54 11 3341-1781.
             </p>
           </section>
         </div>

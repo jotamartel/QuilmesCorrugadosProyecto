@@ -106,7 +106,7 @@ const jsonLdBusiness = {
   url: BASE_URL,
   logo: `${BASE_URL}/logo.svg`,
   image: `${BASE_URL}/og-image.jpg`,
-  telephone: "+54 9 11 6924-9801",
+  telephone: "+54 9 11 3341-1781",
   email: "ventas@quilmescorrugados.com.ar",
   address: {
     "@type": "PostalAddress",

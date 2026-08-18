@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { trackEvent } from '@/lib/utils/tracking';
 
-const WHATSAPP = '5491169249801';
+const WHATSAPP = '5491133411781';
 
 /**
  * Barra de accion fija al pie, solo en movil.

@@ -579,7 +579,7 @@ export async function GET(request: NextRequest) {
         with_api_key: `${RATE_LIMIT_DEFAULT_WITH_KEY} requests/minute (configurable)`,
       },
       contact: {
-        whatsapp: '+54 9 11 6924-9801',
+        whatsapp: '+54 9 11 3341-1781',
         email: 'ventas@quilmescorrugados.com.ar',
         address: 'Lugones 219, B1878 Quilmes, Buenos Aires, Argentina',
       },
@@ -675,7 +675,7 @@ export async function GET(request: NextRequest) {
         // WhatsApp, que esta abajo.
         comprar_online: quote.can_buy_online ? `${BASE_URL}/cajas` : null,
         cotizador_web: `${BASE_URL}/#cotizador`,
-        whatsapp: 'https://wa.me/5491169249801',
+        whatsapp: 'https://wa.me/5491133411781',
       },
       rate_limit: {
         remaining: rateLimitCheck.remaining,

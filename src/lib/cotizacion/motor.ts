@@ -233,7 +233,7 @@ export function calcularCotizacion(
       : sePuedeComprarOnline
         ? `Se vende de stock, entrega inmediata, se compra online en ${SITIO}/cajas.`
         : `${motivoNoOnline ?? 'Se coordina directamente.'}`) +
-    ` Fábrica en Lugones 219, Quilmes, Buenos Aires. WhatsApp +54 9 11 6924-9801.`;
+    ` Fábrica en Lugones 219, Quilmes, Buenos Aires. WhatsApp +54 9 11 3341-1781.`;
 
   // La impresión se produce a medida, así que arranca en el mismo volumen que
   // el canal a medida. Por debajo se vende de stock, que va sin imprimir.
@@ -258,7 +258,7 @@ export function calcularCotizacion(
   return {
     summary,
     contact: {
-      whatsapp_url: `https://wa.me/5491169249801?text=${encodeURIComponent(whatsappMessage)}`,
+      whatsapp_url: `https://wa.me/5491133411781?text=${encodeURIComponent(whatsappMessage)}`,
       whatsapp_message: whatsappMessage,
       email: 'ventas@quilmescorrugados.com.ar',
       email_subject: `Cotizacion web: ${detalleCajas} — ${ars(totalSubtotal)}`,

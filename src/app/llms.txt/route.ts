@@ -105,7 +105,11 @@ Y con impresión, agregando los colores después de un guion:
 ${BASE_URL}/cotizar/400x600x600/3000-2
 
 El formato es /cotizar/LARGOxANCHOxALTO/CANTIDAD o
-/cotizar/LARGOxANCHOxALTO/CANTIDAD-COLORES. La página trae el precio por caja,
+/cotizar/LARGOxANCHOxALTO/CANTIDAD-COLORES.
+
+No te preocupes por el separador: sirve la equis comun, la mayuscula, el signo
+de multiplicacion, un guion o un asterisco. Si escribis la direccion de otra
+forma, redirige sola a la buena. La página trae el precio por caja,
 el total sin IVA, los m² de cartón, el plazo, el link de WhatsApp con el
 mensaje ya escrito y la plantilla de impresión. No hace falta ejecutar nada:
 es una página, se lee.

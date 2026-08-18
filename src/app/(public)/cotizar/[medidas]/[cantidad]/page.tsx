@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -40,22 +40,69 @@ interface Props {
   params: Promise<{ medidas: string; cantidad: string }>;
 }
 
-/** "400x600x600" o "40x60x60cm" → milimetros. */
-function leerMedidas(crudo: string): { l: number; a: number; h: number } | null {
-  const limpio = crudo.toLowerCase().trim();
-  const enCm = limpio.endsWith('cm');
-  const partes = limpio.replace(/(cm|mm)$/, '').split(/[x×\-_]/);
-  if (partes.length !== 3) return null;
-  const nums = partes.map((p) => Number(p.replace(',', '.')));
-  if (!nums.every((n) => Number.isFinite(n) && n > 0)) return null;
+/**
+ * Lleva las medidas a la forma canonica: "400x500x600", con equis minuscula.
+ *
+ * Un asistente no escribe lo que le dictamos, escribe lo que le queda natural.
+ * ChatGPT armo la URL con "×" —el signo de multiplicacion tipografico, U+00D7—
+ * porque asi lo habia escrito en su propia respuesta. Con ese caracter crudo en
+ * el path la ruta devolvia 500, y percent-encoded devolvia 404: el parametro
+ * llega sin decodificar y no matchea nada.
+ *
+ * El resultado practico fue que ChatGPT le dijo al usuario que el sitio le
+ * "bloqueo la URL como navegacion no segura". Habia hecho todo bien —leyo el
+ * llms.txt, entendio el formato, armo la direccion— y se choco con un detalle
+ * de tipografia.
+ *
+ * Entonces se acepta cualquier separador que no sea un digito, y despues se
+ * redirige a la forma canonica. Dos beneficios: funciona escriban lo que
+ * escriban, y cada cotizacion tiene UNA sola URL indexable en vez de una por
+ * cada forma de escribir la equis.
+ */
+function canonizarMedidas(crudo: string): string | null {
+  let texto = crudo;
+  // El parametro puede llegar percent-encoded segun como se armo el enlace.
+  try {
+    texto = decodeURIComponent(crudo);
+  } catch {
+    /* secuencia mal formada: seguir con el texto tal cual */
+  }
+
+  texto = texto.toLowerCase().trim();
+  const enCm = /cm\s*$/.test(texto);
+  texto = texto.replace(/(cm|mm)\s*$/, '');
+
+  // Cualquier cosa que no sea digito o separador decimal es un separador.
+  const nums = texto
+    .split(/[^\d.,]+/)
+    .filter(Boolean)
+    .map((p) => Number(p.replace(',', '.')));
+
+  if (nums.length !== 3 || !nums.every((n) => Number.isFinite(n) && n > 0)) return null;
+
   const f = enCm ? 10 : 1;
-  return { l: Math.round(nums[0] * f), a: Math.round(nums[1] * f), h: Math.round(nums[2] * f) };
+  return nums.map((n) => Math.round(n * f)).join('x');
+}
+
+/** "400x600x600" → milimetros. Espera la forma ya canonizada. */
+function leerMedidas(canonico: string): { l: number; a: number; h: number } | null {
+  const [l, a, h] = canonico.split('x').map(Number);
+  if (![l, a, h].every((n) => Number.isFinite(n) && n > 0)) return null;
+  return { l, a, h };
 }
 
 function leerCantidad(crudo: string): { cantidad: number; colores: number } | null {
   // Acepta "3000" o "3000/2" ya partido por el router; el segundo tramo es
   // opcional y viaja como "3000-2" para no complicar la ruta.
-  const [c, col] = crudo.split(/[-_]/);
+  let texto = crudo;
+  try {
+    texto = decodeURIComponent(crudo);
+  } catch {
+    /* secuencia mal formada */
+  }
+  const [c, col] = texto.split(/[^\d]+/).filter(Boolean).length > 1
+    ? texto.split(/[^\d]+/).filter(Boolean)
+    : [texto.replace(/\D/g, ''), undefined];
   const cantidad = Number(c);
   if (!Number.isFinite(cantidad) || cantidad < 1) return null;
   const colores = Number(col || 0);
@@ -76,7 +123,9 @@ type Resultado =
   | { cotizacion: ReturnType<typeof calcularCotizacion>; caja: Caja };
 
 async function cotizar(medidas: string, cantidadCruda: string): Promise<Resultado | null> {
-  const m = leerMedidas(medidas);
+  const canonico = canonizarMedidas(medidas);
+  if (!canonico) return null;
+  const m = leerMedidas(canonico);
   const c = leerCantidad(cantidadCruda);
   if (!m || !c) return null;
 
@@ -136,6 +185,15 @@ const ars = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`;
 
 export default async function CotizarPage({ params }: Props) {
   const { medidas, cantidad } = await params;
+
+  // Si la direccion no venia en la forma canonica —porque usaron "×", "X", un
+  // asterisco o centimetros— se manda a la buena. Asi una misma cotizacion
+  // tiene una sola URL indexable, y el que la escribio distinto igual llega.
+  const canonico = canonizarMedidas(medidas);
+  if (canonico && canonico !== medidas) {
+    redirect(`/cotizar/${canonico}/${cantidad}`);
+  }
+
   const r = await cotizar(medidas, cantidad);
   if (!r) notFound();
 

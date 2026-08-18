@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { ConectarConIA } from '@/components/public/ConectarConIA';
 import { Check, Copy, ExternalLink, Zap, Box, Calculator, Clock, Shield } from 'lucide-react';
 
 export default function ApiDocsPage() {
@@ -136,6 +137,15 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
 
       {/* Content */}
       <main className="max-w-4xl mx-auto px-6 py-12 space-y-12">
+        {/* Conectar el cotizador al asistente de quien lee.
+            Va ANTES del Quick Start a proposito: la mayoria de quienes llegan
+            aca no viene a escribir codigo, viene a que su asistente pueda
+            cotizar. El curl es para el que integra de verdad, que es minoria. */}
+        <ConectarConIA
+          urlMcp={`${SITE_URL}/api/mcp`}
+          urlCotizar={`${SITE_URL}/cotizar/400x600x600/3000`}
+        />
+
         {/* Quick Start */}
         <section>
           <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">

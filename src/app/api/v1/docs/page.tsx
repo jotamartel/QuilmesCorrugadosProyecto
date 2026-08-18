@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { SITE_URL } from '@/lib/site';
+import { RETAIL_CONFIG } from '@/lib/retail/config';
 import { Check, Copy, ExternalLink, Zap, Box, Calculator, Clock, Shield } from 'lucide-react';
 
 export default function ApiDocsPage() {
@@ -41,9 +42,9 @@ export default function ApiDocsPage() {
         "sheet_length_mm": 1450,
         "sqm_per_box": 0.725,
         "total_sqm": 725,
-        "price_per_m2": 900,
-        "unit_price": 652.50,
-        "subtotal": 652500
+        "price_per_m2": 990,
+        "unit_price": 717.75,
+        "subtotal": 717750
       }
     ],
     "total_m2": 725,
@@ -285,7 +286,7 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
                 <tr>
                   <td className="py-2 font-mono text-gray-900">printing_colors</td>
                   <td className="py-2 text-gray-600">integer</td>
-                  <td className="py-2 text-gray-600">0-4</td>
+                  <td className="py-2 text-gray-600">0-{RETAIL_CONFIG.MAX_PRINTING_COLORS}</td>
                   <td className="py-2 text-gray-600">Cantidad de colores (opcional)</td>
                 </tr>
               </tbody>
@@ -463,7 +464,7 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
             Si necesitás un rate limit mayor para tu integración, contactanos para obtener una API key personalizada.
           </p>
           <a
-            href="mailto:info@quilmescorrugados.com.ar?subject=Solicitud%20de%20API%20Key"
+            href="mailto:ventas@quilmescorrugados.com.ar?subject=Solicitud%20de%20API%20Key"
             className="inline-flex items-center gap-2 px-4 py-2 bg-white text-[#002E55] rounded-lg font-medium hover:bg-gray-100 transition-colors"
           >
             Solicitar API Key
@@ -477,7 +478,7 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
         <div className="max-w-4xl mx-auto px-6 text-center text-sm text-gray-500">
           <p>© {new Date().getFullYear()} Quilmes Corrugados S.A. Todos los derechos reservados.</p>
           <p className="mt-2">
-            <a href="${SITE_URL}" className="hover:text-gray-700">quilmes-corrugados.vercel.app</a>
+            <a href="${SITE_URL}" className="hover:text-gray-700">{SITE_URL.replace(/^https:\/\//, '')}</a>
             {' · '}
             <a href="/llms.txt" className="hover:text-gray-700">llms.txt</a>
             {' · '}

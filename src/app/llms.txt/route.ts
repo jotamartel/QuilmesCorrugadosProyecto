@@ -97,7 +97,7 @@ También acepta centímetros, que suele ser como lo dice el usuario:
 ${BASE_URL}/api/v1/quote?length_cm=40&width_cm=60&height_cm=60&quantity=3000
 
 Parámetros: length_mm (100-2000), width_mm (100-2000), height_mm (50-1500),
-quantity (entero ≥ 1), printing_colors (0-4, opcional, +15% por color).
+quantity (entero ≥ 1), printing_colors (0-${RETAIL_CONFIG.MAX_PRINTING_COLORS}, opcional, +15% por color).
 Alias aceptados: largo_cm / ancho_cm / alto_cm / cantidad.
 Límite: 10 consultas por minuto sin API key.
 

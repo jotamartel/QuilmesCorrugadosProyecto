@@ -8,6 +8,7 @@ import { LandingFooter } from '@/components/public/LandingFooter';
 import { BreadcrumbSchema, ProductSchema } from '@/components/public/SchemaMarkup';
 import { Package, Palette, ShoppingBag, Truck, ArrowRight } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
+import { RETAIL_CONFIG } from '@/lib/retail/config';
 
 // Metadata movida - usar generateMetadata si es necesario
 
@@ -130,8 +131,13 @@ export default function ProductosPage() {
               <div className="text-center">
                 <h3 className="font-semibold text-gray-900 mb-2">Medidas</h3>
                 <p className="text-gray-600 text-sm">
-                  Sin límite de medidas. Fabricamos desde cajas pequeñas de 150mm hasta
-                  contenedores de más de 1.200mm. Cualquier combinación de largo x ancho x alto.
+                  {/* Decia "sin límite de medidas... más de 1.200mm", y hay un límite
+                      duro: ancho + alto no puede superar el ancho de bobina. Prometer
+                      lo que la máquina no hace termina en un pedido que hay que
+                      rechazar después de que el cliente ya decidió. */}
+                  Cualquier combinación de largo x ancho x alto, dentro de un límite de
+                  producción: ancho + alto no puede superar {RETAIL_CONFIG.MAX_SHEET_WIDTH} mm,
+                  que es el ancho de la bobina de cartón.
                 </p>
               </div>
               <div className="text-center">

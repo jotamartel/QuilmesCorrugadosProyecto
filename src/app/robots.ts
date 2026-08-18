@@ -44,6 +44,7 @@ const PUBLICO = [
   // Genera el PDF de la caja desplegada para que el cliente ubique su diseño.
   // Es público a propósito: que un asistente lo pueda ofrecer junto al precio.
   '/api/box-template',
+  '/api/mcp',
 ]
 
 /**

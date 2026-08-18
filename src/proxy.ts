@@ -53,6 +53,9 @@ const PUBLICO: Array<{ patron: RegExp; metodos?: string[]; nota: string }> = [
   { patron: /^\/api\/public\//, nota: 'las llama el cotizador del sitio' },
   { patron: /^\/api\/v1\//, nota: 'API de cotización, pública a propósito' },
   { patron: /^\/api\/box-template/, nota: 'troquel, publicado para asistentes de IA' },
+  // Servidor MCP: lo llama el asistente de otra persona, no hay sesion posible.
+  // Es de solo lectura y usa el mismo rate limit que la API publica.
+  { patron: /^\/api\/mcp$/, nota: 'servidor MCP, publico como la API' },
 
   // Leer el precio es público —lo necesita el cotizador—; escribirlo no.
   // Este es el motivo por el que la lista distingue métodos: sin eso,

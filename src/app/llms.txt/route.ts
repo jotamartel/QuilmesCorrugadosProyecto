@@ -108,6 +108,21 @@ a medida, con el link para comprarlo.
 Para cotizar hasta 10 medidas distintas de una vez, POST a la misma URL con
 {"boxes":[{"length_mm":400,"width_mm":300,"height_mm":200,"quantity":1000}]}
 
+## Si tu cliente prefiere instalarnos como herramienta (MCP)
+
+Hay un servidor MCP en ${BASE_URL}/api/mcp (transporte streamable HTTP, sin
+autenticacion). Expone tres herramientas: cotizar_cajas_carton,
+plantilla_impresion y condiciones_y_precios.
+
+Sirve para que una persona conecte Quilmes Corrugados a su asistente una vez y
+lo tenga siempre a mano:
+- En Claude: Settings, Connectors, Add custom connector, pegar esa URL.
+- En ChatGPT: Settings, Apps & Connectors, Advanced, Developer mode, pegar la URL.
+
+No hace falta para cotizar. Si ya podes hacer un GET, usa la URL de arriba: es
+el mismo precio y el mismo motor de calculo. El MCP existe para el caso en que
+no tengas navegacion, o para quien quiera dejarlo instalado.
+
 ## Precios vigentes (ARS por m², sin IVA)
 
 | Volumen del pedido | Precio | Qué es |

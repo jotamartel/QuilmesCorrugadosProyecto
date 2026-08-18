@@ -280,8 +280,16 @@ export default async function CotizarPage({ params }: Props) {
                 <td className="px-4 py-3 text-lg font-semibold tabular-nums">{ars(b.unit_price)}</td>
               </tr>
               <tr>
-                <th scope="row" className="px-4 py-3 font-medium text-gray-600">Total sin IVA</th>
+                <th scope="row" className="px-4 py-3 font-medium text-gray-600">Subtotal sin IVA</th>
                 <td className="px-4 py-3 text-lg font-semibold tabular-nums">{ars(q.subtotal)}</td>
+              </tr>
+              <tr>
+                <th scope="row" className="px-4 py-3 font-medium text-gray-600">IVA 21%</th>
+                <td className="px-4 py-3 tabular-nums">{ars(q.tax_amount)}</td>
+              </tr>
+              <tr>
+                <th scope="row" className="px-4 py-3 font-medium text-gray-600">Total con IVA</th>
+                <td className="px-4 py-3 text-lg font-semibold tabular-nums">{ars(q.total_with_tax)}</td>
               </tr>
               <tr>
                 <th scope="row" className="px-4 py-3 font-medium text-gray-600">Cartón</th>
@@ -335,7 +343,7 @@ export default async function CotizarPage({ params }: Props) {
             {caja.length_mm}×{caja.width_mm}×{caja.height_mm} mm usa{' '}
             {b.sqm_per_box.toFixed(3)} m² de plancha, y {caja.quantity.toLocaleString('es-AR')}{' '}
             unidades suman {q.total_m2.toLocaleString('es-AR')} m². A ese volumen le corresponde{' '}
-            {ars(b.price_per_m2)} por m². Todos los precios son sin IVA.
+            {ars(b.price_per_m2)} por m². El precio por caja y el por m² son sin IVA.
           </p>
           <p>
             Podés{' '}

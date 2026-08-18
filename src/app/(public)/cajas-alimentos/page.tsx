@@ -12,7 +12,7 @@ import { CtaMovilFijo } from '@/components/public/CtaMovilFijo';
 import { BotonCompartir } from '@/components/public/BotonCompartir';
 import { Pizza, Truck, UtensilsCrossed, ArrowRight } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
-import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
 
 const MIN = RETAIL_CONFIG.MIN_CANTIDAD;
 
@@ -50,9 +50,7 @@ const PREGUNTAS = [
   {
     pregunta: '¿Entregan en CABA y zona sur?',
     respuesta:
-      'Sí. Envío gratis hasta 60 km de la fábrica en Quilmes, que cubre CABA y buena parte ' +
-      'del GBA sur. A todo el país con costo de flete. Stock en 24 a 48 horas, producción a ' +
-      'medida en 7 días hábiles.',
+      ENVIO.largo + ' Stock en 24 a 48 horas, producción a medida en 7 días hábiles.',
   },
 ];
 
@@ -101,7 +99,7 @@ export default function CajasAlimentosPage() {
               },
               { rotulo: 'Impresión', valor: 'Hasta 3 colores; plantilla troquelada desde 1.000 m²' },
               { rotulo: 'Material', valor: 'Cartón kraft, sin tintas en la cara interna' },
-              { rotulo: 'Entrega', valor: 'Stock en 24-48 h; envío gratis hasta 60 km de Quilmes' },
+              { rotulo: 'Envío', valor: ENVIO.corto },
             ]}
             accion={{ texto: 'Ver todos los precios', href: '/precios' }}
           />
@@ -132,7 +130,7 @@ export default function CajasAlimentosPage() {
                 <Truck className="w-6 h-6 text-[#002E55]" />
               </div>
               <h3 className="font-semibold text-gray-900 mb-2">Entrega rápida en GBA</h3>
-              <p className="text-gray-600 text-sm">Producción en Quilmes. Envío gratis zona sur. Entrega en 7-14 días.</p>
+              <p className="text-gray-600 text-sm">Producción propia en Quilmes. Entrega en 7 a 14 días hábiles.</p>
             </div>
           </div>
 

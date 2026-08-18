@@ -12,7 +12,7 @@ import { CtaMovilFijo } from '@/components/public/CtaMovilFijo';
 import { BotonCompartir } from '@/components/public/BotonCompartir';
 import { Package, TrendingDown, Factory, ArrowRight } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
-import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
 
 const MIN = RETAIL_CONFIG.MIN_CANTIDAD;
 
@@ -50,7 +50,7 @@ const PREGUNTAS = [
     pregunta: '¿Qué plazo de producción manejan y cómo se factura?',
     respuesta:
       'La producción a medida demora 7 días hábiles desde la aprobación. Facturamos A y B. ' +
-      'Envío gratis hasta 60 km de la fábrica en Quilmes y a todo el país con costo de flete.',
+      ENVIO.largo,
   },
 ];
 

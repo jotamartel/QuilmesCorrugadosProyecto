@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { SITE_URL } from '@/lib/site';
-import { MINIMOS } from '@/lib/retail/config';
+import { MINIMOS, ENVIO } from '@/lib/retail/config';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
@@ -19,7 +19,7 @@ const faqs = [
   },
   {
     question: '¿Hacen envíos a todo el país?',
-    answer: 'Sí, realizamos envíos a toda la Argentina. El envío es gratis dentro de un radio de 60 km desde nuestra fábrica en Quilmes (zona sur del Gran Buenos Aires). Para envíos a mayor distancia o al interior del país, coordinamos el transporte con tarifas competitivas.',
+    answer: ENVIO.largo,
   },
   {
     question: '¿Cuánto tardan en entregar un pedido?',

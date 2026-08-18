@@ -191,7 +191,9 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       `Mínimos: ${RETAIL_CONFIG.MIN_CANTIDAD} cajas si la medida está en stock; ${n(c.min_m2_per_model)} m² por modelo para producción a medida.`,
       `Impresión: flexográfica, hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores, +15% por color.`,
       'Plazos: stock en 24 a 48 horas; producción a medida en 7 días hábiles.',
-      'Envío: gratis hasta 60 km de la fábrica en Quilmes; a todo el país con costo.',
+      `Envío: gratis en pedidos mayoristas desde ${c.free_shipping_min_m2.toLocaleString('es-AR')} m² y hasta ` +
+        `${c.free_shipping_max_km} km de la fábrica en Quilmes. En pedidos minoristas, retiro en ` +
+        'fábrica o envío a cargo del comprador. Al interior, flete aparte en ambos casos.',
       '',
       'Para un precio exacto hace falta la medida y la cantidad: usá cotizar_cajas_carton.',
     ].join('\n');

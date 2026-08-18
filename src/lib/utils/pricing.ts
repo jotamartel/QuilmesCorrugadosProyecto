@@ -74,9 +74,8 @@ export function calculateSubtotal(totalM2: number, pricePerM2: number): number {
 }
 
 /**
- * Verifica si aplica envío gratis
- * - Mínimo 4.000 m² (camión completo)
- * - Máximo 60 km desde fábrica
+ * Verifica si aplica envío gratis. Los dos umbrales salen de pricing_config,
+ * asi que no se escriben aca: el texto que acompaña tambien los lee de ahi.
  */
 export function isFreeShipping(
   totalM2: number,
@@ -104,7 +103,7 @@ export function getShippingNotes(
   const freeShipping = isFreeShipping(totalM2, distanceKm, config);
 
   if (freeShipping) {
-    return 'Envío gratis incluido (pedido ≥ 4.000 m² y distancia ≤ 60 km)';
+    return `Envío gratis incluido (pedido mayorista ≥ ${config.free_shipping_min_m2.toLocaleString('es-AR')} m² y distancia ≤ ${config.free_shipping_max_km} km)`;
   }
 
   const reasons: string[] = [];

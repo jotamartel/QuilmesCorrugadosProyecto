@@ -815,7 +815,7 @@ export function QuoterForm() {
                     </select>
                     {clientData.province !== 'Buenos Aires' && clientData.province !== 'CABA' && (
                       <p className="text-xs text-[#002E55] mt-1">
-                        El envío gratis solo aplica en Buenos Aires y CABA (hasta {FREE_SHIPPING_MAX_KM} km)
+                        El envío gratis aplica en pedidos mayoristas dentro de {FREE_SHIPPING_MAX_KM} km (Buenos Aires y CABA)
                       </p>
                     )}
                   </div>

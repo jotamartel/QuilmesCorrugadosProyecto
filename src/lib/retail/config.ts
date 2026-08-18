@@ -18,6 +18,10 @@ export interface RetailConfig {
   // Mínimos
   MIN_M2_A_MEDIDA: number;
 
+  // Envío
+  ENVIO_GRATIS_MIN_M2: number;
+  ENVIO_GRATIS_KM: number;
+
   // Impresión
   MAX_PRINTING_COLORS: number;
 
@@ -71,6 +75,12 @@ export const RETAIL_CONFIG: RetailConfig = {
   // Existe como constante porque los metadatos y el JSON-LD son estaticos y no
   // pueden leer la base.
   MIN_M2_A_MEDIDA: 3000,
+
+  // Condiciones del envio gratis. Espejan pricing_config.free_shipping_min_m2
+  // y free_shipping_max_km. El minimo de m² NO es decorativo: el envio gratis
+  // es un beneficio del canal mayorista, no del minorista.
+  ENVIO_GRATIS_MIN_M2: 3000,
+  ENVIO_GRATIS_KM: 60,
 
   // Colores de impresión flexográfica.
   //
@@ -142,4 +152,29 @@ export const MINIMOS = {
     `propia fabricada a pedido, el mínimo es de ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² ` +
     `de cartón por modelo, que son entre 1.000 y 5.000 cajas según el tamaño: por ejemplo, una ` +
     `caja de 400x300x300 mm requiere unas 2.800 unidades.`,
+} as const;
+
+/**
+ * Como se enuncian las condiciones de envio, en un solo lugar.
+ *
+ * Catorce textos decian "envio gratis hasta 60 km" sin mencionar que ese
+ * beneficio arranca en 3.000 m². Le estabamos prometiendo envio sin cargo a
+ * un comprador minorista de 100 cajas que en realidad tiene que retirar por
+ * fabrica o pagarse el flete.
+ *
+ * Es el peor tipo de error comercial: no espanta al cliente, lo atrae con una
+ * condicion que despues hay que desmentir cuando ya decidio comprar. Y en las
+ * superficies que lee un asistente de IA se repite como dato verificado.
+ */
+export const ENVIO = {
+  /** Para metadatos y textos cortos. */
+  corto: `gratis desde ${RETAIL_CONFIG.ENVIO_GRATIS_MIN_M2.toLocaleString('es-AR')} m² dentro de ${RETAIL_CONFIG.ENVIO_GRATIS_KM} km de Quilmes; pedidos menores, retiro en fábrica o envío a cargo del comprador`,
+  /** Para respuestas y donde hay lugar para explicar. */
+  largo:
+    `Depende del tamaño del pedido. En pedidos mayoristas, desde ` +
+    `${RETAIL_CONFIG.ENVIO_GRATIS_MIN_M2.toLocaleString('es-AR')} m², el envío es gratis dentro de un radio de ` +
+    `${RETAIL_CONFIG.ENVIO_GRATIS_KM} km de la fábrica en Quilmes, que cubre la zona sur del Gran Buenos Aires, ` +
+    `CABA y La Plata. En pedidos minoristas el retiro es en la fábrica, o coordinamos el envío con el ` +
+    `costo a cargo del comprador. Para destinos más lejanos o al interior del país, el flete se cotiza ` +
+    `aparte en ambos casos.`,
 } as const;

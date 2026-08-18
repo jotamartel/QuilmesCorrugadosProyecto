@@ -12,7 +12,7 @@ import { CtaMovilFijo } from '@/components/public/CtaMovilFijo';
 import { BotonCompartir } from '@/components/public/BotonCompartir';
 import { Package, Shield, Move, ArrowRight } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
-import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
 
 const MIN = RETAIL_CONFIG.MIN_CANTIDAD;
 
@@ -48,7 +48,7 @@ const PREGUNTAS = [
   {
     pregunta: '¿Hacen envíos y cuánto tardan?',
     respuesta:
-      'Sí. Envío gratis hasta 60 km de la fábrica en Quilmes y a todo el país con costo. ' +
+      ENVIO.largo + ' ' +
       'Lo que está en stock sale en 24 a 48 horas; la producción a medida demora 7 días hábiles.',
   },
 ];
@@ -98,7 +98,7 @@ export default function CajasMudanzaPage() {
               },
               { rotulo: 'Medidas', valor: 'A pedido, hasta 1.200 mm de ancho de plancha' },
               { rotulo: 'Cartón', valor: 'Onda C para uso general, doble onda BC para apilar y frágiles' },
-              { rotulo: 'Entrega', valor: 'Stock en 24-48 h; envío gratis hasta 60 km de Quilmes' },
+              { rotulo: 'Envío', valor: ENVIO.corto },
             ]}
             accion={{ texto: 'Ver todos los precios', href: '/precios' }}
           />

@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { SITE_URL } from '@/lib/site';
+import { ENVIO } from '@/lib/retail/config';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
@@ -153,8 +154,7 @@ export default function ContactoPage() {
           <section className="bg-gray-50 rounded-xl p-8 text-center">
             <h2 className="text-xl font-bold text-gray-900 mb-3">Zona de cobertura</h2>
             <p className="text-gray-600 max-w-xl mx-auto">
-              Envío gratis dentro de un radio de 60 km desde Quilmes (zona sur GBA, CABA, La Plata).
-              Para el resto del país, coordinamos transporte con tarifas competitivas.
+              {ENVIO.largo}
             </p>
           </section>
         </div>

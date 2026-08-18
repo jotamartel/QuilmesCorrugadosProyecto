@@ -19,6 +19,20 @@ import type { PricingConfig } from '@/lib/types/database';
 
 const SITIO = SITE_URL;
 
+/**
+ * IVA general de Argentina.
+ *
+ * Se expone en la respuesta en vez de dejar que el que consume lo calcule.
+ * En una prueba real ChatGPT recibio el subtotal sin IVA, le aplico el 21% por
+ * su cuenta y le presento al usuario un total con impuesto. Le salio bien, pero
+ * es una operacion que no tendria que estar haciendo: si algun dia cambia la
+ * alicuota, o si el modelo se equivoca en la cuenta, el cliente llega con un
+ * numero que no es el nuestro y la discusion la tenemos nosotros.
+ *
+ * Dar el total ya calculado saca esa ambiguedad del medio.
+ */
+const IVA = 0.21;
+
 export interface BoxInput {
   length_mm: number;
   width_mm: number;
@@ -50,6 +64,14 @@ export interface QuoteResult {
   boxes: BoxResult[];
   total_m2: number;
   subtotal: number;
+  /**
+   * Impuestos, explicitos para que nadie tenga que calcularlos.
+   * `subtotal` NUNCA incluye IVA; `total` siempre lo incluye.
+   */
+  tax_rate: number;
+  tax_amount: number;
+  total_with_tax: number;
+  subtotal_includes_tax: false;
   currency: string;
   estimated_days: number;
   valid_until: string;
@@ -225,8 +247,14 @@ export function calcularCotizacion(
     ? `${b0.quantity.toLocaleString('es-AR')} cajas de ${b0.length_mm}x${b0.width_mm}x${b0.height_mm} mm a ${ars(b0.unit_price)} por caja`
     : `${boxResults.length} medidas distintas, ${boxResults.reduce((s, b) => s + b.quantity, 0).toLocaleString('es-AR')} cajas en total`;
 
+  // El resumen lleva los dos numeros: el subtotal, que es como cotizamos, y el
+  // total con IVA, que es lo que el cliente termina pagando. Antes solo iba el
+  // primero con un "+ IVA" al lado, y un asistente hacia la cuenta por su
+  // cuenta para decirle al usuario cuanto sale de verdad. Darle los dos evita
+  // que calcule, y evita que se equivoque calculando.
   const summary =
-    `Quilmes Corrugados: ${detalle}. Total ${ars(totalSubtotal)} ARS + IVA ` +
+    `Quilmes Corrugados: ${detalle}. Subtotal ${ars(totalSubtotal)} ARS sin IVA, ` +
+    `total ${ars(Math.round(totalSubtotal * (1 + IVA)))} ARS con IVA 21% incluido ` +
     `(${totalM2.toLocaleString('es-AR')} m²). ` +
     (!esDeStock
       ? `Producción a medida, ${maxEstimatedDays} días hábiles.`
@@ -280,6 +308,10 @@ export function calcularCotizacion(
     boxes: boxResults,
     total_m2: totalM2,
     subtotal: totalSubtotal,
+    tax_rate: IVA,
+    tax_amount: Math.round(totalSubtotal * IVA * 100) / 100,
+    total_with_tax: Math.round(totalSubtotal * (1 + IVA) * 100) / 100,
+    subtotal_includes_tax: false,
     currency: 'ARS',
     estimated_days: maxEstimatedDays,
     valid_until: validUntil.toISOString().split('T')[0],

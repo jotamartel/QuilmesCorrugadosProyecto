@@ -12,7 +12,7 @@ import { CtaMovilFijo } from '@/components/public/CtaMovilFijo';
 import { BotonCompartir } from '@/components/public/BotonCompartir';
 import { Package, Truck, Shield, ArrowRight } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
-import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
 
 const MIN = RETAIL_CONFIG.MIN_CANTIDAD;
 
@@ -56,7 +56,7 @@ const PREGUNTAS = [
     pregunta: '¿Cuánto tarda la entrega?',
     respuesta:
       'Lo que está en stock sale en 24 a 48 horas. La producción a medida demora 7 días ' +
-      'hábiles. El envío es gratis hasta 60 km de la fábrica en Quilmes y llega a todo el país.',
+      'hábiles. ' + ENVIO.largo,
   },
 ];
 
@@ -106,7 +106,7 @@ export default function CajasEcommercePage() {
               },
               { rotulo: 'Plazo', valor: 'Stock en 24-48 h, producción a medida en 7 días hábiles' },
               { rotulo: 'Impresión', valor: 'Hasta 3 colores, con plantilla troquelada desde 1.000 m²' },
-              { rotulo: 'Envío', valor: 'Gratis hasta 60 km de Quilmes; a todo el país con costo' },
+              { rotulo: 'Envío', valor: ENVIO.corto },
             ]}
             accion={{ texto: 'Ver todos los precios', href: '/precios' }}
           />
@@ -135,7 +135,7 @@ export default function CajasEcommercePage() {
               </div>
               <h3 className="mb-2 font-semibold text-gray-900">Envíos a todo el país</h3>
               <p className="text-sm text-gray-600">
-                Compatible con Correo Argentino y mensajerías. Envío gratis en zona sur GBA.
+                Compatible con Correo Argentino y mensajerías. Coordinamos el despacho.
               </p>
             </div>
             <div className="p-6 text-center">

@@ -12,7 +12,7 @@ import { BotonCompartir } from '@/components/public/BotonCompartir';
 import Link from 'next/link';
 import { Factory, Truck, Ruler, Palette, ArrowDown, ShoppingBag } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
-import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
 
 const benefits = [
   {
@@ -23,7 +23,7 @@ const benefits = [
   {
     icon: Truck,
     title: 'Envíos a todo el país',
-    description: 'Envío gratis hasta 60 km',
+    description: ENVIO.corto,
   },
   {
     icon: Ruler,
@@ -228,7 +228,7 @@ export default function LandingPage() {
           {
             pregunta: '¿Hacen envíos? ¿Cuánto tardan?',
             respuesta:
-              'Envío gratis hasta 60 km de la fábrica en Quilmes y a todo el país con costo ' +
+              ENVIO.largo + ' ' +
               'de flete. Lo que está en stock sale en 24 a 48 horas; la producción a medida ' +
               'demora 7 días hábiles.',
           },

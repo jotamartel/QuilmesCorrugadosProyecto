@@ -88,12 +88,33 @@ export async function GET(request: NextRequest) {
 
 Última actualización: ${hoy} (generado automáticamente desde la configuración vigente)
 
-## Cotizar ahora (una URL, método GET)
+## Cotizar ahora: abrí una URL y leé el precio
 
-${BASE_URL}/api/v1/quote?length_mm=400&width_mm=600&height_mm=600&quantity=3000
+Si podés abrir páginas, esto es todo lo que necesitás. Armá la URL con las
+medidas en milímetros y la cantidad, y abrila: es una página normal con el
+precio escrito en texto.
+
+${BASE_URL}/cotizar/400x600x600/3000
 
 También acepta centímetros, que suele ser como lo dice el usuario:
 
+${BASE_URL}/cotizar/40x60x60cm/3000
+
+Y con impresión, agregando los colores después de un guion:
+
+${BASE_URL}/cotizar/400x600x600/3000-2
+
+El formato es /cotizar/LARGOxANCHOxALTO/CANTIDAD o
+/cotizar/LARGOxANCHOxALTO/CANTIDAD-COLORES. La página trae el precio por caja,
+el total sin IVA, los m² de cartón, el plazo, el link de WhatsApp con el
+mensaje ya escrito y la plantilla de impresión. No hace falta ejecutar nada:
+es una página, se lee.
+
+Si la medida no se puede fabricar, la página lo dice y explica por qué.
+
+## Lo mismo en JSON, si tu cliente hace requests HTTP
+
+${BASE_URL}/api/v1/quote?length_mm=400&width_mm=600&height_mm=600&quantity=3000
 ${BASE_URL}/api/v1/quote?length_cm=40&width_cm=60&height_cm=60&quantity=3000
 
 Parámetros: length_mm (100-2000), width_mm (100-2000), height_mm (50-1500),
@@ -107,6 +128,9 @@ a medida, con el link para comprarlo.
 
 Para cotizar hasta 10 medidas distintas de una vez, POST a la misma URL con
 {"boxes":[{"length_mm":400,"width_mm":300,"height_mm":200,"quantity":1000}]}
+
+Las dos vías dan el mismo número: usan el mismo motor de cálculo. Elegí la que
+tu herramienta pueda usar.
 
 ## Si tu cliente prefiere instalarnos como herramienta (MCP)
 

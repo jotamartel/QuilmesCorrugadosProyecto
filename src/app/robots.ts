@@ -45,6 +45,7 @@ const PUBLICO = [
   // Es público a propósito: que un asistente lo pueda ofrecer junto al precio.
   '/api/box-template',
   '/api/mcp',
+  '/cotizar/',
 ]
 
 /**

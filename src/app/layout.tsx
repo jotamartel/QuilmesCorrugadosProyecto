@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { GoogleAnalytics } from "@/components/tracking/GoogleAnalytics";
 import { GoogleAds } from "@/components/tracking/GoogleAds";
+import { RETAIL_CONFIG } from "@/lib/retail/config";
 import { AtribucionTracker } from "@/components/tracking/AtribucionTracker";
 import { MetaPixel } from "@/components/tracking/MetaPixel";
 import "./globals.css";
@@ -130,32 +131,35 @@ const jsonLdBusiness = {
   hasOfferCatalog: {
     "@type": "OfferCatalog",
     name: "Cajas de Cartón Corrugado",
+    // Las ofertas apuntan a /precios, que es la unica pagina que publica los
+    // valores en el HTML tomandolos de la configuracion vigente.
+    //
+    // Antes cada Offer envolvia un Product con itemOffered. La inspeccion de
+    // Search Console lo marco como error critico en las dos: un Product tiene
+    // que declarar offers, review o aggregateRating, y estos no podian
+    // declarar precio sin congelarlo aca y contradecir a /precios en cuanto
+    // alguien cambie un valor.
+    //
+    // La salida no es completarlos, es no duplicarlos: /precios ya declara los
+    // productos bien, con Product + AggregateOffer + UnitPriceSpecification y
+    // los precios reales. Este catalogo se queda con Offers a secas, que son
+    // validas sin producto anidado, y el detalle vive en un solo lugar.
     itemListElement: [
-      // Las ofertas apuntan a /precios, que es la unica pagina que publica los
-      // valores en el HTML y los toma de la configuracion vigente. El layout no
-      // los repite: si los escribiera aca, quedarian congelados y contradiciendo
-      // a la pagina de precios en cuanto alguien cambie un valor.
       {
         "@type": "Offer",
+        name: "Cajas de cartón corrugado estándar",
+        description: "Cajas a medida sin impresión, cartón onda C",
         url: `${BASE_URL}/precios`,
         priceCurrency: "ARS",
         availability: "https://schema.org/InStock",
-        itemOffered: {
-          "@type": "Product",
-          name: "Cajas de cartón corrugado estándar",
-          description: "Cajas a medida sin impresión, cartón onda C",
-        },
       },
       {
         "@type": "Offer",
+        name: "Cajas de cartón corrugado con impresión",
+        description: `Cajas a medida con impresión flexográfica de hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores`,
         url: `${BASE_URL}/precios`,
         priceCurrency: "ARS",
         availability: "https://schema.org/InStock",
-        itemOffered: {
-          "@type": "Product",
-          name: "Cajas de cartón corrugado con impresión",
-          description: "Cajas a medida con impresión flexográfica de 1 a 4 colores",
-        },
       },
     ],
   },

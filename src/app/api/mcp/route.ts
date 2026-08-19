@@ -85,7 +85,7 @@ const HERRAMIENTAS = [
       },
       required: ['largo_mm', 'ancho_mm', 'alto_mm', 'cantidad'],
     },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
   },
   {
     name: 'plantilla_impresion',
@@ -105,7 +105,7 @@ const HERRAMIENTAS = [
       },
       required: ['largo_mm', 'ancho_mm', 'alto_mm'],
     },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
   },
   {
     name: 'condiciones_y_precios',
@@ -116,7 +116,7 @@ const HERRAMIENTAS = [
       'o "cuál es el mínimo" sin necesidad de una medida concreta. Si ya tenés medidas y ' +
       'cantidad, usá cotizar_cajas_carton, que da el número exacto.',
     inputSchema: { type: 'object', properties: {} },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
   },
 ];
 

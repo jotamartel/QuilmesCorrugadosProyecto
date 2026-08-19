@@ -43,16 +43,16 @@ export default function ConfiguracionPage() {
   // alineados con pricing_config para que un fallo de lectura no muestre
   // precios viejos en el formulario.
   const [pricingFormData, setPricingFormData] = useState({
-    price_per_m2_standard: 740,
-    price_per_m2_volume: 700,
+    price_per_m2_standard: 900,
+    price_per_m2_volume: 800,
     volume_threshold_m2: 5000,
     min_m2_per_model: 3000,
     wholesale_min_m2: 1000, // Limite entre stock (/cajas) y produccion a medida
-    price_per_m2_below_minimum: 900, // Recargo entre wholesale_min_m2 y min_m2_per_model
-    price_per_m2_retail: 990, // Precio de stock, por debajo de wholesale_min_m2
+    price_per_m2_below_minimum: 1000, // Recargo entre wholesale_min_m2 y min_m2_per_model
+    price_per_m2_retail: 1200, // Precio de stock, por debajo de wholesale_min_m2
     printing_min_m2: 1000,
-    printing_included_min_m2: 3000,
-    printing_surcharge_per_color: 0.15,
+    printing_included_min_m2: 1000,
+    printing_surcharge_per_color: 0,
     free_shipping_min_m2: 3000,
     free_shipping_max_km: 60,
     production_days_standard: 7,

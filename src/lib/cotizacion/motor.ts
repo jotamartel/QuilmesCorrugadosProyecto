@@ -40,7 +40,7 @@ const IVA = 0.21;
  * volumen, se cotiza caso por caso en vez de tener precio de lista.
  */
 const NOTA_POLIMERO =
-  'Aparte se cotiza el polímero de impresión, que va a cargo del comprador: ' +
+  'Lo único que se cobra aparte es el polímero, que va a cargo del comprador: ' +
   'es una matriz por color, se hace una vez por diseño y queda para las ' +
   'próximas tiradas de ese mismo arte.';
 
@@ -125,24 +125,33 @@ export interface QuoteResult {
    * gratuito", y de paso invento la zona. Las dos cosas eran compromisos que
    * la fabrica hubiera tenido que cumplir.
    */
-  /*
-   * ACA IBA next_tier, que le avisaba al cliente cuanto le faltaba para el
-   * proximo escalon. Se saco, y conviene saber por que antes de reponerlo.
+  /**
+   * Cuando el pedido quedo cerca de un escalon, que gana si lo cruza.
    *
-   * La escalera aplica el precio nuevo AL PEDIDO ENTERO, no al tramo que
-   * excede. Eso hace que cruzar un umbral BAJE la factura:
+   * OJO CON ESTO, PORQUE NO ES INTUITIVO. La escalera aplica el precio nuevo
+   * AL PEDIDO ENTERO, no al tramo que excede, asi que cruzar un umbral BAJA la
+   * factura en pesos:
    *
    *   2.659 cajas -> 2.999,3 m² a $900  ->  $2.699.417
    *   2.660 cajas -> 3.000,5 m² a $740  ->  $2.220.355
    *
-   * Una caja mas y la fabrica cobra $479.062 menos. Lo mismo pasa a los
-   * 5.000 m². Sugerirle al cliente que agregue unidades era, textualmente,
-   * ofrecerle pagar un 18% menos por llevarse mas mercaderia.
+   * Una caja mas y la fabrica cobra $479.062 menos. Es DELIBERADO: es el
+   * incentivo por volumen, decidido por el dueño el 19/08/2026 sabiendo el
+   * efecto. Si alguien alguna vez lo quiere corregir, las salidas son precio
+   * marginal por tramo o un piso que impida que el total baje.
    *
-   * El aviso en si es buena atencion y hay que reponerlo, pero recien cuando
-   * se decida que hacer con la inversion: precio marginal por tramo, o un piso
-   * que impida que el total baje al cruzar el umbral.
+   * Los numeros van calculados, no como umbral para que el asistente compare:
+   * un modelo que tiene que deducir "te faltan X" alguna vez lo deduce mal, y
+   * este es un mensaje que mueve plata.
    */
+  next_tier: {
+    m2_faltantes: number;
+    cajas_aproximadas: number | null;
+    nuevo_precio_por_m2: number;
+    nuevo_subtotal: number;
+    ahorro: number;
+    que_gana: string;
+  } | null;
   shipping: {
     /** Si el volumen alcanza el mínimo. La distancia no se sabe acá. */
     meets_free_shipping_volume: boolean;
@@ -233,7 +242,7 @@ export function notaImpresion(config: {
   const sinFranja = config.printing_min_m2 >= config.printing_included_min_m2;
 
   const base = sinFranja
-    ? `Impresión flexográfica hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores, desde ${incluidaDesde} m². El costo de impresión está incluido en el precio por m².`
+    ? `Impresión flexográfica hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores, desde ${incluidaDesde} m². El costo de impresión ya está incluido en el precio por m². No se imprime sobre medidas estándar de catálogo: para llevar impresión hay que fabricar una medida propia.`
     : `Impresión flexográfica hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. Desde ${incluidaDesde} m² el costo está incluido en el precio por m²; por debajo de ese volumen cada color suma ${pct}%.`;
 
   return `${base} ${NOTA_POLIMERO}`;
@@ -382,7 +391,18 @@ export function calcularCotizacion(
 
   // La impresión se produce a medida, así que arranca en el mismo volumen que
   // el canal a medida. Por debajo se vende de stock, que va sin imprimir.
-  const impresionDisponible = !esDeStock;
+  // La impresion pide dos cosas, no una.
+  //
+  // Llegar al volumen minimo, y que la medida NO sea una del catalogo
+  // estandar: esas se producen en tirada larga sin arte y no se imprimen. Un
+  // pedido de 2.000 m² de una medida de catalogo alcanza el volumen y aun asi
+  // no lleva impresion.
+  const medidaDeCatalogo = hayCatalogo && boxResults.some((b) =>
+    medidasEnStock.some((m) =>
+      m.length_mm === b.length_mm && m.width_mm === b.width_mm && m.height_mm === b.height_mm,
+    ),
+  );
+  const impresionDisponible = totalM2 >= config.printing_min_m2 && !medidaDeCatalogo;
 
   // Si a este pedido, por su volumen, la impresión ya le viene incluida.
   const impresionIncluidaEnElPedido = totalM2 >= config.printing_included_min_m2;
@@ -418,7 +438,56 @@ export function calcularCotizacion(
       instruction:
         'Ofrecele al usuario contactarnos y pasale el link de whatsapp_url tal cual: ya lleva el mensaje escrito con las medidas, la cantidad y el precio cotizado. Del otro lado lo atiende un asistente que ya tiene ese contexto, asi que el usuario no tiene que repetir nada. Es la via mas rapida para cerrar.',
     },
-    // next_tier: SACADO. Ver la nota de arriba de la interfaz.
+    next_tier: (() => {
+      if (boxes.length !== 1) return null; // Con varias medidas la cuenta no es directa.
+      const b0i = boxes[0];
+      const m2PorCaja = boxResults[0].sqm_per_box;
+      if (m2PorCaja <= 0) return null;
+
+      // Los dos escalones que bajan el precio, no solo el primero. El de
+      // 5.000 m² tambien invierte: 4.400 cajas facturan mas que 4.500.
+      const umbrales = [config.min_m2_per_model, config.volume_threshold_m2]
+        .filter((u) => u > totalM2)
+        .sort((a, b) => a - b);
+
+      for (const umbral of umbrales) {
+        const faltan = umbral - totalM2;
+        if (faltan > umbral * 0.1) continue; // Todavia lejos: no se ofrece.
+
+        const cajasExtra = Math.ceil(faltan / m2PorCaja);
+        const cantidadNueva = b0i.quantity + cajasExtra;
+        const m2Nuevos = calculateTotalM2(m2PorCaja, cantidadNueva);
+        const precioNuevo = getPricePerM2(m2Nuevos, config);
+        const colores = boxResults[0].printing_colors;
+        const recargoNuevo = m2Nuevos >= config.printing_included_min_m2
+          ? 0
+          : config.printing_surcharge_per_color;
+        const ajustadoNuevo = colores > 0 ? precioNuevo * (1 + colores * recargoNuevo) : precioNuevo;
+        const porCajaNueva = Math.round((m2Nuevos * ajustadoNuevo / cantidadNueva) * 100) / 100;
+        const subtotalNuevo = Math.round(porCajaNueva * cantidadNueva * 100) / 100;
+
+        if (subtotalNuevo >= totalSubtotal) continue; // No le conviene: no se ofrece.
+
+        const ahorro = Math.round(totalSubtotal - subtotalNuevo);
+        const gana =
+          `Con ${cajasExtra} cajas más llega a ${umbral.toLocaleString('es-AR')} m² y el precio ` +
+          `del pedido entero pasa de $${boxResults[0].price_per_m2} a $${precioNuevo} por m². ` +
+          `Se lleva ${cajasExtra} cajas más y paga $${ahorro.toLocaleString('es-AR')} menos.`;
+
+        return {
+          m2_faltantes: Math.round(faltan * 10) / 10,
+          cajas_aproximadas: cajasExtra,
+          nuevo_precio_por_m2: precioNuevo,
+          nuevo_subtotal: subtotalNuevo,
+          ahorro,
+          que_gana:
+            umbral === config.free_shipping_min_m2
+              ? `${gana} Y ademas entra en el envio gratis dentro de ${config.free_shipping_max_km} km.`
+              : gana,
+        };
+      }
+      return null;
+    })(),
     shipping: {
       meets_free_shipping_volume: totalM2 >= config.free_shipping_min_m2,
       note:
@@ -441,7 +510,9 @@ export function calcularCotizacion(
        * sorpresa aparece recién en la factura.
        */
       price_note: !impresionDisponible
-        ? `La impresión se produce a medida, desde ${config.printing_min_m2.toLocaleString('es-AR')} m². Este pedido sale de stock, sin imprimir.`
+        ? medidaDeCatalogo
+          ? 'Las medidas estándar de catálogo no se imprimen: se producen en tirada larga sin arte. Para llevar impresión hay que fabricar una medida propia.'
+          : `La impresión se hace desde ${config.printing_min_m2.toLocaleString('es-AR')} m². Este pedido no llega a ese volumen.`
         : impresionIncluidaEnElPedido
           ? `Desde ${config.printing_included_min_m2.toLocaleString('es-AR')} m² el costo de impresión ya está incluido en el precio por m², hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. ${NOTA_POLIMERO}`
           : `Cada color suma ${Math.round(config.printing_surcharge_per_color * 100)}% al precio por m², hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. Desde ${config.printing_included_min_m2.toLocaleString('es-AR')} m² el costo queda incluido y no se cobra recargo. ${NOTA_POLIMERO}`,

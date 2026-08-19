@@ -106,18 +106,18 @@ export const RETAIL_CONFIG: RetailConfig = {
   // con pricing_config vía /api/public/retail-config, que es la fuente de
   // verdad. Se mantienen alineados con la base para que, si falla la lectura,
   // no se cotice un precio viejo.
-  RETAIL_PRICE_PER_M2: 990,       // ARS por m² — pricing_config.price_per_m2_retail
+  RETAIL_PRICE_PER_M2: 1200,       // ARS por m² — pricing_config.price_per_m2_retail
   PRECIO_MINIMO_PEDIDO: 5000,     // ARS
   DECIMALES_PRECIO: 0,            // Redondeo sin decimales
 
   // Tope del canal: pasado este volumen el pedido ya no sale de stock sino de
   // produccion a medida, y se deriva al cotizador mayorista.
   WHOLESALE_THRESHOLD_M2: 1000,   // m² — pricing_config.wholesale_min_m2
-  WHOLESALE_PRICE_PER_M2: 900,    // ARS por m² — solo para mostrar a cuanto sale al derivar
+  WHOLESALE_PRICE_PER_M2: 1000,    // ARS por m² — solo para mostrar a cuanto sale al derivar
   // Piso de la escalera, para poder mostrar "desde $X/m²" en paginas que son
   // componentes cliente y no pueden leer la base. La fuente de verdad sigue
   // siendo pricing_config.price_per_m2_volume; /precios muestra la tabla real.
-  VOLUME_PRICE_PER_M2: 700,       // ARS por m² — pricing_config.price_per_m2_volume
+  VOLUME_PRICE_PER_M2: 800,       // ARS por m² — pricing_config.price_per_m2_volume
 
   // Interacción
   DRAG_SENSITIVITY: 2,           // mm por pixel
@@ -182,6 +182,15 @@ export const MINIMOS = {
  * El horario correcto es 8 a 17. El JSON-LD ya lo tenia bien, asi que Google
  * nunca mostro el equivocado.
  */
+/**
+ * El papel con el que se fabrica. Es una pregunta que hace todo comprador
+ * tecnico y hasta ahora no estaba escrita en ningun lado del sitio.
+ */
+export const MATERIAL = {
+  gramaje: '100 libras',
+  descripcion: 'Cartón corrugado de 100 libras, kraft.',
+} as const;
+
 export const HORARIO = {
   desde: 8,
   hasta: 17,

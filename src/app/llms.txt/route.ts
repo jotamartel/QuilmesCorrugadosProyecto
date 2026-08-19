@@ -16,21 +16,21 @@ import type { PricingConfig } from '@/lib/types/database';
 
 import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
-import { HORARIO } from '@/lib/retail/config';
+import { HORARIO, MATERIAL } from '@/lib/retail/config';
 import { notaImpresion } from '@/lib/cotizacion/motor';
 
 const BASE_URL = SITE_URL;
 
 // Respaldos alineados con la fila activa de pricing_config.
 const RESPALDO = {
-  price_per_m2_retail: 990,
-  price_per_m2_below_minimum: 900,
-  price_per_m2_standard: 740,
-  price_per_m2_volume: 700,
+  price_per_m2_retail: 1200,
+  price_per_m2_below_minimum: 1000,
+  price_per_m2_standard: 900,
+  price_per_m2_volume: 800,
   wholesale_min_m2: 1000,
   printing_min_m2: 1000,
-  printing_included_min_m2: 3000,
-  printing_surcharge_per_color: 0.15,
+  printing_included_min_m2: 1000,
+  printing_surcharge_per_color: 0,
   min_m2_per_model: 3000,
   volume_threshold_m2: 5000,
   free_shipping_min_m2: 3000,
@@ -248,6 +248,7 @@ Cualquier medida dentro de los rangos. Producción ${c.production_days_standard}
 - Mínimo del canal de stock: 100 cajas.
 - Medida mínima por caja: 200 x 200 x 100 mm.
 - Ancho + alto no puede superar 1200 mm (limitación del rollo).
+- Material: ${MATERIAL.descripcion}
 - Precios en pesos argentinos. El subtotal va sin IVA; el total con IVA 21% viene
   aparte en la misma respuesta.
 - Envío gratis solo en pedidos mayoristas: desde ${m2(c.free_shipping_min_m2)} y dentro

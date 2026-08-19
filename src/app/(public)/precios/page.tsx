@@ -37,10 +37,10 @@ const ars = (n: number) => '$' + Math.round(Number(n)).toLocaleString('es-AR');
 const m2 = (n: number) => Number(n).toLocaleString('es-AR') + ' m²';
 
 const RESPALDO = {
-  price_per_m2_retail: 990,
-  price_per_m2_below_minimum: 900,
-  price_per_m2_standard: 740,
-  price_per_m2_volume: 700,
+  price_per_m2_retail: 1200,
+  price_per_m2_below_minimum: 1000,
+  price_per_m2_standard: 900,
+  price_per_m2_volume: 800,
   wholesale_min_m2: 1000,
   min_m2_per_model: 3000,
   volume_threshold_m2: 5000,
@@ -49,8 +49,8 @@ const RESPALDO = {
   production_days_standard: 7,
   production_days_printing: 14,
   printing_min_m2: 1000,
-  printing_included_min_m2: 3000,
-  printing_surcharge_per_color: 0.15,
+  printing_included_min_m2: 1000,
+  printing_surcharge_per_color: 0,
 };
 
 export default async function PreciosPage() {
@@ -74,10 +74,10 @@ export default async function PreciosPage() {
   };
 
   const tramos = [
-    { rango: `Hasta ${m2(c.corteStock)}`, precio: c.stock, que: 'Medidas estándar de stock, desde 100 cajas. Entrega más rápida.', canal: 'stock' as const },
-    { rango: `${m2(c.corteStock)} a ${m2(c.corteMinimo)}`, precio: c.recargo, que: 'Producción a medida, con recargo por bajo volumen.', canal: 'medida' as const },
-    { rango: `${m2(c.corteMinimo)} a ${m2(c.corteVolumen)}`, precio: c.estandar, que: 'Producción a medida, precio estándar.', canal: 'medida' as const },
-    { rango: `Más de ${m2(c.corteVolumen)}`, precio: c.volumen, que: 'Producción a medida, precio por volumen.', canal: 'medida' as const },
+    { rango: `Hasta ${m2(c.corteStock)}`, precio: c.stock, que: 'Medidas estándar de stock, desde 100 cajas. Entrega más rápida. Sin impresión.', canal: 'stock' as const },
+    { rango: `${m2(c.corteStock)} a ${m2(c.corteMinimo)}`, precio: c.recargo, que: 'Producción a medida. Con impresión hasta 3 colores, incluida en el precio.', canal: 'medida' as const },
+    { rango: `${m2(c.corteMinimo)} a ${m2(c.corteVolumen)}`, precio: c.estandar, que: 'Producción a medida, precio estándar. Impresión incluida.', canal: 'medida' as const },
+    { rango: `Más de ${m2(c.corteVolumen)}`, precio: c.volumen, que: 'Producción a medida, precio por volumen. Impresión incluida.', canal: 'medida' as const },
   ];
 
   // Caja de referencia 400x300x300 = 0,87 m² por caja

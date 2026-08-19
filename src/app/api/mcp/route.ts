@@ -24,7 +24,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { calcularCotizacion, validarCajas, urlPlantilla } from '@/lib/cotizacion/motor';
 import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
 import { SITE_URL } from '@/lib/site';
-import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { RETAIL_CONFIG, MATERIAL } from '@/lib/retail/config';
 import type { PricingConfig } from '@/lib/types/database';
 import { notaImpresion } from '@/lib/cotizacion/motor';
 
@@ -190,7 +190,8 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       `· Más de ${n(c.volume_threshold_m2)} m²: ${ars(c.price_per_m2_volume)}/m² — precio por volumen`,
       '',
       `Mínimos: ${RETAIL_CONFIG.MIN_CANTIDAD} cajas si la medida está en stock; ${n(c.min_m2_per_model)} m² por modelo para producción a medida.`,
-      `Impresión: flexográfica, hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores, +15% por color.`,
+      notaImpresion(c),
+      `Material: ${MATERIAL.descripcion}`,
       'Plazos: stock en 24 a 48 horas; producción a medida en 7 días hábiles.',
       `Envío: gratis en pedidos mayoristas desde ${c.free_shipping_min_m2.toLocaleString('es-AR')} m² y hasta ` +
         `${c.free_shipping_max_km} km de la fábrica en Quilmes. En pedidos minoristas, retiro en ` +
@@ -233,7 +234,9 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
         'Es un PDF con la caja desplegada: trae las líneas de corte, las de plegado y las áreas ' +
         'donde puede ir el diseño. El flujo es bajarlo, ubicar el arte sobre esas áreas y ' +
         'mandarlo a ventas@quilmescorrugados.com.ar o por WhatsApp al +54 9 11 3341-1781. ' +
-        `Se imprime hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores, +15% por color.`,
+        `Se imprime hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores y el costo ya está ` +
+          'incluido en el precio por m². Solo se cobra aparte el polímero, una matriz por ' +
+          'color, que va a cargo del comprador. Las medidas estándar de catálogo no se imprimen.',
       { template_pdf: url, max_colores: RETAIL_CONFIG.MAX_PRINTING_COLORS },
     );
   }

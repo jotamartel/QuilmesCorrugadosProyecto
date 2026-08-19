@@ -39,27 +39,28 @@ const groq = process.env.GROQ_API_KEY
   ? new Groq({ apiKey: process.env.GROQ_API_KEY })
   : null;
 
-const PRINTING_INCREMENT = 0.15; // +15% por cada color de impresión
+// El recargo por color se elimino el 19/08/2026: la impresion viene incluida
+// en el precio por m² y solo se cobra el polimero. El calculo pasa por el motor.
 
 /**
  * Config de precios de respaldo, para cuando la DB no responde (env vars, RLS).
  * Tiene que quedar ALINEADA con la fila activa de pricing_config: si se
  * desincroniza, el bot cotiza precios viejos justo cuando nadie lo esta mirando.
- * Ultima verificacion contra produccion: 2026-08-15.
+ * Ultima verificacion contra produccion: 2026-08-19 (precios nuevos).
  */
 function getFallbackPricingConfig(): PricingConfig {
   return {
     id: 'fallback',
-    price_per_m2_standard: 740,
-    price_per_m2_volume: 700,
+    price_per_m2_standard: 900,
+    price_per_m2_volume: 800,
     volume_threshold_m2: 5000,
     min_m2_per_model: 3000,
     wholesale_min_m2: 1000,
-    price_per_m2_below_minimum: 900,
-    price_per_m2_retail: 990,
+    price_per_m2_below_minimum: 1000,
+    price_per_m2_retail: 1200,
     printing_min_m2: 1000,
-    printing_included_min_m2: 3000,
-    printing_surcharge_per_color: 0.15,
+    printing_included_min_m2: 1000,
+    printing_surcharge_per_color: 0,
     free_shipping_min_m2: 3000,
     free_shipping_max_km: 60,
     production_days_standard: 7,

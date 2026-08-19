@@ -155,6 +155,32 @@ export function validarCajas(boxes: BoxInput[]): string[] {
  * navega con GET tiene que obtener exactamente el mismo precio que un cliente
  * que postea desde el sitio.
  */
+/**
+ * Formatea un precio POR UNIDAD conservando los centavos.
+ *
+ * El subtotal no sale de multiplicar el precio por caja: sale de los m² de
+ * carton por el precio del m². Con 2.600 cajas de 300x380x420, el precio por
+ * caja es $1.015,20 y el subtotal $2.639.520. Al mostrar la caja redondeada a
+ * $1.015, el cliente que multiplica los dos numeros que ve en pantalla obtiene
+ * $2.639.000 y le faltan $520.
+ *
+ * La cuenta siempre estuvo bien; lo que engañaba era la pantalla. En una
+ * pagina de cotizacion eso es caro: si el unico numero que el cliente puede
+ * verificar a mano no le da, deja de creerle a los otros.
+ *
+ * Los totales siguen yendo en pesos enteros, que es como se leen.
+ */
+export function precioUnitarioARS(n: number): string {
+  const tieneCentavos = Math.round(n * 100) % 100 !== 0;
+  return (
+    '$' +
+    n.toLocaleString('es-AR', {
+      minimumFractionDigits: tieneCentavos ? 2 : 0,
+      maximumFractionDigits: 2,
+    })
+  );
+}
+
 export function calcularCotizacion(
   boxes: BoxInput[],
   config: PricingConfig,
@@ -244,7 +270,7 @@ export function calcularCotizacion(
   const ars = (n: number) => '$' + Math.round(n).toLocaleString('es-AR');
   const b0 = boxResults[0];
   const detalle = boxResults.length === 1
-    ? `${b0.quantity.toLocaleString('es-AR')} cajas de ${b0.length_mm}x${b0.width_mm}x${b0.height_mm} mm a ${ars(b0.unit_price)} por caja`
+    ? `${b0.quantity.toLocaleString('es-AR')} cajas de ${b0.length_mm}x${b0.width_mm}x${b0.height_mm} mm a ${precioUnitarioARS(b0.unit_price)} por caja`
     : `${boxResults.length} medidas distintas, ${boxResults.reduce((s, b) => s + b.quantity, 0).toLocaleString('es-AR')} cajas en total`;
 
   // El resumen lleva los dos numeros: el subtotal, que es como cotizamos, y el

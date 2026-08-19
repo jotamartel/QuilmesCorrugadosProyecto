@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { CONTACTO } from '@/lib/contacto';
 import { HORARIO, RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
 import { SITE_URL } from '@/lib/site';
-import type { QuoteResult } from '@/lib/cotizacion/motor';
+import { precioUnitarioARS, type QuoteResult } from '@/lib/cotizacion/motor';
 
 // Cliente Twilio - solo se inicializa si hay credenciales configuradas
 const client = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
@@ -642,7 +642,7 @@ Subtotal: ${ars(cotizacion.subtotal)} + IVA
 IVA 21%: ${ars(cotizacion.tax_amount)}
 TOTAL: ${ars(cotizacion.total_with_tax)}
 
-Precio unitario: ${ars(caja.unit_price)} + IVA
+Precio unitario: ${precioUnitarioARS(caja.unit_price)} + IVA
 
 ${cotizacion.channel_note}
 Entrega: ${cotizacion.estimated_days} dias habiles

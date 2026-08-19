@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { RegistrarLeadParams, RegistrarLeadResponse } from '@/types/retell';
+import { precioUnitarioARS } from '@/lib/cotizacion/motor';
 
 export async function POST(request: NextRequest) {
   try {
@@ -192,7 +193,7 @@ async function enviarCotizacionPorEmail(
     const alto = cotizacion.height_mm / 10;
     const cantidad = cotizacion.quantity;
     const precioTotal = cotizacion.subtotal?.toLocaleString('es-AR') || '0';
-    const precioUnitario = cotizacion.unit_price?.toLocaleString('es-AR') || '0';
+    const precioUnitario = cotizacion.unit_price ? precioUnitarioARS(cotizacion.unit_price).slice(1) : '0';
     const tiempoProduccion = `${cotizacion.estimated_days || 5} días hábiles`;
 
     // Enviar email

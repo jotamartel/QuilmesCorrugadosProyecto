@@ -6,6 +6,7 @@
 import { SITE_URL } from '@/lib/site';
 import { HORARIO } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
+import { precioUnitarioARS } from '@/lib/cotizacion/motor';
 
 export interface ParsedEmailData {
   dimensions?: { length: number; width: number; height: number };
@@ -165,7 +166,7 @@ CANTIDAD: ${quantity.toLocaleString('es-AR')} unidades
 TOTAL m2: ${quote.m2_total.toLocaleString('es-AR', { maximumFractionDigits: 1 })}
 
 TOTAL: $${quote.total.toLocaleString('es-AR')}
-Precio unitario: $${quote.unit_price.toLocaleString('es-AR')}
+Precio unitario: ${precioUnitarioARS(quote.unit_price)}
 
 Tiempo de entrega: ${quote.delivery_days} dias habiles
 Validez de la cotizacion: 7 dias

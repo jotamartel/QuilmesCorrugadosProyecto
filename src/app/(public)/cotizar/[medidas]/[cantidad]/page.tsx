@@ -8,6 +8,7 @@ import { calcularCotizacion, validarCajas } from '@/lib/cotizacion/motor';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import { SITE_URL } from '@/lib/site';
 import type { PricingConfig } from '@/lib/types/database';
+import { precioUnitarioARS } from '@/lib/cotizacion/motor';
 
 /**
  * Una cotizacion que es una PAGINA, no una respuesta JSON.
@@ -246,7 +247,7 @@ export default async function CotizarPage({ params }: Props) {
       '@type': 'Offer',
       url,
       priceCurrency: 'ARS',
-      price: Math.round(b.unit_price),
+      price: b.unit_price,
       eligibleQuantity: { '@type': 'QuantitativeValue', value: caja.quantity, unitText: 'cajas' },
       availability: 'https://schema.org/InStock',
       priceValidUntil: q.valid_until,
@@ -277,7 +278,7 @@ export default async function CotizarPage({ params }: Props) {
             <tbody className="divide-y divide-gray-200">
               <tr>
                 <th scope="row" className="px-4 py-3 font-medium text-gray-600">Precio por caja</th>
-                <td className="px-4 py-3 text-lg font-semibold tabular-nums">{ars(b.unit_price)}</td>
+                <td className="px-4 py-3 text-lg font-semibold tabular-nums">{precioUnitarioARS(b.unit_price)}</td>
               </tr>
               <tr>
                 <th scope="row" className="px-4 py-3 font-medium text-gray-600">Subtotal sin IVA</th>

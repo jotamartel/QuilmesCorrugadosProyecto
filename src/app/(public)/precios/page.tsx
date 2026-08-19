@@ -8,6 +8,7 @@ import { EJEMPLOS, rutaEjemplo } from '@/lib/cotizacion/ejemplos';
 import { SITE_URL } from '@/lib/site';
 import type { PricingConfig } from '@/lib/types/database';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { precioUnitarioARS } from '@/lib/cotizacion/motor';
 
 /**
  * Página pública de precios.
@@ -309,7 +310,7 @@ export default async function PreciosPage() {
                         {e.mm.largo}×{e.mm.ancho}×{e.mm.alto} mm
                       </td>
                       <td className="px-4 py-3 text-right font-semibold tabular-nums">
-                        {ars(q.boxes[0].unit_price)}
+                        {precioUnitarioARS(q.boxes[0].unit_price)}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">{ars(q.subtotal)}</td>
                     </tr>

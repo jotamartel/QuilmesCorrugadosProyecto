@@ -15,6 +15,7 @@ import { parseBoxDimensions, validateDimensions } from '@/lib/whatsapp';
 import type { PricingConfig } from '@/lib/types/database';
 import { HORARIO } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
+import { completarConCascada, MODELOS_CONVERSACION } from '@/lib/groq-modelos';
 
 const groq = process.env.GROQ_API_KEY
   ? new Groq({ apiKey: process.env.GROQ_API_KEY })
@@ -273,23 +274,12 @@ PRECIOS ACTUALES (usar SOLO estos si preguntan — no inventar ni negociar otros
     // Mensaje actual
     messages.push({ role: 'user', content: userMessage });
 
-    let completion;
-    try {
-      completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        temperature: 0.7,
-        max_tokens: 350,
-      });
-    } catch (modelError) {
-      console.warn('[WhatsApp AI] Fallback a 8b:', modelError);
-      completion = await groq.chat.completions.create({
-        model: 'llama-3.1-8b-instant',
-        messages,
-        temperature: 0.7,
-        max_tokens: 350,
-      });
-    }
+    const completion = await completarConCascada(
+      groq,
+      { messages, temperature: 0.7, max_tokens: 350 },
+      MODELOS_CONVERSACION,
+      'WhatsApp AI',
+    );
 
     const response = completion.choices[0]?.message?.content?.trim();
     if (!response) {
@@ -526,23 +516,12 @@ PRECIOS ACTUALES:
     }
     messages.push({ role: 'user', content: userMessage });
 
-    let completion;
-    try {
-      completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        temperature: 0.7,
-        max_tokens: 450,
-      });
-    } catch (modelError) {
-      console.warn('[Chat AI] Fallback a 8b:', modelError);
-      completion = await groq.chat.completions.create({
-        model: 'llama-3.1-8b-instant',
-        messages,
-        temperature: 0.7,
-        max_tokens: 450,
-      });
-    }
+    const completion = await completarConCascada(
+      groq,
+      { messages, temperature: 0.7, max_tokens: 450 },
+      MODELOS_CONVERSACION,
+      'Chat AI',
+    );
 
     const response = completion.choices[0]?.message?.content?.trim();
     if (!response) {

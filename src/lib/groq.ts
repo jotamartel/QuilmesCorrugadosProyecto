@@ -1,4 +1,5 @@
 import Groq from 'groq-sdk';
+import { completarConCascada, MODELOS_CLASIFICACION } from '@/lib/groq-modelos';
 
 // Cliente Groq - solo se inicializa si hay API key configurada
 const groq = process.env.GROQ_API_KEY
@@ -80,16 +81,20 @@ EJEMPLOS:
 - "cuéntame un chiste" → {"intent": "unknown", "confidence": 0.1}`;
 
   try {
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Clasifica este mensaje: "${message}"` },
-      ],
-      temperature: 0.1, // Muy bajo para respuestas consistentes
-      max_tokens: 50,   // Muy bajo, solo necesitamos el JSON
-      response_format: { type: 'json_object' },
-    });
+    const completion = await completarConCascada(
+      groq,
+      {
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Clasifica este mensaje: "${message}"` },
+        ],
+        temperature: 0.1, // Muy bajo para respuestas consistentes
+        max_tokens: 300,  // Los modelos que razonan gastan del mismo presupuesto
+        response_format: { type: 'json_object' },
+      },
+      MODELOS_CLASIFICACION,
+      'Groq',
+    );
 
     const response = completion.choices[0]?.message?.content;
     if (!response) {

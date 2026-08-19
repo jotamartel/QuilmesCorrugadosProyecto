@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { SITE_URL } from '@/lib/site';
-import { MINIMOS, ENVIO } from '@/lib/retail/config';
+import { MINIMOS, ENVIO, HORARIO } from '@/lib/retail/config';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
@@ -51,7 +51,7 @@ const faqs = [
   },
   {
     question: '¿Dónde están ubicados?',
-    answer: 'Nuestra fábrica está ubicada en Quilmes, zona sur del Gran Buenos Aires, Argentina. Contamos con planta propia de producción donde fabricamos todas nuestras cajas. Podés visitarnos de lunes a viernes de 8:00 a 17:00 hs.',
+    answer: 'Nuestra fábrica está ubicada en Quilmes, zona sur del Gran Buenos Aires, Argentina. Contamos con planta propia de producción donde fabricamos todas nuestras cajas. Podés visitarnos ' + HORARIO.texto.toLowerCase().replace('lunes', 'de lunes') + '.',
   },
   {
     question: '¿Trabajan con empresas de todo tipo?',

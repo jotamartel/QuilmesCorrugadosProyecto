@@ -1,3 +1,5 @@
+import { HORARIO } from '@/lib/retail/config';
+
 /**
  * Tipos TypeScript para integración con Retell AI
  * Bot telefónico para Quilmes Corrugados
@@ -223,10 +225,14 @@ export const RETELL_CONSTANTS = {
   PRECIO_BASE_M2: 700, // ARS por m²
   ANCHO_LAMINA_MAX_MM: 1200,
   SOLAPA_MM: 50, // 5cm de solapa
+  // Sale de HORARIO y no escrito a mano: esta constante decide si una llamada
+  // se transfiere a una persona. Con 8 a 17 en duro, a las 7 no transferia
+  // estando la fabrica abierta, y a las 16:30 transferia a un telefono que ya
+  // no atendia nadie.
   HORARIO_LABORAL: {
-    INICIO: 8,
-    FIN: 17,
-    DIAS: [1, 2, 3, 4, 5] as number[], // Lunes a Viernes
+    INICIO: HORARIO.desde,
+    FIN: HORARIO.hasta,
+    DIAS: [...HORARIO.dias] as number[],
   },
   DESCUENTOS: [
     { minM2: 5000, descuento: 0.20, nombre: '20% mayorista' },

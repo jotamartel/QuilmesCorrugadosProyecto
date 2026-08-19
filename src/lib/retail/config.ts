@@ -173,16 +173,6 @@ export const MINIMOS = {
  * superficies que lee un asistente de IA se repite como dato verificado.
  */
 /**
- * Horario de atencion. Estaba escrito en quince lugares en dos versiones que no
- * coincidian: el sitio y el JSON-LD decian 8 a 17, y el bot de WhatsApp, el
- * llms.txt, el parser de mails y el prompt de la IA decian 7 a 16. O sea que a
- * las 7:30 el bot atendia como si estuviera abierto y a las 16:30 mandaba a la
- * gente a dejar un mensaje estando la fabrica abierta.
- *
- * El horario correcto es 8 a 17. El JSON-LD ya lo tenia bien, asi que Google
- * nunca mostro el equivocado.
- */
-/**
  * El papel con el que se fabrica. Es una pregunta que hace todo comprador
  * tecnico y hasta ahora no estaba escrita en ningun lado del sitio.
  *
@@ -207,17 +197,27 @@ export const MATERIAL = {
     'consultanos y lo vemos.',
 } as const;
 
+/**
+ * Horario de atencion.
+ *
+ * Estaba escrito en quince lugares en dos versiones que no coincidian: el bot
+ * de WhatsApp, el llms.txt, el parser de mails y el prompt de la IA decian
+ * 7 a 16, y el sitio y el JSON-LD decian 8 a 17.
+ *
+ * El correcto es 7 a 16, confirmado por el dueño el 19/08/2026. La ficha de
+ * Google Business ya lo tenia bien; lo que estaba mal era el sitio.
+ */
 export const HORARIO = {
-  desde: 8,
-  hasta: 17,
+  desde: 7,
+  hasta: 16,
   /** 0 = domingo. */
   dias: [1, 2, 3, 4, 5],
   /** Para paginas y respuestas al cliente. */
-  texto: 'Lunes a viernes de 8:00 a 17:00 hs',
+  texto: 'Lunes a viernes de 7:00 a 16:00 hs',
   /** Para firmas y pies de mensaje, donde el lugar es poco. */
-  corto: 'Lunes a Viernes 8:00 - 17:00',
+  corto: 'Lunes a Viernes 7:00 - 16:00',
   /** Formato de schema.org, para el JSON-LD de LocalBusiness. */
-  schema: 'Mo-Fr 08:00-17:00',
+  schema: 'Mo-Fr 07:00-16:00',
 } as const;
 
 export const ENVIO = {

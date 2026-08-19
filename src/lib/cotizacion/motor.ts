@@ -116,6 +116,20 @@ export interface QuoteResult {
     /** Qué debería hacer el asistente con esto */
     instruction: string;
   };
+  /**
+   * Envío para ESTE pedido, ya resuelto.
+   *
+   * Existe porque un asistente que tiene que comparar los m² del pedido contra
+   * el umbral y sacar la conclusión, alguna vez la saca mal. Paso en una
+   * prueba: con 2.932,8 m² afirmo "como supera los 3.000 m², el envío es
+   * gratuito", y de paso invento la zona. Las dos cosas eran compromisos que
+   * la fabrica hubiera tenido que cumplir.
+   */
+  shipping: {
+    /** Si el volumen alcanza el mínimo. La distancia no se sabe acá. */
+    meets_free_shipping_volume: boolean;
+    note: string;
+  };
   /** Impresión: si aplica a este pedido y cómo enviar el diseño */
   printing: {
     available: boolean;
@@ -255,7 +269,18 @@ export function calcularCotizacion(
       ? pricePerM2 * (1 + printingColors * recargoPorColor)
       : pricePerM2;
 
-    const subtotal = calculateSubtotal(boxTotalSqm, adjustedPricePerM2);
+    // El subtotal sale del precio por caja YA REDONDEADO, no de los m² por el
+    // precio del m².
+    //
+    // Parece al revés, porque el costo real es por metro cuadrado. Pero el
+    // precio unitario por la cantidad es la unica cuenta que el cliente rehace
+    // a mano, y tiene que cerrar. Con 1.000 cajas de 400x300x250 el m² daba
+    // $789.525 y el precio por caja $789,53: quien multiplicaba obtenia
+    // $789.530 y sobraban cinco pesos. La diferencia es de centavos por unidad
+    // —0,0006% en ese pedido— y no mueve la aguja de la fabrica; que el numero
+    // no cierre a la vista si mueve la confianza.
+    const precioPorCaja = Math.round((boxTotalSqm * adjustedPricePerM2 / box.quantity) * 100) / 100;
+    const subtotal = Math.round(precioPorCaja * box.quantity * 100) / 100;
     totalSubtotal += subtotal;
 
     const estimatedDays = getProductionDays(boxHasPrinting, config);
@@ -273,7 +298,7 @@ export function calcularCotizacion(
       sqm_per_box: unfolded.m2,
       total_sqm: boxTotalSqm,
       price_per_m2: adjustedPricePerM2,
-      unit_price: Math.round((subtotal / box.quantity) * 100) / 100,
+      unit_price: precioPorCaja,
       subtotal,
       template_pdf: urlPlantilla(box.length_mm, box.width_mm, box.height_mm),
     });
@@ -369,6 +394,17 @@ export function calcularCotizacion(
       email_subject: `Cotizacion web: ${detalleCajas} — ${ars(totalSubtotal)}`,
       instruction:
         'Ofrecele al usuario contactarnos y pasale el link de whatsapp_url tal cual: ya lleva el mensaje escrito con las medidas, la cantidad y el precio cotizado. Del otro lado lo atiende un asistente que ya tiene ese contexto, asi que el usuario no tiene que repetir nada. Es la via mas rapida para cerrar.',
+    },
+    shipping: {
+      meets_free_shipping_volume: totalM2 >= config.free_shipping_min_m2,
+      note:
+        totalM2 >= config.free_shipping_min_m2
+          ? `Este pedido alcanza los ${config.free_shipping_min_m2.toLocaleString('es-AR')} m² que ` +
+            `pide el envío gratis. Falta confirmar la dirección: es gratis dentro de un radio de ` +
+            `${config.free_shipping_max_km} km de la fábrica en Quilmes. Más lejos, el flete se cotiza aparte.`
+          : `Este pedido son ${totalM2.toLocaleString('es-AR')} m² y no llega a los ` +
+            `${config.free_shipping_min_m2.toLocaleString('es-AR')} m² que pide el envío gratis. ` +
+            `Se retira en la fábrica de Quilmes o se coordina el envío con el costo a cargo del comprador.`,
     },
     printing: {
       available: impresionDisponible,

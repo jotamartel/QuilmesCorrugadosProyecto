@@ -163,6 +163,11 @@ export function crearHerramientas(ctx: ContextoAgente) {
       canal: q.channel,
       nota_del_canal: q.channel_note,
       impresion_disponible: q.printing.available,
+      // Resuelto por el motor, no deducido. El agente no tiene que comparar
+      // los m² contra el umbral: con 2.932,8 m² una vez concluyo que superaba
+      // los 3.000 y prometio envio gratis.
+      envio: q.shipping.note,
+      envio_gratis_por_volumen: q.shipping.meets_free_shipping_volume,
       como_se_cobra_la_impresion: caja.printing_colors > 0 ? q.printing.price_note : undefined,
       link_para_compartir: `${SITE_URL}/cotizar/${largo_mm}x${ancho_mm}x${alto_mm}/${cantidad}`,
       instruccion:
@@ -285,6 +290,13 @@ export function crearHerramientas(ctx: ContextoAgente) {
             'Una o dos frases con lo que necesita: medidas, cantidad, uso, urgencia. ' +
             'Es lo que va a leer el vendedor antes de llamar.',
         },
+        contacto_preferido: {
+          type: 'string',
+          enum: ['telefono', 'whatsapp', 'email', 'sin_preferencia'],
+          description:
+            'Cómo pidió que lo contacten. Si dijo "que me llamen" es telefono. ' +
+            'Si no lo dijo, sin_preferencia.',
+        },
         largo_mm: { type: 'integer', description: 'Solo si ya cotizaste' },
         ancho_mm: { type: 'integer', description: 'Solo si ya cotizaste' },
         alto_mm: { type: 'integer', description: 'Solo si ya cotizaste' },
@@ -295,6 +307,30 @@ export function crearHerramientas(ctx: ContextoAgente) {
     },
     run: async (args) => {
       const telefono = ctx.telefono || args.telefono;
+
+      // No confirmar un canal que no se puede cumplir.
+      //
+      // En una prueba, alguien dejo solo el mail y pidio que lo llamaran al dia
+      // siguiente. El agente confirmo la llamada. El vendedor abre el lead y no
+      // tiene numero: el cliente espera un llamado que nunca va a llegar.
+      const quiereLlamada =
+        args.contacto_preferido === 'telefono' || args.contacto_preferido === 'whatsapp';
+      if (quiereLlamada && !telefono) {
+        return JSON.stringify({
+          guardado: false,
+          falta: 'telefono',
+          instruccion:
+            'Pidió que lo contacten por teléfono y no tenemos su número. Pediselo en ' +
+            'este mismo mensaje, antes de confirmarle nada. No le prometas un llamado.',
+        });
+      }
+      if (args.contacto_preferido === 'email' && !args.email) {
+        return JSON.stringify({
+          guardado: false,
+          falta: 'email',
+          instruccion: 'Pidió que lo contacten por mail y no tenemos su dirección. Pediséla.',
+        });
+      }
 
       // Dos destinos distintos a proposito.
       //

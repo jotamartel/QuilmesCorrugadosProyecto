@@ -44,6 +44,12 @@ export interface PricingConfig {
   price_per_m2_below_minimum: number | null; // Precio con recargo para pedidos < 3000m2
   price_per_m2_retail: number; // Precio por m2 para ventas de stock (< wholesale_min_m2)
   wholesale_min_m2: number; // Limite entre stock (/cajas) y produccion a medida (mayorista)
+
+  // Impresion. Los tres son configurables desde el panel porque la franja
+  // intermedia todavia no esta definida comercialmente.
+  printing_min_m2: number;              // Desde que m2 se ofrece impresion
+  printing_included_min_m2: number;     // Desde que m2 el costo ya viene incluido
+  printing_surcharge_per_color: number; // Recargo por color entre esos dos umbrales (0.15 = +15%)
   free_shipping_min_m2: number;
   free_shipping_max_km: number;
   production_days_standard: number;

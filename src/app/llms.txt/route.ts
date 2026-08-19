@@ -17,6 +17,7 @@ import type { PricingConfig } from '@/lib/types/database';
 import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import { HORARIO } from '@/lib/retail/config';
+import { notaImpresion } from '@/lib/cotizacion/motor';
 
 const BASE_URL = SITE_URL;
 
@@ -27,6 +28,9 @@ const RESPALDO = {
   price_per_m2_standard: 740,
   price_per_m2_volume: 700,
   wholesale_min_m2: 1000,
+  printing_min_m2: 1000,
+  printing_included_min_m2: 3000,
+  printing_surcharge_per_color: 0.15,
   min_m2_per_model: 3000,
   volume_threshold_m2: 5000,
   free_shipping_min_m2: 3000,
@@ -192,14 +196,14 @@ no tengas navegacion, o para quien quiera dejarlo instalado.
 | ${m2(c.min_m2_per_model)} a ${m2(c.volume_threshold_m2)} | ${ars(c.price_per_m2_standard)}/m² | a medida, precio estándar |
 | más de ${m2(c.volume_threshold_m2)} | ${ars(c.price_per_m2_volume)}/m² | a medida, precio por volumen |
 
-El precio baja con el volumen. Impresión: +15% por cada color.
+El precio baja con el volumen. ${notaImpresion(c)}
 No calcules el precio a mano: el m² depende de la plancha desplegada, que no es
 el área de las caras. Usá la API.
 
 ## Impresión: la plantilla se genera sola
 
 Desde ${m2(c.wholesale_min_m2)} las cajas se pueden imprimir, hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores,
-+15% por color. No hace falta que el cliente pida la plantilla ni espere a que
+No hace falta que el cliente pida la plantilla ni espere a que
 se la manden: se genera al instante con las medidas.
 
 ${BASE_URL}/api/box-template?length=400&width=600&height=600

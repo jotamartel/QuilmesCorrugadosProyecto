@@ -17,7 +17,8 @@ import {
   FileText,
   CheckCircle2,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  Palette
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { formatDate } from '@/lib/utils/dates';
@@ -49,6 +50,9 @@ export default function ConfiguracionPage() {
     wholesale_min_m2: 1000, // Limite entre stock (/cajas) y produccion a medida
     price_per_m2_below_minimum: 900, // Recargo entre wholesale_min_m2 y min_m2_per_model
     price_per_m2_retail: 990, // Precio de stock, por debajo de wholesale_min_m2
+    printing_min_m2: 1000,
+    printing_included_min_m2: 3000,
+    printing_surcharge_per_color: 0.15,
     free_shipping_min_m2: 3000,
     free_shipping_max_km: 60,
     production_days_standard: 7,
@@ -79,6 +83,9 @@ export default function ConfiguracionPage() {
           volume_threshold_m2: data.volume_threshold_m2,
           min_m2_per_model: data.min_m2_per_model,
           wholesale_min_m2: data.wholesale_min_m2 ?? 1000,
+          printing_min_m2: data.printing_min_m2 ?? 1000,
+          printing_included_min_m2: data.printing_included_min_m2 ?? 3000,
+          printing_surcharge_per_color: data.printing_surcharge_per_color ?? 0.15,
           price_per_m2_below_minimum: data.price_per_m2_below_minimum || (data.price_per_m2_standard * 1.20),
           price_per_m2_retail: data.price_per_m2_retail || 990,
           free_shipping_min_m2: data.free_shipping_min_m2,
@@ -348,6 +355,55 @@ export default function ConfiguracionPage() {
                     disabled={!editMode}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Palette className="w-5 h-5" />
+                  Impresión
+                </CardTitle>
+                <CardDescription>
+                  Desde los {pricingFormData.printing_included_min_m2.toLocaleString('es-AR')} m² el costo de
+                  impresión ya está incluido en el precio por m² y no se cobra recargo. El polímero se cotiza
+                  siempre aparte y va a cargo del comprador.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Input
+                    label="Se ofrece desde (m2)"
+                    type="number"
+                    value={pricingFormData.printing_min_m2}
+                    onChange={(e) => setPricingFormData({ ...pricingFormData, printing_min_m2: Number(e.target.value) })}
+                    disabled={!editMode}
+                    hint="Por debajo de este volumen no se ofrece impresión."
+                  />
+                  <Input
+                    label="Incluida desde (m2)"
+                    type="number"
+                    value={pricingFormData.printing_included_min_m2}
+                    onChange={(e) => setPricingFormData({ ...pricingFormData, printing_included_min_m2: Number(e.target.value) })}
+                    disabled={!editMode}
+                    hint="Desde acá no se cobra recargo por color."
+                  />
+                  <Input
+                    label="Recargo por color (%)"
+                    type="number"
+                    value={Math.round(pricingFormData.printing_surcharge_per_color * 100)}
+                    onChange={(e) => setPricingFormData({ ...pricingFormData, printing_surcharge_per_color: Number(e.target.value) / 100 })}
+                    disabled={!editMode}
+                    hint="Solo entre los dos valores de arriba."
+                  />
+                </div>
+                {/* Igualar los dos umbrales es como se deja de ofrecer impresion
+                    en la franja intermedia, sin tocar codigo. */}
+                {pricingFormData.printing_min_m2 >= pricingFormData.printing_included_min_m2 && (
+                  <p className="text-sm text-gray-600">
+                    Con estos valores la impresión se ofrece solo cuando ya viene incluida: no hay franja con recargo.
+                  </p>
+                )}
               </CardContent>
             </Card>
 

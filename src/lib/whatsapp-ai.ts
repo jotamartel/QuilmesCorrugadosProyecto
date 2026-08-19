@@ -57,6 +57,9 @@ function getFallbackPricingConfig(): PricingConfig {
     wholesale_min_m2: 1000,
     price_per_m2_below_minimum: 900,
     price_per_m2_retail: 990,
+    printing_min_m2: 1000,
+    printing_included_min_m2: 3000,
+    printing_surcharge_per_color: 0.15,
     free_shipping_min_m2: 3000,
     free_shipping_max_km: 60,
     production_days_standard: 7,
@@ -100,7 +103,9 @@ Los precios y los cortes de tramo NO van escritos acá: llegan en el bloque
 Usar SOLO esos valores. Nunca inventar un precio, ni ofrecer descuentos,
 rebajas o condiciones especiales que no estén en ese bloque: si el cliente
 pide una mejora, derivar a un asesor.
-- Impresión: hasta 3 colores, +15% por cada uno
+- Impresión: hasta 3 colores. Desde cierto volumen el costo está incluido; el bloque
+  "PRECIOS ACTUALES" trae los umbrales. El polímero se cotiza siempre aparte y va a
+  cargo del comprador.
 - Moneda: ARS. El subtotal va sin IVA; el total con IVA 21% se informa aparte
 
 ### Envíos

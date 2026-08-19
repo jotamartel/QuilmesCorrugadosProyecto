@@ -26,6 +26,7 @@ import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
 import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import type { PricingConfig } from '@/lib/types/database';
+import { notaImpresion } from '@/lib/cotizacion/motor';
 
 export const runtime = 'nodejs';
 
@@ -79,7 +80,7 @@ const HERRAMIENTAS = [
           type: 'number',
           description:
             `Colores de impresión flexográfica, de 0 a ${RETAIL_CONFIG.MAX_PRINTING_COLORS}. ` +
-            'Cada color suma 15% al precio por m². Opcional, por defecto 0.',
+            `Hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS}. Opcional, por defecto 0.`,
         },
       },
       required: ['largo_mm', 'ancho_mm', 'alto_mm', 'cantidad'],
@@ -297,7 +298,7 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       cotizacion.channel_note,
       '',
       `Plantilla de impresión (PDF, medidas ya calculadas): ${cotizacion.printing.template_pdf}`,
-      `Impresión flexográfica hasta ${cotizacion.printing.max_colors} colores, +15% por color.`,
+      cotizacion.printing.price_note,
       '',
       'Para avanzar, pasale este link al usuario tal cual: ya lleva el mensaje escrito con las ' +
         'medidas, la cantidad y el precio, así no tiene que contar todo de nuevo.',

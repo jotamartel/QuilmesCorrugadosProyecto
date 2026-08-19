@@ -9,6 +9,7 @@ import { SITE_URL } from '@/lib/site';
 import type { PricingConfig } from '@/lib/types/database';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import { precioUnitarioARS } from '@/lib/cotizacion/motor';
+import { notaImpresion } from '@/lib/cotizacion/motor';
 
 /**
  * Página pública de precios.
@@ -47,6 +48,9 @@ const RESPALDO = {
   free_shipping_max_km: 60,
   production_days_standard: 7,
   production_days_printing: 14,
+  printing_min_m2: 1000,
+  printing_included_min_m2: 3000,
+  printing_surcharge_per_color: 0.15,
 };
 
 export default async function PreciosPage() {
@@ -64,6 +68,9 @@ export default async function PreciosPage() {
     envioKm: Number(config.free_shipping_max_km),
     diasSinImpresion: Number(config.production_days_standard),
     diasConImpresion: Number(config.production_days_printing),
+    printing_min_m2: Number(config.printing_min_m2),
+    printing_included_min_m2: Number(config.printing_included_min_m2),
+    printing_surcharge_per_color: Number(config.printing_surcharge_per_color),
   };
 
   const tramos = [
@@ -217,8 +224,7 @@ export default async function PreciosPage() {
             </table>
           </div>
           <p className="mt-3 text-sm text-gray-500">
-            Impresión flexográfica: +15% por cada color, hasta {RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. Precios en pesos
-            argentinos, sin IVA.
+            {notaImpresion(c)} Precios en pesos argentinos, sin IVA.
           </p>
         </div>
       </section>

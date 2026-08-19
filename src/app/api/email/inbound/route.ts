@@ -11,16 +11,20 @@ import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculation
 import { getPricePerM2, getProductionDays, getActivePricingConfig } from '@/lib/utils/pricing';
 import { createClient } from '@/lib/supabase/server';
 import type { PricingConfig } from '@/lib/types/database';
+import { calcularCotizacion } from '@/lib/cotizacion/motor';
 
 // Cliente Resend para enviar respuestas
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-const PRINTING_INCREMENT = 0.15; // +15% por cada color de impresión
-
 /**
- * Calcula cotizacion usando la configuración de precios activa
+ * Cotiza contra el motor compartido.
+ *
+ * Esta era la cuarta copia del calculo en el proyecto, con su propio +15% por
+ * impresion cobrado siempre. Ese recargo dejo de ser correcto: a partir del
+ * volumen configurado en printing_included_min_m2 la impresion ya viene
+ * incluida en el precio por m², asi que aca se estaba cobrando dos veces.
  */
 async function calculateQuote(
   length: number,
@@ -30,25 +34,22 @@ async function calculateQuote(
   hasPrinting: boolean,
   config: PricingConfig
 ): Promise<{ total: number; m2_total: number; unit_price: number; delivery_days: number }> {
-  const { m2 } = calculateUnfolded(length, width, height);
-  const m2_total = calculateTotalM2(m2, quantity);
-
-  // Usar la función centralizada para obtener el precio por m²
-  const pricePerM2 = getPricePerM2(m2_total, config);
-
-  let total = m2_total * pricePerM2;
-
-  if (hasPrinting) {
-    total *= (1 + PRINTING_INCREMENT);
-  }
-
-  total = Math.round(total);
+  const q = calcularCotizacion(
+    [{
+      length_mm: length,
+      width_mm: width,
+      height_mm: height,
+      quantity,
+      printing_colors: hasPrinting ? 1 : 0,
+    }],
+    config,
+  );
 
   return {
-    total,
-    m2_total,
-    unit_price: Math.round(total / quantity),
-    delivery_days: getProductionDays(hasPrinting, config),
+    total: Math.round(q.subtotal),
+    m2_total: q.total_m2,
+    unit_price: Math.round(q.boxes[0].unit_price),
+    delivery_days: q.estimated_days,
   };
 }
 

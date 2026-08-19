@@ -1,7 +1,7 @@
 import { betaTool } from '@anthropic-ai/sdk/helpers/beta/json-schema';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getActivePricingConfig } from '@/lib/utils/pricing';
-import { calcularCotizacion, precioUnitarioARS, urlPlantilla } from '@/lib/cotizacion/motor';
+import { calcularCotizacion, precioUnitarioARS, urlPlantilla, notaImpresion } from '@/lib/cotizacion/motor';
 import { RETAIL_CONFIG, MINIMOS, ENVIO, HORARIO } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
 import { SITE_URL } from '@/lib/site';
@@ -175,11 +175,15 @@ export const condicionesYPrecios = betaTool({
           }
         : null,
       iva: 'Los precios publicados van sin IVA. El IVA es 21% y se informa aparte.',
-      impresion: {
-        max_colores: RETAIL_CONFIG.MAX_PRINTING_COLORS,
-        tecnica: 'flexografía',
-        recargo: '+15% por color',
-      },
+      impresion: c
+        ? {
+            max_colores: RETAIL_CONFIG.MAX_PRINTING_COLORS,
+            tecnica: 'flexografía',
+            como_se_cobra: notaImpresion(c),
+            incluida_desde_m2: c.printing_included_min_m2,
+            polimero: 'Se cotiza aparte, va a cargo del comprador y depende del diseño. No lo estimes.',
+          }
+        : null,
       limites_de_fabricacion: {
         medida_minima_mm: `${RETAIL_CONFIG.MIN_LARGO}x${RETAIL_CONFIG.MIN_ANCHO}x${RETAIL_CONFIG.MIN_ALTO}`,
         ancho_mas_alto_max_mm: RETAIL_CONFIG.MAX_SHEET_WIDTH,

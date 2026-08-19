@@ -33,6 +33,17 @@ const SITIO = SITE_URL;
  */
 const IVA = 0.21;
 
+/**
+ * El polímero es la matriz flexográfica: una por color, se hace una vez por
+ * diseño y sirve para todas las tiradas siguientes de ese arte. No entra en el
+ * precio por m² y va a cargo del comprador, y como depende del diseño y no del
+ * volumen, se cotiza caso por caso en vez de tener precio de lista.
+ */
+const NOTA_POLIMERO =
+  'Aparte se cotiza el polímero de impresión, que va a cargo del comprador: ' +
+  'es una matriz por color, se hace una vez por diseño y queda para las ' +
+  'próximas tiradas de ese mismo arte.';
+
 export interface BoxInput {
   length_mm: number;
   width_mm: number;
@@ -111,6 +122,8 @@ export interface QuoteResult {
     min_m2: number;
     max_colors: number;
     price_note: string;
+    /** Lo único de la impresión que se cobra aparte. */
+    polymer_note: string;
     /** Plantilla de la primera medida. Cada caja trae la suya en boxes[].template_pdf */
     template_pdf: string;
     how_it_works: string;
@@ -170,6 +183,30 @@ export function validarCajas(boxes: BoxInput[]): string[] {
  *
  * Los totales siguen yendo en pesos enteros, que es como se leen.
  */
+/**
+ * Cómo se cobra la impresión, en una frase, leída de la config vigente.
+ *
+ * Existe porque el "+15% por color" estaba afirmado a mano en ocho superficies
+ * —el llms.txt, el MCP, la página de precios, el prompt del bot— y dejó de ser
+ * cierto: desde cierto volumen el costo ya viene incluido. Una frase escrita a
+ * mano en ocho lugares se corrige en seis.
+ */
+export function notaImpresion(config: {
+  printing_min_m2: number;
+  printing_included_min_m2: number;
+  printing_surcharge_per_color: number;
+}): string {
+  const incluidaDesde = config.printing_included_min_m2.toLocaleString('es-AR');
+  const pct = Math.round(config.printing_surcharge_per_color * 100);
+  const sinFranja = config.printing_min_m2 >= config.printing_included_min_m2;
+
+  const base = sinFranja
+    ? `Impresión flexográfica hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores, desde ${incluidaDesde} m². El costo de impresión está incluido en el precio por m².`
+    : `Impresión flexográfica hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. Desde ${incluidaDesde} m² el costo está incluido en el precio por m²; por debajo de ese volumen cada color suma ${pct}%.`;
+
+  return `${base} ${NOTA_POLIMERO}`;
+}
+
 export function precioUnitarioARS(n: number): string {
   const tieneCentavos = Math.round(n * 100) % 100 !== 0;
   return (
@@ -202,9 +239,20 @@ export function calcularCotizacion(
 
     const pricePerM2 = getPricePerM2(boxTotalSqm, config);
 
-    // +15% por cada color de impresión
+    // El recargo por color solo aplica POR DEBAJO del volumen desde el cual la
+    // impresión ya viene incluida en el precio por m². Antes se cobraba
+    // siempre, así que a partir de 3.000 m² se estaba cobrando dos veces lo
+    // mismo: una en el precio del m² y otra como recargo.
+    //
+    // Lo único que se cobra aparte es el polímero, que va a cargo del comprador
+    // y se cotiza según el diseño. No entra en este cálculo a propósito: no
+    // depende del volumen y ponerle un número de lista acá lo convertiría en
+    // una promesa de precio que nadie revisó.
+    const impresionIncluida = boxTotalSqm >= config.printing_included_min_m2;
+    const recargoPorColor = impresionIncluida ? 0 : config.printing_surcharge_per_color;
+
     const adjustedPricePerM2 = boxHasPrinting && printingColors > 0
-      ? pricePerM2 * (1 + printingColors * 0.15)
+      ? pricePerM2 * (1 + printingColors * recargoPorColor)
       : pricePerM2;
 
     const subtotal = calculateSubtotal(boxTotalSqm, adjustedPricePerM2);
@@ -293,6 +341,9 @@ export function calcularCotizacion(
   // el canal a medida. Por debajo se vende de stock, que va sin imprimir.
   const impresionDisponible = !esDeStock;
 
+  // Si a este pedido, por su volumen, la impresión ya le viene incluida.
+  const impresionIncluidaEnElPedido = totalM2 >= config.printing_included_min_m2;
+
   // Mensaje de handoff. Lleva medidas, cantidad y el precio ya cotizado para
   // que del otro lado no se vuelva a preguntar lo mismo ni se cotice distinto.
   // El prefijo [COTIZADO-WEB] es la marca que usa el bot de WhatsApp para
@@ -321,11 +372,21 @@ export function calcularCotizacion(
     },
     printing: {
       available: impresionDisponible,
-      min_m2: config.wholesale_min_m2,
+      min_m2: config.printing_min_m2,
       max_colors: RETAIL_CONFIG.MAX_PRINTING_COLORS,
-      price_note: impresionDisponible
-        ? `Cada color suma 15% al precio por m². Hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores.`
-        : `La impresión se produce a medida, desde ${config.wholesale_min_m2.toLocaleString('es-AR')} m². Este pedido sale de stock, sin imprimir.`,
+      /**
+       * El polímero se nombra siempre, incluso cuando la impresión está
+       * incluida. Es el único costo de impresión que paga el cliente aparte, y
+       * omitirlo hace que el total parezca cerrado cuando no lo está: la
+       * sorpresa aparece recién en la factura.
+       */
+      price_note: !impresionDisponible
+        ? `La impresión se produce a medida, desde ${config.printing_min_m2.toLocaleString('es-AR')} m². Este pedido sale de stock, sin imprimir.`
+        : impresionIncluidaEnElPedido
+          ? `Desde ${config.printing_included_min_m2.toLocaleString('es-AR')} m² el costo de impresión ya está incluido en el precio por m², hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. ${NOTA_POLIMERO}`
+          : `Cada color suma ${Math.round(config.printing_surcharge_per_color * 100)}% al precio por m², hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. Desde ${config.printing_included_min_m2.toLocaleString('es-AR')} m² el costo queda incluido y no se cobra recargo. ${NOTA_POLIMERO}`,
+      /** Qué se cobra aparte y qué no. Es la pregunta que sigue al precio. */
+      polymer_note: NOTA_POLIMERO,
       template_pdf: urlPlantilla(b0.length_mm, b0.width_mm, b0.height_mm),
       how_it_works: impresionDisponible
         ? 'Descargá el PDF de la plantilla: trae la caja desplegada con las líneas de corte, las de plegado y las áreas donde puede ir el diseño. Ubicá tu arte sobre esas áreas y mandá el archivo a ventas@quilmescorrugados.com.ar o por WhatsApp, y se produce con eso. No hace falta pedir la plantilla: se genera sola con las medidas.'

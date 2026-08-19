@@ -48,3 +48,9 @@ nul
 # Temp files
 tmpclaude-*
 .env*.local
+
+# Transcriptos del QA del agente: se regeneran con scripts/qa-agente.mts
+qa-transcriptos.json
+_qa/
+.env.qa.tmp
+.env.vercel.tmp

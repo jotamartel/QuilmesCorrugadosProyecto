@@ -26,6 +26,7 @@ import {
   ClientType,
 } from '@/lib/whatsapp';
 import { calcularCotizacion } from '@/lib/cotizacion/motor';
+import { responder, agenteDisponible } from '@/lib/agente';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { HORARIO, RETAIL_CONFIG } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
@@ -43,6 +44,7 @@ import {
 } from '@/lib/contact-matching';
 import {
   generateConversationalResponse,
+  getRecentConversationHistory,
   isWhatsAppAIEnabled,
   type BoxTemplateResponse,
 } from '@/lib/whatsapp-ai';
@@ -202,6 +204,28 @@ function hasMediaContent(formData: FormData): boolean {
   return false;
 }
 
+/**
+ * Manda la respuesta del agente y, si menciona la plantilla, tambien el PDF.
+ *
+ * En WhatsApp un archivo adjunto es mejor que un link: se abre sin salir de la
+ * conversacion. El agente devuelve la URL en el texto, asi que se detecta y se
+ * manda tambien como documento. WhatsApp no permite texto junto con un
+ * adjunto, por eso van en dos mensajes.
+ */
+async function enviarRespuestaDelAgente(
+  from: string,
+  phoneNumber: string,
+  texto: string,
+  clientId: string | null,
+) {
+  const plantilla = texto.match(/https?:\/\/\S*\/api\/box-template\?\S+/);
+  if (plantilla) {
+    await sendWhatsAppDocument({ to: from, mediaUrl: plantilla[0] });
+  }
+  await sendWhatsAppMessage({ to: from, body: texto });
+  await saveCommunication(phoneNumber, 'outbound', texto, { agente: true }, clientId);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -294,6 +318,40 @@ export async function POST(request: NextRequest) {
     let needsAdvisor = false;
     /** Con impresión: enviar desplegado PDF inmediatamente */
     let boxTemplateToSend: { length: number; width: number; height: number } | null = null;
+
+    // ─────────────────────────────────────────────────────────────────────
+    // El agente atiende primero. La maquina de estados de mas abajo queda de
+    // respaldo por si la API no esta disponible: es el mismo criterio que en el
+    // chat del sitio, y no comparte proveedor con el camino principal.
+    //
+    // Se salta cuando llega media, que el agente no puede leer, y cuando la
+    // conversacion ya venia a mitad de un flujo viejo, para no cortarle el paso
+    // a alguien que quedo esperando responder "1" o "2".
+    // ─────────────────────────────────────────────────────────────────────
+    const enFlujoViejo = state.step !== 'initial';
+    if (!hasMediaContent(formData) && !enFlujoViejo && agenteDisponible()) {
+      try {
+        const historial = await getRecentConversationHistory(phoneNumber, 10);
+        const r = await responder(body, historial, {
+          canal: 'whatsapp',
+          telefono: phoneNumber,
+        });
+        if (r.texto) {
+          console.log(
+            '[WhatsApp] agente ok. herramientas: %s',
+            r.herramientasUsadas.join(',') || 'ninguna',
+          );
+          await enviarRespuestaDelAgente(from, phoneNumber, r.texto, clientId);
+          return new NextResponse(
+            '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+            { headers: { 'Content-Type': 'text/xml' } },
+          );
+        }
+        console.error('[WhatsApp] el agente devolvio vacio, pasando al respaldo');
+      } catch (error) {
+        console.error('[WhatsApp] el agente fallo, pasando al respaldo:', error);
+      }
+    }
 
     // Detectar media (audio/imagen/video)
     if (hasMediaContent(formData)) {

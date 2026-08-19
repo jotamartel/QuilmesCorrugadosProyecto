@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { HERRAMIENTAS } from './herramientas';
+import { crearHerramientas, type ContextoAgente } from './herramientas';
 import { HORARIO } from '@/lib/retail/config';
 import { SITE_URL } from '@/lib/site';
 
@@ -90,8 +90,12 @@ Si mencionó impresión pero no dijo cuántos colores, preguntáselo antes de co
 
 Al dar un precio decí siempre las cuatro cosas que vienen en la respuesta: que es en pesos, que el subtotal va sin IVA y el total lo incluye, el plazo de entrega y hasta cuándo vale. Y pasale el link de la cotización, que puede compartir con su equipo.
 
+Si cotizaste, el precio VA EN LA RESPUESTA, siempre. Guardar el lead o registrar la consulta son cosas que hacés de fondo: no las cuentes en lugar del precio. Alguien que pidió una cotización y recibe "ya guardé tus datos" se queda sin lo único que vino a buscar.
+
 CUANDO TE CORRIGEN
-Si la persona se corrige a mitad de camino —"2600 no 260", "perdón, eran 40 de alto"— tomá la corrección y seguí. No vuelvas a empezar ni le pidas que repita lo que ya dijo.
+Si la persona se corrige a mitad de camino, tomá la corrección y seguí. No vuelvas a empezar ni le pidas que repita lo que ya dijo.
+
+Ojo con la forma "A no B", que acá se usa mucho: en "2600 no 260" el número bueno es el PRIMERO. Está diciendo "son 2600, no 260" — está desmintiendo el segundo, no pidiéndolo. Lo mismo con "450 no 45" o "son tres colores no dos". Si el valor que corrige ya es el que estabas usando, no recotices: confirmale que lo tenías bien y seguí.
 
 Si algo te queda ambiguo, preguntá. Preguntar cuesta un mensaje; adivinar mal cuesta la venta.
 
@@ -106,6 +110,26 @@ Si deja nombre, empresa, mail o teléfono, guardalo. Si pide que la contacten, g
 Podés mandarla a ${SITE_URL}/cajas para comprar de stock online, o a ${SITE_URL}/precios para ver la escalera completa.
 
 El horario de atención sale de la herramienta de condiciones. Fuera de ese horario podés seguir cotizando igual: para eso está el chat.`;
+
+/**
+ * Lo que cambia entre la web y WhatsApp.
+ *
+ * El resto de las instrucciones es igual a proposito: un mismo negocio no
+ * deberia contestar distinto segun por donde le escriban. Lo unico que cambia
+ * de verdad es el formato del canal y que en WhatsApp ya sabemos quien escribe.
+ */
+const POR_CANAL: Record<ContextoAgente['canal'], string> = {
+  web: `
+ESTE CANAL
+Estás en el chat del sitio. La persona tiene el cotizador y las páginas a mano, así que podés mandarla ahí cuando convenga.`,
+  whatsapp: `
+ESTE CANAL
+Estás en WhatsApp. Mensajes más cortos todavía: dos o tres líneas. Sin viñetas ni listas numeradas, que se leen mal en el teléfono; si tenés que enumerar, usá frases separadas por punto y aparte.
+
+Ya tenemos el número de quien escribe, así que no se lo pidas. Si deja el nombre o la empresa, guardalo.
+
+Si el mensaje empieza con [COTIZADO-WEB], la persona ya cotizó en el sitio y viene a cerrar: el precio que trae es el nuestro. No vuelvas a cotizar ni preguntes las medidas otra vez. Confirmá y avanzá con lo que falta para el pedido.`,
+};
 
 export interface TurnoConversacion {
   role: 'user' | 'assistant';
@@ -128,11 +152,11 @@ export interface RespuestaAgente {
 export async function responder(
   mensaje: string,
   historial: TurnoConversacion[] = [],
-  contexto?: { paginaActual?: string },
+  contexto: ContextoAgente & { paginaActual?: string } = { canal: 'web' },
 ): Promise<RespuestaAgente> {
   if (!anthropic) throw new Error('ANTHROPIC_API_KEY no configurada');
 
-  const dondeEsta = contexto?.paginaActual
+  const dondeEsta = contexto.paginaActual
     ? `\n\nLa persona está en la página ${contexto.paginaActual} del sitio.`
     : '';
 
@@ -144,11 +168,11 @@ export async function responder(
     system: [
       {
         type: 'text',
-        text: INSTRUCCIONES,
+        text: INSTRUCCIONES + POR_CANAL[contexto.canal],
         cache_control: { type: 'ephemeral' },
       },
     ],
-    tools: HERRAMIENTAS,
+    tools: crearHerramientas(contexto),
     max_iterations: 6,
     messages: [
       ...historial.slice(-10).map((t) => ({ role: t.role, content: t.content })),

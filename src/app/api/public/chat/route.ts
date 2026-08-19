@@ -40,7 +40,10 @@ export async function POST(request: NextRequest) {
 
     if (agenteDisponible()) {
       try {
-        const r = await responder(message, turns, { paginaActual: attribution?.pagePath });
+        const r = await responder(message, turns, {
+          canal: 'web',
+          paginaActual: attribution?.pagePath,
+        });
         if (r.texto) {
           // Se loguea qué herramientas usó para poder medir después si de
           // verdad está cotizando o si contesta de memoria.

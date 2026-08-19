@@ -4,6 +4,7 @@ import { getActivePricingConfig } from '@/lib/utils/pricing';
 import { calcularCotizacion, precioUnitarioARS, urlPlantilla, notaImpresion } from '@/lib/cotizacion/motor';
 import { RETAIL_CONFIG, MINIMOS, ENVIO, HORARIO } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
+import { upsertContactProfile } from '@/lib/contact-matching';
 import { SITE_URL } from '@/lib/site';
 
 /**
@@ -24,6 +25,17 @@ import { SITE_URL } from '@/lib/site';
  * el servidor MCP. Es el punto del ejercicio: una sola fuente, cuatro consumos.
  */
 
+/**
+ * De dónde viene la conversación. El teléfono llega solo cuando entra por
+ * WhatsApp: ahí ya lo sabemos, así que el agente no tiene que pedirlo ni el
+ * modelo tiene que acordarse de pasarlo.
+ */
+export interface ContextoAgente {
+  canal: 'web' | 'whatsapp';
+  /** E.164 sin el prefijo whatsapp:, cuando el canal lo trae. */
+  telefono?: string;
+}
+
 async function leerCatalogoDeStock() {
   try {
     const { data } = await createAdminClient()
@@ -39,7 +51,17 @@ async function leerCatalogoDeStock() {
   }
 }
 
-export const cotizarCajas = betaTool({
+/**
+ * Arma las herramientas para una conversación.
+ *
+ * Es una factory y no un array constante porque `guardar_lead` necesita el
+ * teléfono de quien escribe, y ese dato cambia por conversación. La
+ * alternativa —que el modelo lo pase como parámetro— es confiar en que se
+ * acuerde de un dato que el sistema ya tiene: exactamente el tipo de cosa que
+ * conviene sacarle de encima.
+ */
+export function crearHerramientas(ctx: ContextoAgente) {
+  const cotizarCajas = betaTool({
   name: 'cotizar_cajas',
   description:
     'Calcula el precio real de un pedido de cajas de cartón corrugado. Es la ÚNICA ' +
@@ -154,7 +176,7 @@ export const cotizarCajas = betaTool({
   },
 });
 
-export const condicionesYPrecios = betaTool({
+  const condicionesYPrecios = betaTool({
   name: 'condiciones_y_precios',
   description:
     'Devuelve las condiciones comerciales vigentes: mínimos de cada canal, escalera ' +
@@ -214,7 +236,7 @@ export const condicionesYPrecios = betaTool({
   },
 });
 
-export const plantillaDeImpresion = betaTool({
+  const plantillaDeImpresion = betaTool({
   name: 'plantilla_impresion',
   description:
     'Devuelve el link al PDF del desplegado de la caja, con las líneas de corte y ' +
@@ -242,47 +264,104 @@ export const plantillaDeImpresion = betaTool({
   },
 });
 
-export const guardarLead = betaTool({
-  name: 'guardar_lead',
-  description:
-    'Guarda los datos de la persona para que un vendedor la contacte. Llamala ' +
-    'cuando deje su nombre, empresa, mail o teléfono, o cuando pida que la ' +
-    'contacten. No hace falta tener todos los datos: guardá lo que haya. Llamala ' +
-    'una sola vez por conversación, salvo que agregue datos nuevos.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      nombre: { type: 'string', description: 'Nombre de la persona, si lo dijo' },
-      empresa: { type: 'string', description: 'Empresa, si la dijo' },
-      email: { type: 'string', description: 'Email, si lo dejó' },
-      telefono: { type: 'string', description: 'Teléfono, si lo dejó' },
-      resumen: {
-        type: 'string',
-        description:
-          'Una o dos frases con lo que necesita: medidas, cantidad, uso, urgencia. ' +
-          'Es lo que va a leer el vendedor antes de llamar.',
+  const guardarLead = betaTool({
+    name: 'guardar_lead',
+    description:
+      'Guarda los datos de la persona para que un vendedor la contacte. Llamala ' +
+      'cuando deje su nombre, empresa, mail o teléfono, o cuando pida que la ' +
+      'contacten. No hace falta tener todos los datos ni haber cotizado: guardá ' +
+      'lo que haya. Si ya cotizaste en esta conversación, pasá también las ' +
+      'medidas y la cantidad. Llamala una sola vez, salvo que agregue datos nuevos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        nombre: { type: 'string', description: 'Nombre de la persona, si lo dijo' },
+        empresa: { type: 'string', description: 'Empresa, si la dijo' },
+        email: { type: 'string', description: 'Email, si lo dejó' },
+        telefono: { type: 'string', description: 'Teléfono, si lo dejó y no lo tenemos ya' },
+        resumen: {
+          type: 'string',
+          description:
+            'Una o dos frases con lo que necesita: medidas, cantidad, uso, urgencia. ' +
+            'Es lo que va a leer el vendedor antes de llamar.',
+        },
+        largo_mm: { type: 'integer', description: 'Solo si ya cotizaste' },
+        ancho_mm: { type: 'integer', description: 'Solo si ya cotizaste' },
+        alto_mm: { type: 'integer', description: 'Solo si ya cotizaste' },
+        cantidad: { type: 'integer', description: 'Solo si ya cotizaste' },
       },
+      required: ['resumen'],
+      additionalProperties: false,
     },
-    required: ['resumen'],
-    additionalProperties: false,
-  },
-  run: async (args) => {
-    try {
-      // Service role: no hay sesion de usuario en un endpoint publico, y con el
-      // cliente SSR las policies de RLS rechazan el insert en silencio. Ya paso
-      // con los leads de WhatsApp, que se perdieron todos.
-      const { error } = await createAdminClient().from('public_quotes').insert({
-        requester_name: args.nombre || args.empresa || 'Consulta del chat',
-        requester_company: args.empresa || null,
-        requester_email: args.email || null,
-        requester_phone: args.telefono || null,
-        message: args.resumen,
-        source: 'chat_web',
-        requested_contact: true,
-        status: 'pending',
-      });
-      if (error) {
-        console.error('[Agente] No se pudo guardar el lead:', error);
+    run: async (args) => {
+      const telefono = ctx.telefono || args.telefono;
+
+      // Dos destinos distintos a proposito.
+      //
+      // contact_profiles es QUIEN es la persona y admite que todavia no haya
+      // pedido nada. public_quotes es QUE pidio, y exige medidas y cantidad:
+      // intentar guardar ahi un contacto que solo dejo el nombre revienta con
+      // un NOT NULL en length_mm y el lead se pierde igual que antes.
+      let guardadoAlgo = false;
+
+      if (telefono) {
+        try {
+          await upsertContactProfile({
+            phoneNumber: telefono,
+            email: args.email,
+            displayName: args.nombre,
+            companyName: args.empresa,
+          });
+          guardadoAlgo = true;
+        } catch (e) {
+          console.error('[Agente] No se pudo guardar el contacto:', e);
+        }
+      }
+
+      const hayCotizacion =
+        args.largo_mm && args.ancho_mm && args.alto_mm && args.cantidad;
+
+      // La tabla exige al menos un canal de contacto. Sin telefono ni mail la
+      // fila no le sirve a nadie: alcanza con el perfil de contacto.
+      const sePuedeContactar = !!telefono || !!args.email;
+      if (sePuedeContactar && (hayCotizacion || !telefono)) {
+        try {
+          // Service role: no hay sesion de usuario en un endpoint publico, y con
+          // el cliente SSR las policies de RLS rechazan el insert en silencio.
+          // Ya paso con los leads de WhatsApp, que se perdieron todos.
+          const { error } = await createAdminClient().from('public_quotes').insert({
+            requester_name:
+              args.nombre || args.empresa ||
+              (telefono ? 'WhatsApp ' + telefono.slice(-4) : 'Consulta del chat'),
+            requester_company: args.empresa || null,
+            requester_email: args.email || null,
+            requester_phone: telefono || null,
+            // Null y no cero: una caja de 0x0x0 no se distingue de un dato
+            // mal cargado, y ensucia los reportes. Van los cuatro o ninguno,
+            // que es lo que exige el CHECK de la tabla.
+            length_mm: hayCotizacion ? args.largo_mm : null,
+            width_mm: hayCotizacion ? args.ancho_mm : null,
+            height_mm: hayCotizacion ? args.alto_mm : null,
+            quantity: hayCotizacion ? args.cantidad : null,
+            message: args.resumen,
+            // source y canal tienen un CHECK que solo admite 'web' y
+            // 'whatsapp'. Que la consulta la haya tomado el asistente y no el
+            // formulario va en notes, que es texto libre: sirve para medir
+            // cuanto trae este canal antes de poner plata en campañas.
+            source: ctx.canal === 'whatsapp' ? 'whatsapp' : 'web',
+            canal: ctx.canal === 'whatsapp' ? 'whatsapp' : 'web',
+            notes: 'Tomado por el asistente automatico',
+            requested_contact: true,
+            status: 'pending',
+          });
+          if (error) console.error('[Agente] No se pudo guardar la consulta:', error);
+          else guardadoAlgo = true;
+        } catch (e) {
+          console.error('[Agente] No se pudo guardar la consulta:', e);
+        }
+      }
+
+      if (!guardadoAlgo) {
         return JSON.stringify({
           guardado: false,
           instruccion:
@@ -293,14 +372,10 @@ export const guardarLead = betaTool({
         guardado: true,
         instruccion: 'Confirmale que un vendedor la va a contactar y en qué horario se atiende.',
       });
-    } catch (e) {
-      console.error('[Agente] No se pudo guardar el lead:', e);
-      return JSON.stringify({ guardado: false, instruccion: 'Ofrecele WhatsApp.' });
-    }
-  },
-});
+    },
+  });
 
-export const derivarAHumano = betaTool({
+  const derivarAHumano = betaTool({
   name: 'derivar_a_humano',
   description:
     'Devuelve el link de WhatsApp con un mensaje ya escrito para seguir la ' +
@@ -332,10 +407,5 @@ export const derivarAHumano = betaTool({
   },
 });
 
-export const HERRAMIENTAS = [
-  cotizarCajas,
-  condicionesYPrecios,
-  plantillaDeImpresion,
-  guardarLead,
-  derivarAHumano,
-];
+  return [cotizarCajas, condicionesYPrecios, plantillaDeImpresion, guardarLead, derivarAHumano];
+}

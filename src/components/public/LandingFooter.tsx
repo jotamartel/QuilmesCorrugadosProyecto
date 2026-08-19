@@ -94,6 +94,11 @@ export function LandingFooter() {
                   Política de privacidad
                 </a>
               </li>
+              <li>
+                <a href="/terminos" className="hover:text-white">
+                  Términos y condiciones
+                </a>
+              </li>
             </ul>
           </div>
         </div>

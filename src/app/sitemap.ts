@@ -83,6 +83,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'yearly',
       priority: 0.5,
     },
+    {
+      url: `${BASE_URL}/terminos`,
+      lastModified: now,
+      changeFrequency: 'yearly',
+      priority: 0.5,
+    },
 
     // Cotizaciones concretas, con el precio en el title.
     //

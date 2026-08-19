@@ -125,6 +125,15 @@ export interface QuoteResult {
    * gratuito", y de paso invento la zona. Las dos cosas eran compromisos que
    * la fabrica hubiera tenido que cumplir.
    */
+  /**
+   * Si el pedido quedó cerca de un umbral que le conviene, cuánto le falta.
+   * Null cuando ya lo superó o cuando está demasiado lejos como para ofrecerlo.
+   */
+  next_tier: {
+    m2_faltantes: number;
+    cajas_aproximadas: number | null;
+    que_gana: string;
+  } | null;
   shipping: {
     /** Si el volumen alcanza el mínimo. La distancia no se sabe acá. */
     meets_free_shipping_volume: boolean;
@@ -381,7 +390,12 @@ export function calcularCotizacion(
   const whatsappMessage =
     `[COTIZADO-WEB] Hola! Ya tengo una cotizacion del sitio y quiero avanzar.\n\n` +
     `Pedido: ${detalleCajas}\n` +
-    `Total cotizado: ${ars(totalSubtotal)} + IVA (${totalM2.toLocaleString('es-AR')} m²)\n` +
+    // "Total" es solo el monto CON IVA. Este mensaje decia "Total cotizado:
+    // $2.639.520 + IVA" y del otro lado el asistente lo repetia tal cual, asi
+    // que el error de etiqueta viajaba entero hasta quien arma la orden de
+    // compra: medio millon de diferencia sobre este pedido.
+    `Subtotal: ${ars(totalSubtotal)} sin IVA (${totalM2.toLocaleString('es-AR')} m²)\n` +
+    `Total con IVA 21%: ${ars(Math.round(totalSubtotal * (1 + IVA)))}\n` +
     (esDeStock ? `Corresponde al canal de stock.\n` : `Produccion a medida, ${maxEstimatedDays} dias habiles.\n`) +
     `\n¿Me confirman disponibilidad y como seguimos?`;
 
@@ -395,6 +409,22 @@ export function calcularCotizacion(
       instruction:
         'Ofrecele al usuario contactarnos y pasale el link de whatsapp_url tal cual: ya lleva el mensaje escrito con las medidas, la cantidad y el precio cotizado. Del otro lado lo atiende un asistente que ya tiene ese contexto, asi que el usuario no tiene que repetir nada. Es la via mas rapida para cerrar.',
     },
+    next_tier: (() => {
+      // Cuanto falta para el proximo umbral que le conviene al cliente.
+      //
+      // Un pedido de 2.932,8 m² esta a 67 m² del minimo mayorista, que trae
+      // envio gratis e impresion incluida. Nadie se lo dijo: se cotizo, se
+      // cerro, y quedaron dos ventajas sin ofrecer y unas cajas sin vender.
+      const faltan = config.free_shipping_min_m2 - totalM2;
+      if (faltan <= 0 || faltan > config.free_shipping_min_m2 * 0.1) return null;
+      const m2PorCaja = boxResults[0]?.sqm_per_box || 0;
+      const cajas = m2PorCaja > 0 ? Math.ceil(faltan / m2PorCaja) : null;
+      return {
+        m2_faltantes: Math.round(faltan * 10) / 10,
+        cajas_aproximadas: cajas,
+        que_gana: `Llegando a ${config.free_shipping_min_m2.toLocaleString('es-AR')} m² el envío pasa a ser gratis dentro de ${config.free_shipping_max_km} km y el costo de impresión queda incluido.`,
+      };
+    })(),
     shipping: {
       meets_free_shipping_volume: totalM2 >= config.free_shipping_min_m2,
       note:

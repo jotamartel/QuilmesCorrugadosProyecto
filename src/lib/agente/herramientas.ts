@@ -167,6 +167,7 @@ export function crearHerramientas(ctx: ContextoAgente) {
       // los m² contra el umbral: con 2.932,8 m² una vez concluyo que superaba
       // los 3.000 y prometio envio gratis.
       envio: q.shipping.note,
+      le_falta_poco_para_el_proximo_escalon: q.next_tier,
       envio_gratis_por_volumen: q.shipping.meets_free_shipping_volume,
       como_se_cobra_la_impresion: caja.printing_colors > 0 ? q.printing.price_note : undefined,
       link_para_compartir: `${SITE_URL}/cotizar/${largo_mm}x${ancho_mm}x${alto_mm}/${cantidad}`,

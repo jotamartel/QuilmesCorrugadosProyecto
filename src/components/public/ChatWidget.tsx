@@ -73,7 +73,7 @@ function etiquetaDeEnlace(url: string): string {
   try {
     const u = new URL(url);
     if (u.pathname.startsWith('/api/box-template')) return 'Descargar la plantilla (PDF)';
-    if (u.pathname.startsWith('/cotizar/')) return 'Ver la cotizacion';
+    if (u.pathname.startsWith('/cotizar/')) return 'Ver la cotización';
     if (u.hostname.includes('wa.me')) return 'Escribir por WhatsApp';
     const corto = (u.hostname.replace(/^www\./, '') + u.pathname).replace(/\/$/, '');
     return corto.length > 42 ? corto.slice(0, 42) + '…' : corto;

@@ -1,3 +1,5 @@
+import { MEDIDA_MINIMA } from '@/lib/utils/box-calculations';
+
 export interface RetailConfig {
   // Límites de dimensiones (mm)
   MIN_LARGO: number;
@@ -55,12 +57,16 @@ export interface RetailConfig {
 }
 
 export const RETAIL_CONFIG: RetailConfig = {
-  // Límites de dimensiones (mm)
-  MIN_LARGO: 100,
+  // Límites de dimensiones (mm). Los mínimos NO se escriben acá: salen de
+  // MEDIDA_MINIMA, que es lo que la fábrica puede producir de verdad. Estaban
+  // en 100x100x50 y contradecían a isUndersized, que valida el alta de cajas
+  // en 200x200x100. Con los viejos, el cotizador minorista tomaba pedidos
+  // imposibles y el asistente le informó a un cliente la medida equivocada.
+  MIN_LARGO: MEDIDA_MINIMA.largo,
   MAX_LARGO: 800,
-  MIN_ANCHO: 100,
+  MIN_ANCHO: MEDIDA_MINIMA.ancho,
   MAX_ANCHO: 600,
-  MIN_ALTO: 50,
+  MIN_ALTO: MEDIDA_MINIMA.alto,
   MAX_ALTO: 600,
 
   // Valores iniciales (mm)

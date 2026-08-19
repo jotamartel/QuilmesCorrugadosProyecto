@@ -67,10 +67,25 @@ export function isOversized(length: number, width: number, height: number): bool
 }
 
 /**
- * Verifica si una caja es menor al tamaño mínimo (200x200x100)
+ * La medida mas chica que la fabrica puede producir.
+ *
+ * Este es el dato autoritativo. Estaba escrito aca y ademas, con otros valores
+ * —100x100x50—, en RETAIL_CONFIG. Los dos se usaban: esta version validaba el
+ * alta de cajas en el catalogo, y la de RETAIL_CONFIG validaba la API del
+ * cotizador minorista y los deslizadores del configurador.
+ *
+ * O sea que el cotizador aceptaba pedidos de cajas que la fabrica no fabrica, y
+ * el asistente, que leia de ahi, le informo a un cliente que la medida minima
+ * era 100x100x50. Ahora RETAIL_CONFIG toma estos valores.
  */
+export const MEDIDA_MINIMA = { largo: 200, ancho: 200, alto: 100 } as const;
+
 export function isUndersized(length: number, width: number, height: number): boolean {
-  return length < 200 || width < 200 || height < 100;
+  return (
+    length < MEDIDA_MINIMA.largo ||
+    width < MEDIDA_MINIMA.ancho ||
+    height < MEDIDA_MINIMA.alto
+  );
 }
 
 /**

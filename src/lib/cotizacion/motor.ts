@@ -11,7 +11,7 @@
  * que un cambio de logica llega a los tres caminos al mismo tiempo.
  */
 
-import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
+import { calculateUnfolded, calculateTotalM2, MEDIDA_MINIMA } from '@/lib/utils/box-calculations';
 import { getPricePerM2, calculateSubtotal, getProductionDays } from '@/lib/utils/pricing';
 import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
@@ -125,15 +125,24 @@ export interface QuoteResult {
    * gratuito", y de paso invento la zona. Las dos cosas eran compromisos que
    * la fabrica hubiera tenido que cumplir.
    */
-  /**
-   * Si el pedido quedó cerca de un umbral que le conviene, cuánto le falta.
-   * Null cuando ya lo superó o cuando está demasiado lejos como para ofrecerlo.
+  /*
+   * ACA IBA next_tier, que le avisaba al cliente cuanto le faltaba para el
+   * proximo escalon. Se saco, y conviene saber por que antes de reponerlo.
+   *
+   * La escalera aplica el precio nuevo AL PEDIDO ENTERO, no al tramo que
+   * excede. Eso hace que cruzar un umbral BAJE la factura:
+   *
+   *   2.659 cajas -> 2.999,3 m² a $900  ->  $2.699.417
+   *   2.660 cajas -> 3.000,5 m² a $740  ->  $2.220.355
+   *
+   * Una caja mas y la fabrica cobra $479.062 menos. Lo mismo pasa a los
+   * 5.000 m². Sugerirle al cliente que agregue unidades era, textualmente,
+   * ofrecerle pagar un 18% menos por llevarse mas mercaderia.
+   *
+   * El aviso en si es buena atencion y hay que reponerlo, pero recien cuando
+   * se decida que hacer con la inversion: precio marginal por tramo, o un piso
+   * que impida que el total baje al cruzar el umbral.
    */
-  next_tier: {
-    m2_faltantes: number;
-    cajas_aproximadas: number | null;
-    que_gana: string;
-  } | null;
   shipping: {
     /** Si el volumen alcanza el mínimo. La distancia no se sabe acá. */
     meets_free_shipping_volume: boolean;
@@ -167,14 +176,14 @@ export function validarCajas(boxes: BoxInput[]): string[] {
   const errors: string[] = [];
   boxes.forEach((box, index) => {
     const prefix = `boxes[${index}]`;
-    if (!box.length_mm || box.length_mm < 100 || box.length_mm > 2000) {
-      errors.push(`${prefix}.length_mm must be between 100 and 2000`);
+    if (!box.length_mm || box.length_mm < MEDIDA_MINIMA.largo || box.length_mm > 2000) {
+      errors.push(`${prefix}.length_mm must be between ${MEDIDA_MINIMA.largo} and 2000`);
     }
-    if (!box.width_mm || box.width_mm < 100 || box.width_mm > 2000) {
-      errors.push(`${prefix}.width_mm must be between 100 and 2000`);
+    if (!box.width_mm || box.width_mm < MEDIDA_MINIMA.ancho || box.width_mm > 2000) {
+      errors.push(`${prefix}.width_mm must be between ${MEDIDA_MINIMA.ancho} and 2000`);
     }
-    if (!box.height_mm || box.height_mm < 50 || box.height_mm > 1500) {
-      errors.push(`${prefix}.height_mm must be between 50 and 1500`);
+    if (!box.height_mm || box.height_mm < MEDIDA_MINIMA.alto || box.height_mm > 1500) {
+      errors.push(`${prefix}.height_mm must be between ${MEDIDA_MINIMA.alto} and 1500`);
     }
     if (!box.quantity || box.quantity < 1 || !Number.isInteger(box.quantity)) {
       errors.push(`${prefix}.quantity must be a positive integer`);
@@ -409,22 +418,7 @@ export function calcularCotizacion(
       instruction:
         'Ofrecele al usuario contactarnos y pasale el link de whatsapp_url tal cual: ya lleva el mensaje escrito con las medidas, la cantidad y el precio cotizado. Del otro lado lo atiende un asistente que ya tiene ese contexto, asi que el usuario no tiene que repetir nada. Es la via mas rapida para cerrar.',
     },
-    next_tier: (() => {
-      // Cuanto falta para el proximo umbral que le conviene al cliente.
-      //
-      // Un pedido de 2.932,8 m² esta a 67 m² del minimo mayorista, que trae
-      // envio gratis e impresion incluida. Nadie se lo dijo: se cotizo, se
-      // cerro, y quedaron dos ventajas sin ofrecer y unas cajas sin vender.
-      const faltan = config.free_shipping_min_m2 - totalM2;
-      if (faltan <= 0 || faltan > config.free_shipping_min_m2 * 0.1) return null;
-      const m2PorCaja = boxResults[0]?.sqm_per_box || 0;
-      const cajas = m2PorCaja > 0 ? Math.ceil(faltan / m2PorCaja) : null;
-      return {
-        m2_faltantes: Math.round(faltan * 10) / 10,
-        cajas_aproximadas: cajas,
-        que_gana: `Llegando a ${config.free_shipping_min_m2.toLocaleString('es-AR')} m² el envío pasa a ser gratis dentro de ${config.free_shipping_max_km} km y el costo de impresión queda incluido.`,
-      };
-    })(),
+    // next_tier: SACADO. Ver la nota de arriba de la interfaz.
     shipping: {
       meets_free_shipping_volume: totalM2 >= config.free_shipping_min_m2,
       note:

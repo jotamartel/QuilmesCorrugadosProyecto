@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Package, Clock, Truck, Send, Loader2, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { BoxItemData, BoxCalculations } from './BoxItemForm';
+import { precioUnitarioARS } from '@/lib/cotizacion/motor';
 
 interface PriceSummaryProps {
   boxes: BoxItemData[];
@@ -194,6 +195,16 @@ export function PriceSummary({
 
           {/* Total */}
           <div className="border-t border-gray-100 pt-4">
+            {/* Con una sola medida el unitario es directo y es lo que la
+                persona compara. Con varias no tiene sentido un promedio. */}
+            {boxes.length === 1 && boxes[0].quantity > 0 && (
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-gray-600">Precio por caja:</span>
+                <span className="text-base font-semibold text-gray-800">
+                  {precioUnitarioARS(totalSubtotal / boxes[0].quantity)} + IVA
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center">
               <span className="text-lg font-semibold text-gray-700">Total estimado:</span>
               <span className="text-3xl font-bold text-[#002E55]">{formatCurrency(totalSubtotal)}</span>

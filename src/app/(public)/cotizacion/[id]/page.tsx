@@ -9,6 +9,7 @@ import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { BelowMinimumModal } from '@/components/public/BelowMinimumModal';
 import { formatCurrency } from '@/lib/utils/pricing';
+import { precioUnitarioARS } from '@/lib/cotizacion/motor';
 
 // Importar BoxPreview3D dinámicamente
 const BoxPreview3D = dynamic(
@@ -211,6 +212,13 @@ export default function QuoteConfirmationPage() {
                     <span className="font-medium">{quote.total_sqm.toLocaleString('es-AR', { minimumFractionDigits: 2 })} m²</span>
                   </div>
                   <hr className="my-3" />
+                  {/* El unitario es el numero con el que la gente compara
+                      proveedores y arma su propio costo. Estaba calculado y no
+                      se mostraba. */}
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Precio por caja:</span>
+                    <span className="font-semibold">{precioUnitarioARS(quote.unit_price)} + IVA</span>
+                  </div>
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total estimado:</span>
                     <span className="text-amber-600">{formatCurrency(quote.subtotal)}</span>

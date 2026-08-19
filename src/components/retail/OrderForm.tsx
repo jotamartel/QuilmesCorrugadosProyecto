@@ -12,6 +12,65 @@ interface OrderFormProps {
   savedData?: OrderFormData | null;
 }
 
+/**
+ * Detecta si la persona esta pidiendo impresion en el campo de mensaje libre.
+ *
+ * POR QUE EXISTE
+ *
+ * Entro un pedido real —el 266— de 100 cajas de 200x200x200 con este mensaje:
+ * "tmb me gustaria imprimirle el logo". El pedido se tomo sin decir nada. Con
+ * las reglas vigentes ese pedido NO se puede imprimir por dos motivos a la vez:
+ * son 34 m² y la impresion arranca en 1.000, y ademas 200x200x200 es una medida
+ * de catalogo, que no lleva arte.
+ *
+ * O sea que el cliente iba a recibir cien cajas lisas habiendo pedido su logo,
+ * y se iba a enterar al abrir la caja. Eso no se arregla con una nota interna:
+ * el que tiene que enterarse a tiempo es el.
+ */
+const PALABRAS_IMPRESION = [
+  'imprim', 'impres', 'logo', 'serigraf', 'estampa', 'marca', 'diseño', 'diseno', 'arte',
+];
+
+function pideImpresion(mensaje: string): boolean {
+  const t = mensaje.toLowerCase();
+  return PALABRAS_IMPRESION.some((p) => t.includes(p));
+}
+
+/**
+ * Que le impide imprimir a ESTE pedido, si algo. Null si puede.
+ * Los umbrales van en duro porque este componente corre en el navegador y no
+ * puede leer pricing_config; se revisan junto con la escalera.
+ */
+function motivoSinImpresion(boxes: BoxQuoteLine[]): string | null {
+  const totalM2 = boxes.reduce((s, b) => s + b.totalM2, 0);
+  const hayDeCatalogo = boxes.some((b) => !!b.standardBoxId);
+
+  if (hayDeCatalogo && totalM2 < 1000) {
+    return (
+      'Este pedido no puede llevar impresión por dos motivos: la impresión se hace ' +
+      'desde 1.000 m² de cartón y acá son ' + totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 }) +
+      ' m², y además las medidas estándar de catálogo se producen sin arte. Para imprimir hay ' +
+      'que fabricar una medida propia y llegar a ese volumen. Podés mandarnos igual la consulta ' +
+      'y lo vemos: te cotizamos la opción con impresión aparte.'
+    );
+  }
+  if (hayDeCatalogo) {
+    return (
+      'Las medidas estándar de catálogo se producen sin arte, así que este pedido no puede ' +
+      'llevar impresión. Para imprimir hay que fabricar una medida propia. Contanos y te ' +
+      'cotizamos esa opción.'
+    );
+  }
+  if (totalM2 < 1000) {
+    return (
+      'La impresión se hace desde 1.000 m² de cartón y este pedido son ' +
+      totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' m². Podés mandarnos ' +
+      'la consulta igual y te cotizamos qué cantidad haría falta.'
+    );
+  }
+  return null;
+}
+
 const TAX_OPTIONS = [
   { value: 'responsable_inscripto', label: 'Responsable Inscripto' },
   { value: 'monotributista', label: 'Monotributista' },
@@ -46,6 +105,11 @@ export default function OrderForm({ boxes, visible, onSubmit, onBack, savedData 
       scrollRef.current.scrollTop = 0;
     }
   }, [visible]);
+
+  // Se calcula al vuelo mientras escribe: si menciona impresion y este pedido
+  // no califica, el aviso aparece antes de que confirme, no despues.
+  const avisoImpresion =
+    form.mensaje && pideImpresion(form.mensaje) ? motivoSinImpresion(boxes) : null;
 
   const update = (field: keyof OrderFormData, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -339,6 +403,14 @@ export default function OrderForm({ boxes, visible, onSubmit, onBack, savedData 
               placeholder="Algo que quieras contarnos sobre tu pedido..."
               rows={3}
             />
+            {avisoImpresion && (
+              <div
+                className="mt-2 rounded-xl px-4 py-3 text-sm leading-snug"
+                style={{ background: '#FFF8E6', border: '1px solid #E8D9A8', color: '#6B5620' }}
+              >
+                {avisoImpresion}
+              </div>
+            )}
           </div>
 
           {/* Legal text */}

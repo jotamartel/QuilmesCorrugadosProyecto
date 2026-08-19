@@ -28,6 +28,7 @@ import {
 } from '@/lib/types/database';
 import type { FulfillmentStatus, PublicQuote, PublicQuoteStatus } from '@/lib/types/database';
 import { formatBoxDimensions, formatCUIT, formatPhone } from '@/lib/utils/format';
+import { precioUnitarioARS } from '@/lib/cotizacion/motor';
 
 // Flujo de transiciones para mostrar botones de accion
 const FULFILLMENT_FLOW: Record<FulfillmentStatus, { status: FulfillmentStatus; label: string; icon: typeof Package; color: string }[]> = {
@@ -187,6 +188,7 @@ export default function VentaRetailDetailPage({ params }: { params: Promise<{ id
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cantidad</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">m2/caja</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">m2 total</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Precio/caja</th>
                     <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
                   </tr>
                 </thead>
@@ -198,6 +200,9 @@ export default function VentaRetailDetailPage({ params }: { params: Promise<{ id
                     <td className="px-4 py-3 text-sm">{sale.quantity}</td>
                     <td className="px-4 py-3 text-sm">{sale.sqm_per_box?.toFixed(3)} m²</td>
                     <td className="px-4 py-3 text-sm">{sale.total_sqm?.toFixed(2)} m²</td>
+                    <td className="px-4 py-3 text-sm text-right tabular-nums">
+                      {sale.quantity ? precioUnitarioARS(sale.subtotal / sale.quantity) : '-'}
+                    </td>
                     <td className="px-4 py-3 text-sm font-medium text-right">
                       {formatCurrency(sale.subtotal)}
                     </td>

@@ -113,9 +113,9 @@ export default async function TerminosPage() {
               tiene esa limitación.
             </p>
             <p>
-              Fabricamos únicamente en cartón corrugado, {MATERIAL.descripcion.toLowerCase()} No
-              trabajamos microcorrugado ni cartulina, y no exportamos: vendemos solo dentro de la
-              República Argentina.
+              Trabajamos en cartón corrugado {MATERIAL.detalle}. No fabricamos microcorrugado ni
+              cartulina, y no exportamos: vendemos solo dentro de la República Argentina. Si
+              necesitás otro gramaje, consultanos: se cotiza aparte.
             </p>
           </section>
 

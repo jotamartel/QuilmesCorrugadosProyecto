@@ -185,10 +185,26 @@ export const MINIMOS = {
 /**
  * El papel con el que se fabrica. Es una pregunta que hace todo comprador
  * tecnico y hasta ahora no estaba escrita en ningun lado del sitio.
+ *
+ * HOY HAY UN SOLO GRAMAJE, y por eso vive aca como constante. Cuando se
+ * comercialice mas de uno con precios distintos, esto se muda a
+ * pricing_config: el gramaje va a pasar a ser una variable del precio, igual
+ * que el volumen, y tiene que poder cambiarse desde el panel sin deployar.
+ *
+ * Mientras tanto los textos dicen "hoy trabajamos" y no "fabricamos
+ * unicamente": afirmar exclusividad sobre algo que esta por dejar de ser
+ * exclusivo es fabricar una contradiccion con fecha.
  */
 export const MATERIAL = {
   gramaje: '100 libras',
-  descripcion: 'Cartón corrugado de 100 libras, kraft.',
+  /** Frase completa, para una lista de condiciones. */
+  descripcion: 'Cartón corrugado kraft de 100 libras.',
+  /** Solo el papel, para meter en una oración que ya dijo "cartón corrugado". */
+  detalle: 'kraft de 100 libras',
+  /** Deja la puerta abierta sin prometer nada que hoy no exista. */
+  nota:
+    'Hoy trabajamos cartón kraft de 100 libras. Si necesitás otro gramaje, ' +
+    'consultanos y lo vemos.',
 } as const;
 
 export const HORARIO = {

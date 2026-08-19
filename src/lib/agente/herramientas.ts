@@ -210,7 +210,7 @@ export function crearHerramientas(ctx: ContextoAgente) {
           }
         : null,
       iva: 'Los precios publicados van sin IVA. El IVA es 21% y se informa aparte.',
-      material: MATERIAL.descripcion,
+      material: MATERIAL.nota,
       impresion: c
         ? {
             max_colores: RETAIL_CONFIG.MAX_PRINTING_COLORS,

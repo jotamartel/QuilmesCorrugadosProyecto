@@ -192,7 +192,7 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       '',
       `Mínimos: ${RETAIL_CONFIG.MIN_CANTIDAD} cajas si la medida está en stock; ${n(c.min_m2_per_model)} m² por modelo para producción a medida.`,
       notaImpresion(c),
-      `Material: ${MATERIAL.descripcion}`,
+      `Material: ${MATERIAL.nota}`,
       'Plazos: stock en 24 a 48 horas; producción a medida en 7 días hábiles.',
       `Envío: gratis en pedidos mayoristas desde ${c.free_shipping_min_m2.toLocaleString('es-AR')} m² y hasta ` +
         `${c.free_shipping_max_km} km de la fábrica en Quilmes. En pedidos minoristas, retiro en ` +

@@ -283,7 +283,7 @@ Cualquier medida dentro de los rangos. Producción ${c.production_days_standard}
 - Mínimo del canal de stock: 100 cajas.
 - Medida mínima por caja: 200 x 200 x 100 mm.
 - Ancho + alto no puede superar 1200 mm (limitación del rollo).
-- Material: ${MATERIAL.descripcion}
+- Material: ${MATERIAL.nota}
 - Precios en pesos argentinos. El subtotal va sin IVA; el total con IVA 21% viene
   aparte en la misma respuesta.
 - Envío gratis solo en pedidos mayoristas: desde ${m2(c.free_shipping_min_m2)} y dentro

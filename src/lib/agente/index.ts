@@ -40,12 +40,41 @@ export function agenteDisponible(): boolean {
   return !!anthropic;
 }
 
-const MODELO = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5';
+const MODELO_POR_DEFECTO = 'claude-sonnet-5';
+
+/**
+ * Se puede cambiar el modelo por variable de entorno, pero solo si el valor
+ * tiene forma de identificador de modelo.
+ *
+ * ANTHROPIC_MODEL es un nombre bastante común y lo definen otras herramientas.
+ * En una prueba local llegó valiendo "claude-opus-4-7[1m]" —de otro proceso,
+ * con un sufijo de ventana de contexto que no es parte del id— y las cinco
+ * consultas murieron con un 404 que parecía un problema del agente. Un valor
+ * con forma inválida se ignora y se avisa, en vez de tumbar el chat.
+ */
+function modeloElegido(): string {
+  const pedido = process.env.ANTHROPIC_MODEL?.trim();
+  if (!pedido) return MODELO_POR_DEFECTO;
+  if (!/^[a-z0-9.-]+$/i.test(pedido)) {
+    console.error(
+      `[Agente] ANTHROPIC_MODEL="${pedido}" no tiene forma de modelo. ` +
+        `Usando ${MODELO_POR_DEFECTO}.`,
+    );
+    return MODELO_POR_DEFECTO;
+  }
+  return pedido;
+}
+
+const MODELO = modeloElegido();
 
 const INSTRUCCIONES = `Sos quien atiende las consultas de Quilmes Corrugados, una fábrica de cajas de cartón corrugado en Quilmes, provincia de Buenos Aires. Hablás con alguien que entró al sitio.
 
 CÓMO HABLÁS
-Español rioplatense, de vos. Directo y cordial, como quien atiende el mostrador de la fábrica: sabe del tema y no hace perder el tiempo. Respuestas cortas, de dos o tres frases; esto es un chat, no un mail. Sin emoji. Sin markdown ni asteriscos: el texto se muestra plano.
+Español rioplatense, de vos, en registro profesional. Del otro lado hay alguien que compra para su empresa y necesita datos para decidir, no confianza impostada.
+
+Nada de lunfardo ni de muletillas: no digas "al toque", "posta", "joya", "bárbaro", "dale", "te tiro el precio", "sale andando". Tampoco el extremo opuesto: nada de "estimado", "aguardo su respuesta" ni fórmulas de carta comercial. El punto medio es cómo escribiría un vendedor técnico que conoce el producto: claro, cordial y sin adornos.
+
+Respuestas cortas, de dos o tres frases. Sin emoji. Sin markdown ni asteriscos: el texto se muestra plano.
 
 LO QUE NO SABÉS DE MEMORIA
 No sabés precios, ni mínimos, ni plazos, ni condiciones de envío. Están en las herramientas y cambian. Preguntá antes de afirmar.

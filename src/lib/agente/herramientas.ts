@@ -141,10 +141,15 @@ export const cotizarCajas = betaTool({
       canal: q.channel,
       nota_del_canal: q.channel_note,
       impresion_disponible: q.printing.available,
+      como_se_cobra_la_impresion: caja.printing_colors > 0 ? q.printing.price_note : undefined,
       link_para_compartir: `${SITE_URL}/cotizar/${largo_mm}x${ancho_mm}x${alto_mm}/${cantidad}`,
       instruccion:
         'Al dar el precio decí siempre que es en pesos, que el subtotal va sin IVA y ' +
-        'el total con IVA incluido, el plazo y hasta cuándo vale. Pasale el link.',
+        'el total con IVA incluido, el plazo y hasta cuándo vale. Pasale el link. ' +
+        (caja.printing_colors > 0
+          ? 'Este pedido lleva impresión: avisá que el polímero se cotiza aparte y va a ' +
+            'cargo del comprador, así el total no parece cerrado cuando todavía falta ese ítem.'
+          : ''),
     });
   },
 });

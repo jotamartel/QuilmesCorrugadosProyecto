@@ -57,6 +57,66 @@ function saveMessages(msgs: Message[]) {
   }
 }
 
+/**
+ * El texto del mensaje, con los enlaces vivos y sin romper la burbuja.
+ *
+ * Antes se renderizaba como texto plano dentro de un <p>. Una URL larga —la de
+ * la plantilla lleva tres parametros de query— no tiene donde cortar, asi que
+ * empujaba el ancho de la burbuja y se salia del panel. Y encima no se podia
+ * hacer clic: habia que seleccionar y copiar a mano.
+ *
+ * Los enlaces se muestran con una etiqueta corta en vez de la URL cruda. La
+ * direccion completa sigue estando en el href, asi que copiar el enlace sigue
+ * dando la URL entera.
+ */
+function etiquetaDeEnlace(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.pathname.startsWith('/api/box-template')) return 'Descargar la plantilla (PDF)';
+    if (u.pathname.startsWith('/cotizar/')) return 'Ver la cotizacion';
+    if (u.hostname.includes('wa.me')) return 'Escribir por WhatsApp';
+    const corto = (u.hostname.replace(/^www\./, '') + u.pathname).replace(/\/$/, '');
+    return corto.length > 42 ? corto.slice(0, 42) + '…' : corto;
+  } catch {
+    return url;
+  }
+}
+
+function TextoConEnlaces({ texto, esDelUsuario }: { texto: string; esDelUsuario: boolean }) {
+  const partes = texto.split(/(https?:\/\/[^\s]+)/g);
+
+  return (
+    // overflow-wrap:anywhere es el que impide que una cadena sin espacios
+    // ensanche la burbuja. break-words solo no alcanza para una URL.
+    <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
+      {partes.map((parte, i) => {
+        if (!/^https?:\/\//.test(parte)) return <span key={i}>{parte}</span>;
+
+        // La puntuacion que sigue al enlace no es parte del enlace.
+        const m = parte.match(/^(.*?)([.,;:!?)\]]*)$/);
+        const url = m ? m[1] : parte;
+        const cola = m ? m[2] : '';
+
+        return (
+          <span key={i}>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`underline underline-offset-2 ${
+                esDelUsuario ? 'text-white' : 'text-[#002E55] hover:text-[#001a33]'
+              }`}
+            >
+              {etiquetaDeEnlace(url)}
+            </a>
+            {cola}
+          </span>
+        );
+      })}
+    </p>
+  );
+}
+
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -312,7 +372,7 @@ export function ChatWidget() {
                       : 'bg-white border border-gray-200 text-gray-800'
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  <TextoConEnlaces texto={msg.content} esDelUsuario={msg.role === 'user'} />
                   {msg.role === 'assistant' && msg.templateUrl && (
                     <a
                       href={msg.templateUrl}

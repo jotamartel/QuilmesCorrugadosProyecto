@@ -23,25 +23,41 @@ import type Groq from 'groq-sdk';
  * siguiente y se loguea distinto de cualquier otro error, para que la próxima
  * baja se vea en los logs en vez de disolverse en un mensaje de disculpas.
  *
- * OJO CON max_tokens: varios de estos modelos razonan antes de responder y ese
+ * OJO CON max_tokens: estos modelos razonan antes de responder y ese
  * razonamiento consume del mismo presupuesto. Con max_tokens bajo devuelven
- * cadena vacía y finish_reason "length", sin error. Medido: gpt-oss-20b con 50
- * tokens devuelve vacío; los compound contestan igual. Por eso los compound van
- * primero y hay un piso de tokens más abajo.
+ * cadena vacía y finish_reason "length", sin tirar error. Medido: gpt-oss-20b
+ * con los 50 tokens que pedía classifyIntent sale vacío. Por eso el piso de
+ * más abajo.
+ */
+
+/**
+ * NO USAR groq/compound ni compound-mini de primeros.
+ *
+ * No son modelos: son sistemas agénticos que por dentro buscan y llaman
+ * herramientas, y eso se cobra del mismo presupuesto. Medido con el prompt
+ * real de este chat, que pesa 1.468 tokens:
+ *
+ *   openai/gpt-oss-120b   1.468 de prompt ->  1.918 total
+ *   groq/compound-mini    3.359 de prompt ->  4.123 total   (2,3x)
+ *   groq/compound         413 Request Entity Too Large
+ *
+ * Con el techo de 8.000 tokens por minuto del plan gratuito eso es la
+ * diferencia entre cuatro consultas por minuto y una. Y compound directamente
+ * no acepta este prompt: era el 413 que rompia la rama de cotizacion.
  */
 
 /** Conversación: respuestas al cliente, en castellano rioplatense. */
 export const MODELOS_CONVERSACION = [
-  'groq/compound',
-  'groq/compound-mini',
   'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'groq/compound-mini',
 ] as const;
 
 /** Clasificación: JSON corto, tiene que ser barato y rápido. */
 export const MODELOS_CLASIFICACION = [
-  'groq/compound-mini',
-  'groq/compound',
   'openai/gpt-oss-20b',
+  'openai/gpt-oss-120b',
+  'groq/compound-mini',
 ] as const;
 
 /**
@@ -61,11 +77,9 @@ function esModeloInexistente(error: unknown): boolean {
  * Groq cuenta los tokens por minuto POR MODELO, no por cuenta. Asi que un 429
  * en uno no dice nada del siguiente: conviene probarlo.
  *
- * Importa mas de lo que parece con el plan gratuito. El techo es de 8.000
- * tokens por minuto y una consulta de este chat pesa unos 7.500 entre el prompt
- * de sistema y el historial, o sea que entra poco mas de una por minuto. Sin
- * esta caida, la segunda persona que escribe en el mismo minuto recibe una
- * disculpa.
+ * Importa con el plan gratuito, donde el techo son 8.000 tokens por minuto:
+ * a ~1.900 por consulta entran cuatro, y la quinta persona del minuto se
+ * encuentra con una disculpa si no hay a donde caer.
  */
 function esLimiteDeTasa(error: unknown): boolean {
   return (error as { status?: number })?.status === 429;

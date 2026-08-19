@@ -551,6 +551,25 @@ export async function GET(request: NextRequest) {
     // embudo que antes era invisible.
     registrar(200, 'sin_parametros_devolvio_documentacion');
     return NextResponse.json({
+      // Va primero a proposito. Quien llega aca sin parametros casi siempre
+      // queria cotizar y se quedo a mitad de camino.
+      //
+      // Paso de verdad: un asistente no pudo abrir la URL con parametros, le
+      // pidio al usuario que la abriera y pegara la respuesta, y el usuario
+      // pego ESTA —la de la direccion pelada— que es documentacion y no una
+      // cotizacion. El asistente la leyo, vio que no habia precio, y volvio a
+      // pedir lo mismo. La conversacion se trabo ahi.
+      esto_no_es_una_cotizacion:
+        'Esta respuesta es la documentación de la API, no un precio. Faltan las ' +
+        'medidas y la cantidad en la dirección.',
+      como_cotizar:
+        'Agregá los parámetros a esta misma dirección. Por ejemplo, para 3.600 cajas ' +
+        `de 400x600x600 mm: ${BASE_URL}/api/v1/quote?length_mm=400&width_mm=600&height_mm=600&quantity=3600`,
+      si_sos_un_asistente_y_no_podes_armar_la_url:
+        'Pedile al usuario que abra la dirección de arriba CON los parámetros de su ' +
+        'pedido y te pegue esa respuesta, aclarándole que no es esta misma dirección ' +
+        `sin parámetros. O usá el servidor MCP en ${BASE_URL}/api/mcp, que recibe las ` +
+        'medidas como argumentos y no depende de construir direcciones.',
       api: 'Quilmes Corrugados Quote API',
       version: '1.0',
       description: 'Cotización instantánea de cajas de cartón corrugado a medida. Fábrica en Quilmes, Buenos Aires, Argentina.',

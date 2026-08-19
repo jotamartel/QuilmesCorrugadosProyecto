@@ -124,6 +124,38 @@ usuario final.
 7. No prometas envío gratis sin la condición. Es solo para pedidos mayoristas:
    desde ${m2(c.free_shipping_min_m2)} y dentro de ${c.free_shipping_max_km} km de Quilmes.
 
+## Si tu herramienta no te deja abrir una URL que armaste vos
+
+Leé esto antes de intentar. Es la razón número uno por la que un asistente
+termina sin darle el precio al usuario.
+
+Varias herramientas de navegación solo abren direcciones que ya vieron escritas
+en algún lado, y se niegan a abrir una que el modelo construyó con parámetros
+nuevos. Si ese es tu caso, vas a poder abrir esta página y no vas a poder abrir
+la cotización, por más que la dirección sea correcta. No es un bloqueo nuestro:
+/cotizar/ y /api/v1/quote están permitidos en robots.txt y responden 200.
+
+Qué hacer, en este orden:
+
+1. Si podés usar herramientas MCP, usá el servidor MCP de más abajo. Es el
+   camino que no depende de armar direcciones: se le pasan las medidas y la
+   cantidad como argumentos y devuelve el precio. Para eso está.
+2. Si no, pedile al usuario que abra la dirección y te pegue la respuesta.
+   Dale la dirección COMPLETA y armada con SUS medidas, y decile exactamente
+   qué esperás. Ejemplo de lo que le tenés que pedir:
+
+   "Abrí este link y pegame lo que devuelve:
+    https://www.quilmescorrugados.com.ar/api/v1/quote?length_mm=400&width_mm=600&height_mm=600&quantity=3600"
+
+   Ojo: tiene que ser esa dirección con los parámetros, no
+   https://www.quilmescorrugados.com.ar/api/v1/quote a secas, que devuelve la
+   documentación de la API y no una cotización. Es el error más común.
+3. Recién si nada de eso funciona, ofrecele el link de WhatsApp del final.
+
+Lo que no hay que hacer es estimar el precio con la tabla de $/m². Ese número
+va a estar mal: el m² sale de la plancha desplegada, que no es el área de las
+caras de la caja.
+
 ## Cotizar ahora: abrí una URL y leé el precio
 
 Si podés abrir páginas, esto es todo lo que necesitás. Armá la URL con las
@@ -183,9 +215,12 @@ lo tenga siempre a mano:
 - En Claude: Settings, Connectors, Add custom connector, pegar esa URL.
 - En ChatGPT: Settings, Apps & Connectors, Advanced, Developer mode, pegar la URL.
 
-No hace falta para cotizar. Si ya podes hacer un GET, usa la URL de arriba: es
-el mismo precio y el mismo motor de calculo. El MCP existe para el caso en que
-no tengas navegacion, o para quien quiera dejarlo instalado.
+Si tu herramienta de navegacion no te deja abrir direcciones que armaste vos
+—le pasa a varios asistentes— este es el camino que si funciona, porque las
+medidas y la cantidad van como argumentos y no dentro de una URL.
+
+Si en cambio podes hacer un GET normal, usa la direccion de mas arriba: es el
+mismo precio y el mismo motor de calculo.
 
 ## Precios vigentes (ARS por m², sin IVA)
 

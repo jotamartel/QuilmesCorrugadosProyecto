@@ -25,6 +25,7 @@ import { calcularCotizacion, validarCajas, urlPlantilla } from '@/lib/cotizacion
 import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
 import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG, MATERIAL } from '@/lib/retail/config';
+import { CONTACTO } from '@/lib/contacto';
 import type { PricingConfig } from '@/lib/types/database';
 import { notaImpresion } from '@/lib/cotizacion/motor';
 
@@ -268,9 +269,11 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
     if (errores.length) {
       registrar(req, nombre, 400, `medida_rechazada:${errores[0].slice(0, 90)}`);
       return resultado(
-        `Esa caja no la podemos fabricar: ${errores.join('; ')}. ` +
-          'Si el usuario necesita algo fuera de estos límites, que nos escriba por WhatsApp al ' +
-          '+54 9 11 3341-1781 y lo vemos.',
+        `${errores.join(' ')}
+
+` +
+          `Si necesita algo fuera de estos límites, que nos escriba por WhatsApp al ` +
+          `${CONTACTO.telefonoVisible} y lo vemos.`,
         undefined,
         true,
       );

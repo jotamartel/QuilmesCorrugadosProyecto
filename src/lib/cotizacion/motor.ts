@@ -200,7 +200,7 @@ export function validarCajas(boxes: BoxInput[]): string[] {
     const cual = boxes.length > 1 ? `Caja ${index + 1}: ` : '';
 
     if (!box.length_mm || !box.width_mm || !box.height_mm) {
-      errors.push(`${cual}faltan medidas. Hacen falta largo, ancho y alto en milímetros.`);
+      errors.push(`${cual}Faltan medidas: hacen falta largo, ancho y alto en milímetros.`);
       return;
     }
 
@@ -210,7 +210,7 @@ export function validarCajas(boxes: BoxInput[]): string[] {
       box.height_mm < MEDIDA_MINIMA.alto
     ) {
       errors.push(
-        `${cual}la medida mínima que fabricamos es ` +
+        `${cual}La medida mínima que fabricamos es ` +
           `${MEDIDA_MINIMA.largo}x${MEDIDA_MINIMA.ancho}x${MEDIDA_MINIMA.alto} mm y pediste ` +
           `${box.length_mm}x${box.width_mm}x${box.height_mm} mm.`,
       );
@@ -218,7 +218,7 @@ export function validarCajas(boxes: BoxInput[]): string[] {
 
     if (box.length_mm > 2000 || box.width_mm > 2000 || box.height_mm > 1500) {
       errors.push(
-        `${cual}la medida máxima es 2000x2000x1500 mm y pediste ` +
+        `${cual}La medida máxima es 2000x2000x1500 mm y pediste ` +
           `${box.length_mm}x${box.width_mm}x${box.height_mm} mm.`,
       );
     }
@@ -228,14 +228,14 @@ export function validarCajas(boxes: BoxInput[]): string[] {
     const plancha = box.width_mm + box.height_mm;
     if (plancha > RETAIL_CONFIG.MAX_SHEET_WIDTH) {
       errors.push(
-        `${cual}no se puede fabricar: ancho más alto dan ${plancha} mm y el ancho ` +
+        `${cual}Esa caja no se puede fabricar: ancho más alto dan ${plancha} mm y el ancho ` +
           `máximo de plancha es ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho del rollo ` +
           `de cartón. Bajando el ancho o el alto entra; el largo no tiene ese límite.`,
       );
     }
 
     if (!box.quantity || box.quantity < 1 || !Number.isInteger(box.quantity)) {
-      errors.push(`${cual}la cantidad tiene que ser un número entero de cajas.`);
+      errors.push(`${cual}La cantidad tiene que ser un número entero de cajas.`);
     }
 
     if (
@@ -243,7 +243,7 @@ export function validarCajas(boxes: BoxInput[]): string[] {
       (box.printing_colors < 0 || box.printing_colors > RETAIL_CONFIG.MAX_PRINTING_COLORS)
     ) {
       errors.push(
-        `${cual}imprimimos hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores y pediste ${box.printing_colors}.`,
+        `${cual}Imprimimos hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores y pediste ${box.printing_colors}.`,
       );
     }
   });

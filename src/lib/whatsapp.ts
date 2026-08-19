@@ -1,5 +1,9 @@
 import twilio from 'twilio';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { CONTACTO } from '@/lib/contacto';
+import { HORARIO, RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
+import { SITE_URL } from '@/lib/site';
+import type { QuoteResult } from '@/lib/cotizacion/motor';
 
 // Cliente Twilio - solo se inicializa si hay credenciales configuradas
 const client = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
@@ -7,26 +11,27 @@ const client = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
   : null;
 
 const TWILIO_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
-const BUSINESS_PHONE = process.env.WHATSAPP_BUSINESS_NUMBER || '+5491133411781';
+const BUSINESS_PHONE = process.env.WHATSAPP_BUSINESS_NUMBER || CONTACTO.tel;
 
 // Timeout de conversación (30 minutos por defecto, configurable)
 const CONVERSATION_TIMEOUT_MS = 30 * 60 * 1000;
 
-// Horario de atención: Lunes a Viernes 7:00 - 16:00 (Argentina)
+// Horario de atencion, desde HORARIO en retail/config. Antes estaba escrito
+// aca en 7-16 mientras el sitio y el JSON-LD decian 8-17.
 const BUSINESS_HOURS = {
-  start: 7,
-  end: 16,
+  start: HORARIO.desde,
+  end: HORARIO.hasta,
   // 0 = Domingo, 6 = Sábado
-  workDays: [1, 2, 3, 4, 5],
+  workDays: [...HORARIO.dias] as number[],
 };
 
 // Límites de dimensiones (consistente con el resto del sistema)
 const LIMITS = {
-  maxSheetWidth: 1200,
-  minLength: 200,
-  minWidth: 200,
-  minHeight: 100,
-  minQuantity: 100,
+  maxSheetWidth: RETAIL_CONFIG.MAX_SHEET_WIDTH,
+  minLength: RETAIL_CONFIG.MIN_LARGO,
+  minWidth: RETAIL_CONFIG.MIN_ANCHO,
+  minHeight: RETAIL_CONFIG.MIN_ALTO,
+  minQuantity: RETAIL_CONFIG.MIN_CANTIDAD,
 };
 
 interface WhatsAppMessage {
@@ -605,7 +610,7 @@ export function getPrintingMessage(quantity: number): string {
 Llevan impresion?
 
 1 - Sin impresion (lisa)
-2 - Con impresion (hasta 3 colores)`;
+2 - Con impresion (hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores)`;
 }
 
 /**
@@ -614,32 +619,53 @@ Llevan impresion?
 export function getQuoteMessage(
   dimensions: { length: number; width: number; height: number },
   quantity: number,
-  hasPrinting: boolean,
-  quote: { total: number; totalM2: number; deliveryDays: number }
+  cotizacion: QuoteResult,
 ): string {
+  const caja = cotizacion.boxes[0];
   const boxDesc = `${dimensions.length}x${dimensions.width}x${dimensions.height}mm`;
-  const unitPrice = Math.round(quote.total / quantity);
+  const colores = caja.printing_colors;
+  const ars = (n: number) => '$' + Math.round(n).toLocaleString('es-AR');
+
+  // El detalle de impresion dice cuantos colores, no un "si" pelado: antes el
+  // bot cobraba el recargo de un color sin haber preguntado nunca cuantos.
+  const impresion = colores > 0
+    ? `(impresion ${colores} ${colores === 1 ? 'color' : 'colores'})`
+    : '(lisa)';
 
   let message = `COTIZACION QUILMES CORRUGADOS
 
-Caja: ${boxDesc} ${hasPrinting ? '(con impresion)' : '(lisa)'}
+Caja: ${boxDesc} ${impresion}
 Cantidad: ${quantity.toLocaleString('es-AR')} unidades
-Total m2: ${quote.totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 })}
+Total m2: ${cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits: 1 })}
 
-Total: $${quote.total.toLocaleString('es-AR')}
-Precio unitario: $${unitPrice.toLocaleString('es-AR')}
+Subtotal: ${ars(cotizacion.subtotal)} + IVA
+IVA 21%: ${ars(cotizacion.tax_amount)}
+TOTAL: ${ars(cotizacion.total_with_tax)}
 
-Tiempo de entrega: ${quote.deliveryDays} dias habiles
-Validez: 7 dias`;
+Precio unitario: ${ars(caja.unit_price)} + IVA
 
-  if (quote.totalM2 < 3000) {
-    message += '\n\n(Pedido menor al minimo recomendado de 3000 m2)';
+${cotizacion.channel_note}
+Entrega: ${cotizacion.estimated_days} dias habiles
+Cotizacion valida hasta el ${new Date(cotizacion.valid_until + 'T12:00:00').toLocaleDateString('es-AR')}
+
+Ver online: ${SITE_URL}/cotizar/${dimensions.length}x${dimensions.width}x${dimensions.height}/${quantity}`;
+
+  // El aviso de minimo tiene que ser el del canal que le toca a este pedido.
+  // Antes decia siempre "menor al minimo de 3.000 m2", asi que a un minorista
+  // de 260 cajas —que esta perfectamente dentro de lo que le vendemos— el bot
+  // le avisaba que su pedido no llegaba a un minimo que no es el suyo.
+  if (quantity < RETAIL_CONFIG.MIN_CANTIDAD) {
+    message += `\n\n(El minimo de compra es ${RETAIL_CONFIG.MIN_CANTIDAD} unidades)`;
   }
 
-  if (hasPrinting) {
+  if (colores > 0) {
     message += `
 
-Te enviamos el desplegado de la caja en el siguiente mensaje para que incorpores tu diseño. Las areas verdes indican donde cargar el logo.`;
+Te mandamos tambien el desplegado de la caja para que incorpores tu diseño. Las areas verdes indican donde cargar el logo.`;
+  } else if (!cotizacion.printing.available) {
+    message += `
+
+La impresion se produce a medida, desde ${cotizacion.printing.min_m2.toLocaleString('es-AR')} m2. Este pedido sale de stock, asi que va liso.`;
   }
 
   message += `
@@ -654,12 +680,74 @@ Queres confirmar el pedido?
 }
 
 /**
+ * Lee cual de las opciones numeradas eligio la persona.
+ *
+ * Antes cada paso hacia bodyLower.includes('2'), que matchea cualquier 2 en
+ * cualquier parte del texto. En una prueba real el dueño escribio "2600 no 260"
+ * para corregir la cantidad y el bot lo leyo como "opcion 2 = con impresion":
+ * la correccion se perdio y encima se agrego un recargo que nadie pidio.
+ *
+ * Ahora se acepta el numero solo o al principio, o una palabra clave con
+ * limite de palabra. Si no hay nada claro devuelve null y quien llama vuelve a
+ * preguntar, que es mucho mejor que adivinar.
+ */
+export function detectarOpcion(
+  texto: string,
+  opciones: Array<{
+    n: number;
+    palabras: string[];
+    /**
+     * Palabras que solo valen si son el mensaje entero. "no" es la respuesta
+     * natural a "llevan impresion?", pero tambien aparece en medio de una
+     * correccion como "2600 no 260": ahi no elige nada, corrige la cantidad.
+     */
+    exacto?: string[];
+  }>,
+): number | null {
+  const b = texto.trim().toLowerCase();
+  const validos = opciones.map((o) => o.n);
+
+  // "2", "2.", "2)", "2 -"
+  const solo = b.match(/^(\d+)\s*[.\-)]?\s*$/);
+  if (solo && validos.includes(Number(solo[1]))) return Number(solo[1]);
+
+  // "2 con impresion"
+  const prefijo = b.match(/^(\d+)[\s.\-)]+\S/);
+  if (prefijo && validos.includes(Number(prefijo[1]))) return Number(prefijo[1]);
+
+  // Palabra clave. Se compara sobre el texto con la puntuacion convertida en
+  // espacios y con un espacio en cada punta, asi "sin" nunca matchea dentro de
+  // "sinceramente" y no hace falta escapar nada.
+  //
+  // Se recorren las opciones en orden y gana la primera que aparezca, por eso
+  // las mas especificas ("sin impresion") van antes que las generales
+  // ("impresion") en la lista que arma quien llama.
+  const limpio = b.replace(/[^a-záéíóúüñ0-9]+/gi, ' ').trim();
+  const plano = ' ' + limpio + ' ';
+
+  // Primero las que exigen ser el mensaje completo.
+  for (const o of opciones) {
+    for (const p of o.exacto || []) {
+      if (limpio === p.toLowerCase()) return o.n;
+    }
+  }
+
+  for (const o of opciones) {
+    for (const p of o.palabras) {
+      if (plano.includes(' ' + p.toLowerCase() + ' ')) return o.n;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Genera mensaje de confirmacion
  */
 export function getConfirmationMessage(): string {
   return `Perfecto! Un vendedor te va a contactar en breve para confirmar los detalles.
 
-Horario de atencion: Lunes a Viernes 7:00 - 16:00
+Horario de atencion: ${HORARIO.corto}
 
 Necesitas algo mas? Escribe "cotizar" para una nueva cotizacion.`;
 }
@@ -671,10 +759,10 @@ export function getAdvisorMessage(): string {
   return `Te comunicamos con un asesor.
 
 Mientras tanto, podes llamar o escribir a:
-WhatsApp: ${BUSINESS_PHONE}
-Email: ventas@quilmescorrugados.com.ar
+WhatsApp: ${CONTACTO.telefonoVisible}
+Email: ${CONTACTO.email}
 
-Horario: Lunes a Viernes 7:00 - 16:00`;
+Horario: ${HORARIO.corto}`;
 }
 
 /**
@@ -683,9 +771,7 @@ Horario: Lunes a Viernes 7:00 - 16:00`;
 export function getShippingMessage(hasQuoted: boolean = false): string {
   const baseMessage = `Si, hacemos envios a todo el pais!
 
-El envio es GRATIS dentro de un radio de 60km de nuestra fabrica en Quilmes, en compras superiores a 3.000 m2.
-
-Para otras zonas o cantidades menores, consultanos por el costo de envio.`;
+${ENVIO.largo}`;
 
   if (hasQuoted) {
     return baseMessage + `
@@ -705,7 +791,7 @@ export function getOutOfHoursMessage(): string {
   return `Hola! Gracias por escribir a Quilmes Corrugados.
 
 Estamos fuera de horario de atencion.
-Nuestro horario es: Lunes a Viernes 7:00 - 16:00
+Nuestro horario es: ${HORARIO.corto}
 
 Deja tu mensaje y te respondemos a la brevedad.
 

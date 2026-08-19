@@ -13,6 +13,8 @@ import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculation
 import { SITE_URL } from '@/lib/site';
 import { parseBoxDimensions, validateDimensions } from '@/lib/whatsapp';
 import type { PricingConfig } from '@/lib/types/database';
+import { HORARIO } from '@/lib/retail/config';
+import { CONTACTO } from '@/lib/contacto';
 
 const groq = process.env.GROQ_API_KEY
   ? new Groq({ apiKey: process.env.GROQ_API_KEY })
@@ -98,9 +100,9 @@ pide una mejora, derivar a un asesor.
 
 ### Datos de contacto
 - WhatsApp: ${BUSINESS_PHONE}
-- Email: ventas@quilmescorrugados.com.ar
-- Dirección: Lugones 219, B1878 Quilmes, Buenos Aires
-- Horario: Lunes a Viernes 7:00 - 16:00 (Argentina)
+- Email: ${CONTACTO.email}
+- Dirección: ${CONTACTO.direccion}
+- Horario: ${HORARIO.corto} (Argentina)
 
 ### Mensajes que arrancan con [COTIZADO-WEB]
 

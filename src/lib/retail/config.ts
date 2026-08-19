@@ -166,6 +166,29 @@ export const MINIMOS = {
  * condicion que despues hay que desmentir cuando ya decidio comprar. Y en las
  * superficies que lee un asistente de IA se repite como dato verificado.
  */
+/**
+ * Horario de atencion. Estaba escrito en quince lugares en dos versiones que no
+ * coincidian: el sitio y el JSON-LD decian 8 a 17, y el bot de WhatsApp, el
+ * llms.txt, el parser de mails y el prompt de la IA decian 7 a 16. O sea que a
+ * las 7:30 el bot atendia como si estuviera abierto y a las 16:30 mandaba a la
+ * gente a dejar un mensaje estando la fabrica abierta.
+ *
+ * El horario correcto es 8 a 17. El JSON-LD ya lo tenia bien, asi que Google
+ * nunca mostro el equivocado.
+ */
+export const HORARIO = {
+  desde: 8,
+  hasta: 17,
+  /** 0 = domingo. */
+  dias: [1, 2, 3, 4, 5],
+  /** Para paginas y respuestas al cliente. */
+  texto: 'Lunes a viernes de 8:00 a 17:00 hs',
+  /** Para firmas y pies de mensaje, donde el lugar es poco. */
+  corto: 'Lunes a Viernes 8:00 - 17:00',
+  /** Formato de schema.org, para el JSON-LD de LocalBusiness. */
+  schema: 'Mo-Fr 08:00-17:00',
+} as const;
+
 export const ENVIO = {
   /** Para meta descriptions y otros lugares con limite duro de caracteres. */
   micro: `gratis desde ${RETAIL_CONFIG.ENVIO_GRATIS_MIN_M2.toLocaleString('es-AR')} m²`,

@@ -22,8 +22,13 @@ import {
   getUnsupportedMediaMessage,
   isWithinBusinessHours,
   getPhoneQuoteHistory,
+  detectarOpcion,
   ClientType,
 } from '@/lib/whatsapp';
+import { calcularCotizacion } from '@/lib/cotizacion/motor';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { HORARIO, RETAIL_CONFIG } from '@/lib/retail/config';
+import { CONTACTO } from '@/lib/contacto';
 import { sendNotification } from '@/lib/notifications';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { SITE_URL } from '@/lib/site';
@@ -42,39 +47,38 @@ import {
   type BoxTemplateResponse,
 } from '@/lib/whatsapp-ai';
 
-const PRINTING_INCREMENT = 0.15; // +15% por cada color de impresión
-
 /**
- * Calcula cotizacion simple para el bot de WhatsApp
- * Usa la configuración de precios activa desde la base de datos
+ * Cotiza usando el mismo motor que la web, la API y el MCP.
+ *
+ * Antes este archivo tenia su propia copia del calculo, con su propio +15% por
+ * impresion y su propio redondeo. Los arreglos que se hacian en el motor
+ * —el IVA, el limite de colores, saber si la impresion aplica a este canal—
+ * nunca llegaban al canal por el que mas gente pregunta.
  */
-async function calculateQuote(
-  length: number,
-  width: number,
-  height: number,
+async function cotizar(
+  dimensions: { length: number; width: number; height: number },
   quantity: number,
-  hasPrinting: boolean,
-  config: PricingConfig
-): Promise<{ total: number; totalM2: number; deliveryDays: number }> {
-  const { m2 } = calculateUnfolded(length, width, height);
-  const totalM2 = calculateTotalM2(m2, quantity);
+  printingColors: number,
+  config: PricingConfig,
+) {
+  const supabase = createAdminClient();
+  const { data: catalogo } = await supabase
+    .from('boxes')
+    .select('length_mm, width_mm, height_mm, stock')
+    .eq('is_standard', true)
+    .eq('is_active', true);
 
-  // Usar la función centralizada para obtener el precio por m²
-  const pricePerM2 = getPricePerM2(totalM2, config);
-
-  let total = totalM2 * pricePerM2;
-
-  if (hasPrinting) {
-    total *= (1 + PRINTING_INCREMENT);
-  }
-
-  const deliveryDays = getProductionDays(hasPrinting, config);
-
-  return {
-    total: Math.round(total),
-    totalM2,
-    deliveryDays,
-  };
+  return calcularCotizacion(
+    [{
+      length_mm: dimensions.length,
+      width_mm: dimensions.width,
+      height_mm: dimensions.height,
+      quantity,
+      printing_colors: printingColors,
+    }],
+    config,
+    catalogo || [],
+  );
 }
 
 /**
@@ -88,8 +92,10 @@ async function saveCommunication(
   clientId?: string | null
 ) {
   try {
-    const supabase = await createClient();
-    await supabase.from('communications').insert({
+    // Service role a proposito: este endpoint lo llama Twilio, no un usuario
+    // logueado, asi que no hay sesion que satisfaga las policies de RLS.
+    const supabase = createAdminClient();
+    const { error } = await supabase.from('communications').insert({
       channel: 'whatsapp',
       direction,
       content,
@@ -99,6 +105,7 @@ async function saveCommunication(
         ...metadata,
       },
     });
+    if (error) console.error('[WhatsApp] Error guardando comunicacion:', error);
   } catch (error) {
     console.error('[WhatsApp] Error guardando comunicacion:', error);
   }
@@ -115,12 +122,14 @@ async function createWhatsAppLead(data: {
   clientType?: 'particular' | 'empresa';
   dimensions: { length: number; width: number; height: number };
   quantity: number;
-  hasPrinting: boolean;
+  printingColors: number;
   quote: { total: number; totalM2: number; deliveryDays: number };
   conversationId?: string;
 }): Promise<string | null> {
   try {
-    const supabase = await createClient();
+    // Con el cliente SSR este insert venia fallando con RLS 42501 en cada
+    // consulta: salia el mail al equipo pero el lead no quedaba en la base.
+    const supabase = createAdminClient();
 
     // Calcular m² por caja
     const { m2: sqmPerBox } = calculateUnfolded(
@@ -145,8 +154,8 @@ async function createWhatsAppLead(data: {
         width_mm: data.dimensions.width,
         height_mm: data.dimensions.height,
         quantity: data.quantity,
-        has_printing: data.hasPrinting,
-        printing_colors: data.hasPrinting ? 1 : 0,
+        has_printing: data.printingColors > 0,
+        printing_colors: data.printingColors,
 
         // Cálculos
         sqm_per_box: sqmPerBox,
@@ -301,33 +310,61 @@ export async function POST(request: NextRequest) {
         'nos vemos', 'hasta luego', 'chau', 'adios', 'adiós',
         'buen dia', 'buen día', 'saludos',
       ];
-      const isClosingMessage = closingPatterns.some(pattern =>
+      // Solo se toman como cierre cuando no hay una cotizacion en curso.
+      // "dale", "ok", "listo" y "perfecto" estan en esta lista y tambien son
+      // la forma normal de decir que si: a mitad del flujo cerraban la
+      // conversacion en vez de avanzarla, y encima borraban el estado.
+      const enMedioDelFlujo = state.step !== 'initial';
+      const isClosingMessage = !enMedioDelFlujo && closingPatterns.some(pattern =>
         bodyLower === pattern || bodyLower.startsWith(pattern + ' ') || bodyLower.endsWith(' ' + pattern)
       );
 
+      // Salidas de emergencia. Antes solo funcionaban con el texto exacto, asi
+      // que "quiero cancelar" o "cancelar por favor" no hacian nada y la
+      // persona quedaba atrapada en el paso donde estuviera.
+      const quiereSalir = detectarOpcion(body, [
+        { n: 1, palabras: ['cancelar', 'reiniciar', 'empezar', 'basta', 'salir'] },
+      ]) === 1;
+      const pideHumano = state.step !== 'quoted' && detectarOpcion(body, [
+        { n: 1, palabras: ['asesor', 'vendedor', 'humano'] },
+      ]) === 1;
+
       // Comandos especiales
-      if (bodyLower === 'cancelar' || bodyLower === 'reiniciar') {
+      if (quiereSalir) {
         await clearConversationState(phoneNumber);
-        responseMessage = 'Conversacion reiniciada. Escribe "cotizar" para empezar de nuevo.';
+        responseMessage = 'Listo, empezamos de cero. Escribi "cotizar" cuando quieras.';
+      }
+      // Pedir un humano tiene que funcionar en cualquier momento, no solo
+      // despues de cotizar.
+      else if (pideHumano) {
+        responseMessage = getAdvisorMessage();
+        needsAdvisor = true;
+        await sendNotification({
+          type: 'advisor_request',
+          origin: 'WhatsApp',
+          contact: {
+            phone: phoneNumber,
+            name: state.clientName,
+            email: state.clientEmail,
+          },
+        });
       }
       // Mensajes de cierre
       else if (isClosingMessage) {
         responseMessage = `Gracias a vos! Si necesitas otra cotizacion, escribi "cotizar".
 
-Quilmes Corrugados - Lunes a Viernes 7:00 - 16:00`;
+Quilmes Corrugados - ${HORARIO.corto}`;
       }
       // Esperando tipo de cliente (particular o empresa)
       else if (state.step === 'waiting_client_type') {
-        let isParticular = bodyLower.includes('1') ||
-          bodyLower.includes('particular') ||
-          bodyLower.includes('persona') ||
-          bodyLower.includes('yo');
-
-        let isEmpresa = bodyLower.includes('2') ||
-          bodyLower.includes('empresa') ||
-          bodyLower.includes('negocio') ||
-          bodyLower.includes('compañia') ||
-          bodyLower.includes('pyme');
+        // includes('1') matcheaba "necesito 1000 cajas" como particular, y
+        // "empresa" contiene ambas opciones si se busca por substring.
+        const tipoElegido = detectarOpcion(body, [
+          { n: 1, palabras: ['particular', 'persona', 'yo', 'personal'] },
+          { n: 2, palabras: ['empresa', 'negocio', 'compañia', 'compania', 'pyme', 'comercio'] },
+        ]);
+        let isParticular = tipoElegido === 1;
+        let isEmpresa = tipoElegido === 2;
 
         // Si no detectamos con patterns simples, usar Groq
         if (!isParticular && !isEmpresa && isGroqEnabled()) {
@@ -451,13 +488,19 @@ Por favor usa el formato:
       }
       // Esperando cantidad
       else if (state.step === 'waiting_quantity') {
-        const qtyMatch = body.match(/(\d{1,3}(?:\.\d{3})*|\d+)/);
+        // El '+' no es cosmetico. Con '*' la primera alternativa matcheaba
+        // \d{1,3} sola y tenia exito, asi que \d+ nunca se probaba: todo
+        // numero de 4 o mas digitos sin puntos se leia truncado a sus primeros
+        // tres. "2600 unidades" entraba como 260 y salia una cotizacion diez
+        // veces menor que se veia perfectamente valida. El caso mas silencioso
+        // era 1000 -> 100, que ademas pasa el control de minimo.
+        const qtyMatch = body.match(/(\d{1,3}(?:\.\d{3})+|\d+)/);
 
         if (qtyMatch) {
           const quantity = Number(qtyMatch[1].replace(/\./g, ''));
 
-          if (quantity < 100) {
-            responseMessage = `La cantidad minima es 100 unidades. Cuantas necesitas?`;
+          if (quantity < RETAIL_CONFIG.MIN_CANTIDAD) {
+            responseMessage = `La cantidad minima es ${RETAIL_CONFIG.MIN_CANTIDAD} unidades. Cuantas necesitas?`;
           } else {
             await updateConversationState(phoneNumber, {
               step: 'waiting_printing',
@@ -473,15 +516,35 @@ Ejemplo: 500`;
       }
       // Esperando impresion
       else if (state.step === 'waiting_printing') {
-        const hasPrinting = bodyLower.includes('2') ||
-          bodyLower.includes('impresion') ||
-          bodyLower.includes('impreso') ||
-          bodyLower.includes('si') ||
-          bodyLower.includes('logo');
+        // "sin impresion" va primero: si se evaluara "impresion" antes, la
+        // negacion matchearia la opcion contraria. Y 'si' pelado no entra en
+        // la lista, porque estaba matcheando adentro de "sin".
+        const impresionElegida = detectarOpcion(body, [
+          {
+            n: 1,
+            palabras: [
+              'sin impresion', 'sin impresión', 'sin logo', 'sin nada',
+              'no quiero', 'no lleva', 'no llevan', 'no necesito',
+              'lisa', 'lisas', 'liso',
+            ],
+            exacto: ['no', 'ninguna', 'ninguno', 'nada'],
+          },
+          { n: 2, palabras: ['impresion', 'impresa', 'impreso', 'logo', 'estampado', 'color', 'colores'] },
+        ]);
 
         const { dimensions, quantity } = state;
 
-        if (!dimensions || !quantity) {
+        if (impresionElegida === null) {
+          // Antes cualquier texto con un 2 adentro contaba como "si". El dueño
+          // escribio "2600 no 260" para corregir la cantidad y el bot lo tomo
+          // como opcion 2: perdio la correccion y cobro un recargo que nadie
+          // habia pedido. Preguntar de nuevo cuesta un mensaje; adivinar mal
+          // cuesta la cotizacion entera.
+          responseMessage = `No entendi si llevan impresion.
+
+1 - Sin impresion (lisa)
+2 - Con impresion (hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores)`;
+        } else if (!dimensions || !quantity) {
           await clearConversationState(phoneNumber);
           responseMessage = 'Hubo un error. Escribe "cotizar" para empezar de nuevo.';
         } else {
@@ -490,14 +553,21 @@ Ejemplo: 500`;
           if (!pricingConfig) {
             responseMessage = 'Disculpá, hay un problema técnico con los precios. Por favor contactá con un asesor.';
           } else {
-            const quote = await calculateQuote(
-              dimensions.length,
-              dimensions.width,
-              dimensions.height,
+            const hasPrinting = impresionElegida === 2;
+            // Un color mientras no exista la columna para guardar cuantos. Es
+            // lo mismo que cobraba antes, pero ahora sale del motor y no de un
+            // +15% escrito a mano en este archivo.
+            const cotizacion = await cotizar(
+              dimensions,
               quantity,
-              hasPrinting,
-              pricingConfig
+              hasPrinting ? 1 : 0,
+              pricingConfig,
             );
+            const quote = {
+              total: cotizacion.subtotal,
+              totalM2: cotizacion.total_m2,
+              deliveryDays: cotizacion.estimated_days,
+            };
 
             await updateConversationState(phoneNumber, {
               step: 'quoted',
@@ -506,9 +576,11 @@ Ejemplo: 500`;
               lastQuoteM2: quote.totalM2,
             });
 
-            responseMessage = getQuoteMessage(dimensions, quantity, hasPrinting, quote);
+            responseMessage = getQuoteMessage(dimensions, quantity, cotizacion);
             quoteData = { total: quote.total, totalM2: quote.totalM2 };
-            if (hasPrinting) boxTemplateToSend = dimensions;
+            // Solo se promete el desplegado si la impresion aplica de verdad a
+            // este pedido: en el canal de stock no se imprime.
+            if (hasPrinting && cotizacion.printing.available) boxTemplateToSend = dimensions;
 
             // Crear lead en public_quotes
             await createWhatsAppLead({
@@ -519,7 +591,7 @@ Ejemplo: 500`;
               clientType: state.clientType,
               dimensions,
               quantity,
-              hasPrinting,
+              printingColors: cotizacion.boxes[0].printing_colors,
               quote,
             });
 
@@ -542,16 +614,25 @@ Ejemplo: 500`;
       }
       // Ya cotizado, esperando confirmacion
       else if (state.step === 'quoted') {
-        if (bodyLower.includes('1') || bodyLower.includes('confirmar') || bodyLower.includes('si')) {
+        // includes('3') convertia "quiero cambiar a 300 unidades" en pedido de
+        // asesor, e includes('si') hacia que "un asesor si es posible" contara
+        // como confirmacion del pedido.
+        const accion = detectarOpcion(body, [
+          { n: 3, palabras: ['asesor', 'vendedor', 'humano', 'hablar', 'persona'] },
+          { n: 2, palabras: ['modificar', 'cambiar', 'corregir', 'otra', 'otras'] },
+          { n: 1, palabras: ['confirmar', 'confirmo', 'dale', 'avancemos', 'acepto'] },
+        ]);
+
+        if (accion === 1) {
           responseMessage = getConfirmationMessage();
           await clearConversationState(phoneNumber);
-        } else if (bodyLower.includes('2') || bodyLower.includes('modificar')) {
+        } else if (accion === 2) {
           await updateConversationState(phoneNumber, { step: 'waiting_dimensions' });
           responseMessage = `OK, empecemos de nuevo. Indicame las nuevas medidas:
 
 Formato: Largo x Ancho x Alto
 Ejemplo: 400x300x300`;
-        } else if (bodyLower.includes('3') || bodyLower.includes('asesor')) {
+        } else if (accion === 3) {
           responseMessage = getAdvisorMessage();
           needsAdvisor = true;
 
@@ -615,7 +696,7 @@ Ejemplo: 400x300x300`;
               case 'closing':
                 responseMessage = `Gracias a vos! Si necesitas otra cotizacion, escribi "cotizar".
 
-Quilmes Corrugados - Lunes a Viernes 7:00 - 16:00`;
+Quilmes Corrugados - ${HORARIO.corto}`;
                 break;
 
               case 'advisor':
@@ -728,6 +809,27 @@ Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
 
   } catch (error) {
     console.error('[WhatsApp] Webhook error:', error);
+
+    // Antes esto devolvia 200 con TwiML vacio: la persona escribia y no le
+    // contestaba nadie, sin forma de saber si el mensaje habia llegado. Se le
+    // avisa y se le deja una salida humana. El 200 se mantiene a proposito:
+    // con un 500 Twilio reintenta y, como el handler todavia no es idempotente,
+    // el reintento puede avanzar el flujo dos veces.
+    try {
+      const from = (await request.clone().formData()).get('From') as string | null;
+      if (from) {
+        await sendWhatsAppMessage({
+          to: from,
+          body:
+            `Perdon, tuvimos un problema tecnico y no pude procesar tu mensaje.\n\n` +
+            `Escribinos directamente al ${CONTACTO.telefonoVisible} o a ${CONTACTO.email} ` +
+            `y lo resolvemos a mano.`,
+        });
+      }
+    } catch (avisoError) {
+      console.error('[WhatsApp] Tampoco se pudo avisar del error:', avisoError);
+    }
+
     return new NextResponse(
       '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
       { status: 200, headers: { 'Content-Type': 'text/xml' } }

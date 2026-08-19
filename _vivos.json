@@ -1,0 +1,451 @@
+[
+ {
+  "dimension": "parseo",
+  "confirmacion": "route.ts:454 es `body.match(/(\\d{1,3}(?:\\.\\d{3})*|\\d+)/)`. Sin flag `g`, `.match()` devuelve la primera coincidencia. Para `2600` en pos 0: alt1 `\\d{1,3}` matchea greedy `260`, luego `(?:\\.\\d{3})*` matchea 0 veces sin exigir nada más, así que alt1 termina con éxito y alt2 nunca se prueba. `Number('260'.replace(/\\./g,''))=260`. Idéntico para 4000→400, 10000→100. Coincide con la transcripción real."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "route.ts:476-480 arma hasPrinting con `includes('2')||includes('impresion')||includes('impreso')||includes('si')||includes('logo')`. Para el body real '2600 no 260': contiene '2' → true. Para 'sin impresion': `'sin impresion'.includes('si')` es true (subcadena en 'sin') Y `includes('impresion')` es true → true, invertido. Para 'sí' con tilde: `'sí'.includes('si')` es false porque 'í'≠'i'. Cero check de negación."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "route.ts:545,548,554 chequean en orden 1/confirmar/si → 2/modificar → 3/asesor. 'quiero cambiar a 300 unidades': no tiene '1', no 'confirmar', no 'si' (no subcadena en el string); no tiene '2' ni 'modificar'; sí tiene '3' → cae en ASESOR en vez de MODIFICAR. 'hablo con 1 asesor' contiene '1' → CONFIRMAR. 'asi es que necesito modificar' contiene 'si' (en 'asi') → CONFIRMAR. Todo verificado."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "route.ts:321-330 setea isParticular e isEmpresa por separado con includes(). route.ts:346 arranca `if (isParticular)`, así particular gana ante empate. 'empresa 1 SRL': isParticular=true (por '1') y isEmpresa=true (por 'empresa') → clasificado PARTICULAR. Confirmado."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "whatsapp.ts:225 `hasExplicitCm` solo chequea `/\\b(cm|cent[ií]metros?)\\b/i` — 'mm' no está en la regex y no hay flag para NO convertir. whatsapp.ts:235 `if (hasExplicitCm || (l<100 && w<100 && h<100))` multiplica por 10. '40x30x30 mm': hasExplicitCm=false pero todos <100 → convierte a 400x300x300 sin avisar. `convertedFromCm` se devuelve pero route.ts:441 solo lee length/width/height, nunca usa `convertedFromCm`."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "whatsapp.ts:216 patrón `/(\\d+)\\s*[x×]\\s*(\\d+)\\s*[x×]\\s*(\\d+)/i`. Para '40,5x30x30': en pos 0 matchea `\\d+` = '40', pero siguiente char es ',' no [x×] ni \\s → falla; el engine avanza, encuentra '5' seguido de 'x30x30' y matchea. Resultado l=5,w=30,h=30. '40*30*30' sin [x×] → no matchea. 'por' como separador no está soportado. Confirmado."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "route.ts:296-306 arma closingPatterns y chequea `bodyLower === pattern || startsWith(pattern+' ') || endsWith(' '+pattern)`. Está ANTES de todos los estados (line 314). Confirmo el bug del patrón — 'gracias confirmo' → startsWith('gracias ') → cierre; 'ok' solo → equals → cierre; 'dale 40x30x30' (sin coma) → startsWith('dale ') → cierre. Los closingPatterns roban mensajes de estados intermedios sin limpiar el estado.",
+  "correccion": "Los escenarios específicos del auditor con coma ('ok, 500', 'dale, 40x30x30', 'gracias, confirmo') NO disparan el bug porque después de 'ok' viene ',' y no ' ', y startsWith('ok ') es false. Pero cualquier variante sin coma sí lo dispara. La afirmación de fondo (cierre gana a los estados y no limpia state) es real."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "route.ts:309 `if (bodyLower === 'cancelar' || bodyLower === 'reiniciar')` con igualdad estricta. 'cancelar por favor', 'atras', 'me equivoque' no matchean. El chequeo `includes('cotizar')` está en el else-if de line 577; como es la ÚLTIMA rama de un chain, si el usuario está en cualquier waiting_* el handler de ese estado corre primero y 'cotizar' no llega."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "route.ts:313-317 solo setea responseMessage, no llama a clearConversationState. Si venía de step='quoted', queda en 'quoted'. Después escribir 'cotizar': el chain de else-if evalúa waiting_client_type (no), waiting_name (no), ..., quoted (SÍ, sigue en quoted). Cae al handler line 544; ningún caso matchea 'cotizar' → devuelve 'No entendi tu respuesta 1/2/3'. Verificado línea por línea."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "route.ts:476-480 no valida body no vacío. Si `bodyLower=''`: `''.includes('2')` etc. todos false → hasPrinting=false → cae al else en line 487 que sigue directo a calculateQuote y a getQuoteMessage. Para que llegue vacío, hasMediaContent tiene que ser false (que un sticker no llene MediaUrl0/MediaContentType0/NumMedia es posible). '???' también rinde hasPrinting=false y cotiza."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "whatsapp.ts:170-176: `else if (!companyName && !line.includes('@') && lines.indexOf(line)===0)` prueba `/\\b(sa|srl|...)/i.test(line) || /^[A-Z]/.test(line)` — el segundo OR matchea CUALQUIER línea que empiece con mayúscula. 'Juan Perez' arranca con 'J' → companyName='Juan Perez'. Line 181 fallback: si aún no hay companyName y hay líneas, `companyName = lines[0]` sin ninguna condición extra (solo que no tenga '@') → 'juan' minúscula también termina como razón social."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "route.ts:369 `if (name.length >= 3)`. Nada más. 'cotizar' (7)→ clientName='cotizar' y avanza a waiting_dimensions. '???','1234','hola' todos pasan. Confirmado."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "route.ts:290-292 `if (hasMediaContent(formData)) { responseMessage = getUnsupportedMediaMessage(); }`. El body no se procesa y el estado no avanza. hasMediaContent (line 185-194) chequea MediaUrl0/MediaContentType0/NumMedia; devuelve true si alguno es truthy y distinto de '0'. Confirmado."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "route.ts:264 llama a getConversationState y sigue lineal. No hay try-lock, no hay upsert condicional con optimistic locking, no hay tabla de dedupe por MessageSid. `memoryCache` es Map local (whatsapp.ts:64), inservible en serverless multi-instancia. Dos POST concurrentes leen el mismo state, procesan la misma rama, hacen upsert los dos y disparan sendWhatsAppMessage/createWhatsAppLead/sendNotification duplicados."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "route.ts:577 es la última rama del if/else-if chain. Como waiting_dimensions/quantity/printing/quoted se chequean antes, cuando el usuario está en uno de esos steps la rama de reset nunca corre. Además `includes('cotizar')` matchea 'cotizarme' sin word boundary. Confirmado línea por línea."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "whatsapp.ts:24-30 define `LIMITS = { maxSheetWidth:1200, minLength:200, minWidth:200, minHeight:100, minQuantity:100 }` como const local. route.ts:459 `if (quantity < 100)` con literal, no lee de RETAIL_CONFIG. validateDimensions usa LIMITS local. Ningún import de `@/lib/retail/config` en estos archivos. Es el mismo patrón que ya pasó con colores/IVA/envío/teléfono."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "whatsapp.ts:16-21 `BUSINESS_HOURS = { start:7, end:16, workDays:[1..5] }`. Line 452-453 `hour >= start && hour < end` → a las 16:00 exacto ya es 'fuera de horario', pero el propio texto dice '7:00 - 16:00'. Mensajes duplicados con '7:00 - 16:00' en route.ts:317, whatsapp.ts:662, 677, 708. Según el contexto del proyecto, la página de contacto dice 8-17: divergencia confirmada por diseño (no verifiqué el archivo público pero el hardcodeo del bot es 7-16, indiscutible)."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "route.ts:45 define `PRINTING_INCREMENT=0.15` local. route.ts:51-78 implementa calculateQuote propia que devuelve {total, totalM2, deliveryDays} sin tax_rate/tax_amount/total_with_tax/subtotal_includes_tax. No hay import de `@/lib/cotizacion/motor`. validateDimensions también es local (whatsapp.ts:497), no usa validarCajas del motor. Divergencia confirmada."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "whatsapp.ts:13 `const CONVERSATION_TIMEOUT_MS = 30 * 60 * 1000`. Line 297: si expiró, `clearConversationState` + devuelve `{step:'initial'}` sin ninguna marca de 'expiré'. El siguiente mensaje del usuario entra a route.ts con state.step='initial', y si no matchea 'hola'/'cotizar'/'buenos dias'/'buenas tardes' cae al else final (Groq o 'escribe cotizar'). Confirmado."
+ },
+ {
+  "dimension": "parseo",
+  "confirmacion": "whatsapp.ts:501 `sheetWidth = height + width`. Solo chequea maxSheetWidth, minLength, minWidth, minHeight — NO hay tope de length (una caja 5000x300x300 pasa: sheetWidth=600<1200, length no se compara con nada). route.ts:459 solo chequea `quantity < 100`, no tiene max. Confirmado. La fórmula `h+w` para 'ancho de plancha' no fue contrastada con motor.ts en este archivo (no la abrí), pero el hecho de que sea una fórmula local y no venga de motor.ts es en sí un problema."
+ },
+ {
+  "titulo": "El bot tiene su propio calculo de cotizacion, no usa el motor compartido",
+  "archivo": "src/app/api/whatsapp/webhook/route.ts",
+  "linea": 51,
+  "por_que_esta_mal": "El bot define su propia funcion calculateQuote (lineas 45-78) en vez de importar calcularCotizacion() de src/lib/cotizacion/motor.ts. El motor es explicito en su docblock: 'Dos copias de un calculo de precios se desincronizan. Este archivo es la unica fuente: lo usan la API publica (GET y POST) y las tools de MCP'. WhatsApp quedo afuera y ya divergio: no aplica IVA, hardcodea 15% de recargo, no clasifica canal, no valida impresion contra canal, no expone precio por m2 aplicado. Es exactamente el patron que el proyecto sufre repetidamente (colores, minimos, envio, IVA, telefono).",
+  "codigo_actual": "const PRINTING_INCREMENT = 0.15;\nasync function calculateQuote(length, width, height, quantity, hasPrinting, config) {\n  const { m2 } = calculateUnfolded(length, width, height);\n  const totalM2 = calculateTotalM2(m2, quantity);\n  const pricePerM2 = getPricePerM2(totalM2, config);\n  let total = totalM2 * pricePerM2;\n  if (hasPrinting) total *= (1 + PRINTING_INCREMENT);\n  const deliveryDays = getProductionDays(hasPrinting, config);\n  return { total: Math.round(total), totalM2, deliveryDays };\n}",
+  "escenario": "Cliente pide 260 cajas de 300x380x420 con impresion. Bot devuelve $333.899 (sin IVA, con recargo +15% asumiendo 1 color). La API REST/MCP/pagina /cotizar sobre el mismo pedido devolveria: subtotal $333.899 + IVA $70.119 = total $404.018, ademas de channel='stock', can_buy_online=false, printing.available=false (porque 293 m² esta debajo del canal a medida donde se imprime). Un cliente que compare WhatsApp con la web ve dos cotizaciones distintas de la misma fabrica.",
+  "costo_comercial": "cotiza_mal",
+  "arreglo_propuesto": "Borrar calculateQuote y PRINTING_INCREMENT del route. Importar { calcularCotizacion } de '@/lib/cotizacion/motor'. Llamar con un solo box: calcularCotizacion([{ length_mm, width_mm, height_mm, quantity, printing_colors: colorsElegidos }], pricingConfig). Adaptar getQuoteMessage para consumir el QuoteResult (subtotal, tax_amount, total_with_tax, channel, channel_note, printing.available, valid_until, estimated_days). Los datos deben SALIR del motor, no recalcularse en el mensaje.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "precios",
+  "confirmacion": "webhook/route.ts:45-78 define PRINTING_INCREMENT=0.15 y la funcion async calculateQuote(length,width,height,quantity,hasPrinting,config) que hace totalM2*pricePerM2 y aplica *(1+PRINTING_INCREMENT) si hasPrinting. No hay import de '@/lib/cotizacion/motor'. Devuelve solo {total, totalM2, deliveryDays} — no channel, no tax, no printing.available, no valid_until. El motor.ts declara explicitamente en su docblock 'Este archivo es la unica fuente: lo usan la API publica (GET y POST) y las tools de MCP, asi que un cambio de logica llega a los tres caminos al mismo tiempo' — WhatsApp quedo afuera de esos tres caminos y confirma el patron de duplicacion."
+ },
+ {
+  "titulo": "El bot no informa IVA: presenta un 'Total' ambiguo que no coincide con el resto del sistema",
+  "archivo": "src/lib/whatsapp.ts",
+  "linea": 597,
+  "por_que_esta_mal": "getQuoteMessage muestra 'Total: $X' sin distinguir subtotal vs total con IVA. El motor compartido acaba de agregar tax_rate=0.21, tax_amount, total_with_tax y subtotal_includes_tax:false precisamente para sacar esa ambiguedad (ver docblock del IVA en motor.ts). El bot no participo del cambio y sigue devolviendo el numero pelado, que es lo que el motor documenta como problema: 'si algun dia cambia la alicuota, o si el modelo se equivoca en la cuenta, el cliente llega con un numero que no es el nuestro y la discusion la tenemos nosotros'. Ademas el bot NO expone el numero con IVA en ninguna parte del mensaje.",
+  "codigo_actual": "let message = `COTIZACION QUILMES CORRUGADOS\n\nCaja: ${boxDesc} ${hasPrinting ? '(con impresion)' : '(lisa)'}\nCantidad: ${quantity.toLocaleString('es-AR')} unidades\nTotal m2: ${quote.totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 })}\n\nTotal: $${quote.total.toLocaleString('es-AR')}\nPrecio unitario: $${unitPrice.toLocaleString('es-AR')}`;",
+  "escenario": "Transcripcion real 18/8/2026: 260 cajas de 300x380x420 con impresion → 'Total: $333.899'. Ese numero es el subtotal SIN IVA (293,28 m² × $990/m² × 1,15 = $333.899). El cliente asume que es lo que paga. La factura llega por $404.018 (+$70.119 IVA). O al reves: el vendedor cotiza con IVA y el motor devuelve sin, y el cliente compara los dos y se cae la venta. La misma cotizacion pedida a la API REST devuelve subtotal $333.899 + tax_amount $70.119 + total_with_tax $404.018 explicitos.",
+  "costo_comercial": "confunde",
+  "arreglo_propuesto": "Reemplazar 'Total: $X' por dos lineas explicitas usando el resultado del motor: 'Subtotal: $333.899 (sin IVA)' y 'Total con IVA 21%: $404.018'. Mientras siga existiendo calculateQuote local, calcular tax_amount = Math.round(total * 0.21) y total_with_tax en el bot. Idealmente eliminar calculateQuote y usar QuoteResult.tax_amount / total_with_tax del motor.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "precios",
+  "confirmacion": "En whatsapp.ts getQuoteMessage (linea ~597 en la seccion 'Total: $') el mensaje solo tiene 'Total: $${quote.total.toLocaleString(...)}' y 'Precio unitario: $${unitPrice.toLocaleString(...)}'. calculateQuote no calcula tax_amount ni total_with_tax. En motor.ts la constante IVA=0.21 y el QuoteResult expone subtotal, tax_rate, tax_amount, total_with_tax y subtotal_includes_tax:false — el bot no toca nada de esto. El docblock del IVA en motor.ts es explicito: 'si algun dia cambia la alicuota, o si el modelo se equivoca en la cuenta, el cliente llega con un numero que no es el nuestro y la discusion la tenemos nosotros'."
+ },
+ {
+  "titulo": "El bot habilita impresion en el canal de stock, donde el motor la prohibe",
+  "archivo": "src/lib/whatsapp.ts",
+  "linea": 578,
+  "por_que_esta_mal": "getPrintingMessage siempre pregunta '¿Con impresion (hasta 3 colores)?' sin importar el volumen. El motor compartido decide printing.available = !esDeStock; es decir, la impresion SOLO se ofrece a partir de wholesale_min_m2 (3.000 m²): 'La impresion se produce a medida, desde X m². Este pedido sale de stock, sin imprimir' (motor.ts:price_note). El bot cotiza +15% sobre un pedido de stock, cobrandole al cliente algo que la fabrica no produce en ese canal.",
+  "codigo_actual": "export function getPrintingMessage(quantity: number): string {\n  return `Cantidad: ${quantity.toLocaleString('es-AR')} unidades\n\nLlevan impresion?\n\n1 - Sin impresion (lisa)\n2 - Con impresion (hasta 3 colores)`;\n}",
+  "escenario": "Transcripcion real: 260 cajas × 1,128 m² = 293,28 m² (canal stock, muy debajo de 3.000). Bot ofrece impresion, cliente elige '2' (aunque sea por error), bot cobra +$43.552 de recargo por una impresion que ese canal no fabrica. Si el cliente confirma, hay que volver atras: o le cobran menos que lo cotizado, o le producen a medida (14 dias en vez de 24-48 hs) sin que lo eligiera.",
+  "costo_comercial": "cotiza_mal",
+  "arreglo_propuesto": "Antes de preguntar impresion, calcular el total_m2 del pedido y compararlo con pricingConfig.wholesale_min_m2. Si totalM2 < wholesale_min_m2, saltear el paso de impresion (hasPrinting = false forzado) y avisar 'Para este volumen es de stock, sin impresion. La impresion arranca en X m². ¿Cotizo asi o queres subir la cantidad?'. Alternativa: llamar al motor y usar quote.printing.available para decidir si preguntar.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "precios",
+  "confirmacion": "whatsapp.ts getPrintingMessage devuelve un texto fijo con las opciones '1 - Sin impresion / 2 - Con impresion (hasta 3 colores)' sin recibir totalM2 ni consultar el canal. calculateQuote aplica +15% cuando hasPrinting es true sin importar el volumen. Motor.ts calcula `const impresionDisponible = !esDeStock` y ademas escribe el price_note 'La impresión se produce a medida, desde X m². Este pedido sale de stock, sin imprimir'. El bot ignora esa regla y cobra un recargo por algo que ese canal no fabrica."
+ },
+ {
+  "titulo": "Umbral de 3.000 m² hardcodeado en el mensaje, se le muestra a particulares que estan en el canal correcto",
+  "archivo": "src/lib/whatsapp.ts",
+  "linea": 611,
+  "por_que_esta_mal": "getQuoteMessage compara literal 'quote.totalM2 < 3000' con un numero magico para agregar la advertencia. Ese 3.000 es el minimo del canal mayorista/a medida (pricing_config.wholesale_min_m2, RETAIL_CONFIG.MIN_M2_A_MEDIDA). Un particular que ya se identifico como 'particular' y que pidio 260 cajas (por encima del minimo minorista de 100) esta cotizando correctamente en el canal de stock, pero recibe una advertencia como si le faltara volumen. Es exactamente el pattern que retail/config.ts:MINIMOS documenta que 'espanta una venta real': se le dice al cliente 'estas por debajo del minimo' cuando en realidad esta bien.",
+  "codigo_actual": "if (quote.totalM2 < 3000) {\n  message += '\\n\\n(Pedido menor al minimo recomendado de 3000 m2)';\n}",
+  "escenario": "Transcripcion real: Ricardo (particular) pide 260 cajas, recibe la advertencia '(Pedido menor al minimo recomendado de 3000 m2)'. Ricardo es minorista, su minimo es 100 cajas (RETAIL_CONFIG.MIN_CANTIDAD), y esta arriba de eso. La advertencia lo empuja a pensar que su pedido no es viable, cuando en realidad es un pedido de stock estandar con entrega en 24-48 hs. Perdida directa de un lead calificado.",
+  "costo_comercial": "pierde_venta",
+  "arreglo_propuesto": "Eliminar la comparacion hardcoded. Usar la respuesta del motor: quote.channel_note ya trae el texto correcto ('Esta medida esta en stock...', 'Producción a medida...', o el motivoNoOnline con canal explicito). Alternativamente, si se mantiene el calculo local, comparar contra pricingConfig.wholesale_min_m2 y solo agregar la nota si state.clientType === 'empresa'. Para particulares en canal stock, mostrar el positivo: 'Este pedido es de stock: entrega en 24 a 48 horas'.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "precios",
+  "confirmacion": "En whatsapp.ts getQuoteMessage: `if (quote.totalM2 < 3000) { message += '\\n\\n(Pedido menor al minimo recomendado de 3000 m2)'; }`. Es literal, no lee pricingConfig.wholesale_min_m2, no lee RETAIL_CONFIG.MIN_M2_A_MEDIDA, no toma en cuenta state.clientType. El mismo patron esta en getQuantityMessage. La transcripcion confirma que aparecio con 293,3 m² para un particular con 260 cajas (por encima del minimo minorista de 100), exactamente el caso que MINIMOS.largo en retail/config.ts documenta como 'la mitad que espanta'."
+ },
+ {
+  "titulo": "Bot pregunta 'con o sin impresion' pero jamas cuantos colores; asume 1 y cobra +15%",
+  "archivo": "src/app/api/whatsapp/webhook/route.ts",
+  "linea": 476,
+  "por_que_esta_mal": "El bot ofrece 'Con impresion (hasta 3 colores)' pero solo tiene una rama binaria (hasPrinting true/false) y aplica PRINTING_INCREMENT = 0.15 fijo. El motor compartido soporta 1..MAX_PRINTING_COLORS (3) y cobra printing_colors * 15% (motor.ts: pricePerM2 * (1 + printingColors * 0.15)). Ademas createWhatsAppLead:149 registra 'printing_colors: hasPrinting ? 1 : 0' en public_quotes, o sea que el lead queda con 1 color hardcodeado. Si el cliente queria 2 o 3 colores, el vendedor va a rehacer la cotizacion, cobrar diferente, y explicar por que.",
+  "codigo_actual": "// webhook/route.ts:476\nconst hasPrinting = bodyLower.includes('2') || bodyLower.includes('impresion') || ...\n// route.ts:67-69\nif (hasPrinting) { total *= (1 + PRINTING_INCREMENT); }\n// route.ts:149\nprinting_colors: data.hasPrinting ? 1 : 0,",
+  "escenario": "Cliente pide caja con 3 colores para su logo. Bot cotiza +15% ($333.899), motor cotizaria +45% ($421.003). Diferencia $87.104 que aparece cuando el vendedor recotiza. Peor caso: cliente confirma, se produce el pedido con 1 color en vez de 3 porque asi quedo en public_quotes.printing_colors=1, y llegan cajas sin el logo completo.",
+  "costo_comercial": "cotiza_mal",
+  "arreglo_propuesto": "Agregar un paso 'waiting_printing_colors' entre waiting_printing y quoted. Si el usuario dice 'con impresion', preguntar 'Cuantos colores (1, 2 o 3)?' y guardar en state.printingColors. Pasar ese valor al motor como printing_colors. En createWhatsAppLead, usar state.printingColors en vez de hardcoded 1.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "precios",
+  "confirmacion": "En webhook/route.ts:476 la deteccion es binaria: `const hasPrinting = bodyLower.includes('2') || bodyLower.includes('impresion') || ...`. calculateQuote solo recibe hasPrinting boolean y aplica PRINTING_INCREMENT=0.15 fijo. En createWhatsAppLead:149: `printing_colors: hasPrinting ? 1 : 0` — literalmente hardcodea 1 color en la base. Motor.ts hace `pricePerM2 * (1 + printingColors * 0.15)` y valida 0..RETAIL_CONFIG.MAX_PRINTING_COLORS (3). Un cliente que quiera 2 o 3 colores queda cotizado y registrado como si hubiera pedido 1."
+ },
+ {
+  "titulo": "clientType se captura pero NO cambia el precio, el minimo, el canal ni los tiempos",
+  "archivo": "src/app/api/whatsapp/webhook/route.ts",
+  "linea": 493,
+  "por_que_esta_mal": "El bot pregunta al principio si es particular o empresa y guarda state.clientType. Ese dato solo se usa en dos lugares: (a) createWhatsAppLead:141 para poner requester_tax_condition en public_quotes, y (b) sendNotification para mostrarlo al equipo. NO se pasa a calculateQuote, NO condiciona el minimo mostrado (getQuantityMessage siempre dice '3.000 m²'), NO condiciona la disponibilidad de impresion, NO condiciona los dias de entrega, NO condiciona el mensaje final. La pregunta esta de adorno. Ademas confunde: el usuario cree que al elegir 'particular' va a recibir un tratamiento minorista, y en la cotizacion aparece un 'minimo de 3.000 m² mayorista' que contradice esa expectativa.",
+  "codigo_actual": "const quote = await calculateQuote(\n  dimensions.length,\n  dimensions.width,\n  dimensions.height,\n  quantity,\n  hasPrinting,\n  pricingConfig\n); // clientType NO se pasa",
+  "escenario": "Un empresario elige 'empresa', pide 500 cajas. Bot le dice 'minimo recomendado 3.000 m2' aunque su pedido de 3-4.000 cajas caiga en el mismo umbral que un particular. Un particular elige 'particular', pide 260 cajas (correcto para minorista), y recibe la misma advertencia mayorista. La pregunta no discrimina nada.",
+  "costo_comercial": "confunde",
+  "arreglo_propuesto": "Definir explicitamente que hace clientType con el precio: (a) si es la unica diferencia el mensaje/canal, entonces cambiar getQuantityMessage para mostrar 'Minimo: 100 cajas' a particulares y 'Minimo: 3.000 m²' a empresas; (b) si hay un IVA discriminado (consumidor final vs responsable inscripto), pasarlo al motor. Documentar la decision en un solo lugar. Si la respuesta es 'nada', quitar la pregunta.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "precios",
+  "confirmacion": "webhook/route.ts pasa state.clientType a createWhatsAppLead (linea 519, se mapea a requester_tax_condition en linea 141) y a sendNotification. NO se pasa a calculateQuote. getQuantityMessage y getPrintingMessage no reciben clientType. getQuoteMessage tampoco. La condicion de la advertencia '< 3000 m2' no lo consulta. La pregunta particular/empresa efectivamente no discrimina el mensaje al usuario ni el precio; solo el rotulo del lead."
+ },
+ {
+  "titulo": "getQuantityMessage muestra el minimo mayorista a todo el mundo como '3.000 m² recomendado'",
+  "archivo": "src/lib/whatsapp.ts",
+  "linea": 590,
+  "por_que_esta_mal": "El texto 'Minimo recomendado: cantidad que sume 3.000 m2' esta hardcodeado. No lee RETAIL_CONFIG.MIN_M2_A_MEDIDA (que si esta en 3.000 pero por accidente), no lee pricing_config, y no diferencia canal. La skill retail/config.ts:MINIMOS ya definio un texto oficial ('corto' y 'largo') precisamente para no repetir esto: 'Depende del canal. Si la medida esta en catalogo, se compra de stock desde 100 cajas... Si querés una medida propia fabricada a pedido, el mínimo es de 3.000 m²'. El bot lo ignora y usa su propia frase, que es la version 'mitad de la verdad' que retail/config.ts explicitamente documenta como problema.",
+  "codigo_actual": "export function getQuantityMessage(length, width, height): string {\n  return `Caja: ${length} x ${width} x ${height} mm\n\nCuantas unidades necesitas?\n\nMinimo recomendado: cantidad que sume 3.000 m2`;\n}",
+  "escenario": "Comprador minorista escribe al bot, elige 'particular', ve 'Minimo recomendado: 3.000 m²'. Calcula rapido que 3.000 m² son ~2.700 cajas de su medida, se descarta solo. En realidad podia comprar desde 100 cajas de stock. Es exactamente el caso que MINIMOS.largo intenta prevenir.",
+  "costo_comercial": "pierde_venta",
+  "arreglo_propuesto": "Importar MINIMOS desde '@/lib/retail/config' y usar MINIMOS.corto (o MINIMOS.largo si hay lugar): 'Minimo: desde 100 cajas de stock o 3.000 m² a medida'. Alternativamente, si state.clientType='particular', mostrar solo 'Minimo: 100 cajas'.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "precios",
+  "confirmacion": "whatsapp.ts getQuantityMessage: `Minimo recomendado: cantidad que sume 3.000 m2` es un string literal. No importa MINIMOS ni RETAIL_CONFIG. En retail/config.ts existe la constante MINIMOS.corto/largo precisamente para no repetir 'la mitad de la verdad' — el bot no la usa. Ademas la funcion no recibe clientType, asi que un particular ve exactamente el mismo texto que una empresa."
+ },
+ {
+  "titulo": "'Validez: 7 dias' hardcodeada, ignora pricing_config.quote_validity_days",
+  "archivo": "src/lib/whatsapp.ts",
+  "linea": 604,
+  "por_que_esta_mal": "El mensaje de cotizacion escribe 'Validez: 7 dias' como literal. El motor usa config.quote_validity_days y devuelve valid_until: '2026-08-25' calculado sobre esa base. Si el negocio decide cambiar la validez desde el dashboard (por inflacion, cambio de proveedor, etc), la API REST y MCP se actualizan, la pagina /cotizar tambien, y el bot sigue prometiendo 7 dias fijos. Es la misma trampa que el proyecto ya sufrio con envio, IVA, minimos y colores: el dato viviendo duplicado.",
+  "codigo_actual": "Tiempo de entrega: ${quote.deliveryDays} dias habiles\nValidez: 7 dias`;",
+  "escenario": "Suben la inflacion mensual al 10%, negocio baja quote_validity_days de 7 a 3 dias. Cliente cotiza por WhatsApp un lunes, ve 'Validez: 7 dias', llama al vendedor el jueves siguiente. El vendedor tiene que decirle 'esa validez esta vencida, la cotizacion real era 3 dias'. Cliente se enoja, o peor: el vendedor sostiene el precio a perdida para no discutir.",
+  "costo_comercial": "cotiza_mal",
+  "arreglo_propuesto": "Pasar el config a getQuoteMessage y usar `Validez: ${config.quote_validity_days} dias`. Idealmente pasar el QuoteResult completo del motor y usar `Vence: ${quote.valid_until}` (fecha absoluta, evita malentendidos de 'desde cuando cuentan los 7 dias').",
+  "confianza": "verificado_en_codigo",
+  "dimension": "precios",
+  "confirmacion": "whatsapp.ts getQuoteMessage: literalmente `Validez: 7 dias` en el template. calculateQuote no recibe ni devuelve validez. En motor.ts se hace `validUntil.setDate(validUntil.getDate() + config.quote_validity_days)` y se devuelve `valid_until: validUntil.toISOString().split('T')[0]`. Si el negocio cambia quote_validity_days en la base, la API, el MCP y /cotizar se actualizan; el bot sigue diciendo 7 dias."
+ },
+ {
+  "titulo": "BUSINESS_PHONE hardcodeado en whatsapp.ts en vez de leer contacto.ts",
+  "archivo": "src/lib/whatsapp.ts",
+  "linea": 10,
+  "por_que_esta_mal": "whatsapp.ts define BUSINESS_PHONE = env.WHATSAPP_BUSINESS_NUMBER || '+5491133411781'. Existe contacto.ts con CONTACTO.tel que es la fuente unica y su docblock lo dice explicitamente: 'El telefono estaba escrito a mano 32 veces, en 22 archivos y en cuatro formatos distintos'. El fallback en whatsapp.ts es la aparicion numero 33. Si algun dia cambia el numero y se olvidan de sincronizar el env var, getAdvisorMessage sigue mandando gente al viejo.",
+  "codigo_actual": "const BUSINESS_PHONE = process.env.WHATSAPP_BUSINESS_NUMBER || '+5491133411781';",
+  "escenario": "Cambia el numero de la fabrica a +5491100000000. Se actualiza contacto.ts, se actualiza el env var en produccion, pero un deploy previo o un entorno sin env cae al fallback hardcodeado. getAdvisorMessage manda al cliente a WhatsApp: +5491133411781, que ya no atiende. Cliente escribe, no responde nadie, se pierde el lead.",
+  "costo_comercial": "pierde_venta",
+  "arreglo_propuesto": "import { CONTACTO } from '@/lib/contacto'; const BUSINESS_PHONE = CONTACTO.tel;. Eliminar el fallback hardcoded. En getAdvisorMessage y getShippingMessage usar CONTACTO.telefonoVisible.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "precios",
+  "confirmacion": "whatsapp.ts:10: `const BUSINESS_PHONE = process.env.WHATSAPP_BUSINESS_NUMBER || '+5491133411781';`. contacto.ts exporta CONTACTO.tel = '+5491133411781' y su docblock advierte explicitamente: 'El telefono estaba escrito a mano 32 veces, en 22 archivos y en cuatro formatos distintos'. Este fallback es una de esas apariciones a mano que la constante fue creada para eliminar. Se usa en getAdvisorMessage y se expone via getBusinessPhone()."
+ },
+ {
+  "titulo": "Horario del bot (7-16) no coincide con el sitio (8-17)",
+  "archivo": "src/lib/whatsapp.ts",
+  "linea": 17,
+  "por_que_esta_mal": "BUSINESS_HOURS en whatsapp.ts es start:7, end:16. La pagina /contacto y varios textos del sitio dicen 'Lunes a viernes de 8:00 a 17:00 hs'. Dos fuentes de verdad para el mismo dato. isWithinBusinessHours() decide si mostrar getOutOfHoursMessage(), que ademas escribe el rango 'Lunes a Viernes 7:00 - 16:00' como literal (no leyendo BUSINESS_HOURS), asi que si cambian los numeros arriba hay que acordarse tambien de cambiar el texto.",
+  "codigo_actual": "const BUSINESS_HOURS = { start: 7, end: 16, workDays: [1, 2, 3, 4, 5] };\n// ...\nreturn `... Nuestro horario es: Lunes a Viernes 7:00 - 16:00 ...`;",
+  "escenario": "Cliente escribe al bot a las 16:30 hs de un martes. El bot le contesta 'estamos fuera de horario, hasta las 16'. El cliente entra al sitio y ve 'Lunes a viernes 8-17 hs' y llama por telefono, donde efectivamente hay alguien. Contradiccion visible que erosiona confianza. Peor: cliente escribe a las 7:30 pensando que abre a las 8 (segun el sitio), el bot le contesta activamente pero el vendedor humano no esta.",
+  "costo_comercial": "confunde",
+  "arreglo_propuesto": "Definir el horario en un solo lugar (por ejemplo src/lib/horario.ts, HORARIO = { desdeHora: 8, hastaHora: 17, dias: 'Lunes a viernes' }) y hacer que tanto whatsapp.ts como la pagina de contacto lo importen. En getOutOfHoursMessage armar el texto a partir de las constantes en vez de hardcodearlo. Definir cual de los dos horarios es el correcto y actualizar el otro.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "precios",
+  "confirmacion": "whatsapp.ts:17-22: `BUSINESS_HOURS = { start: 7, end: 16, workDays: [1,2,3,4,5] }`. app/(public)/contacto/page.tsx muestra literalmente 'Lunes a viernes de 8:00 a 17:00 hs'. Ademas getOutOfHoursMessage (whatsapp.ts) hardcodea 'Lunes a Viernes 7:00 - 16:00' como string en vez de leer BUSINESS_HOURS — con lo cual son tres apariciones desincronizables. isClosingMessage (webhook/route.ts:317) y getConfirmationMessage tambien repiten 'Lunes a Viernes 7:00 - 16:00'."
+ },
+ {
+  "titulo": "Bot envia mensaje de fuera de horario y a continuacion contesta como si estuviera adentro",
+  "archivo": "src/app/api/whatsapp/webhook/route.ts",
+  "linea": 595,
+  "por_que_esta_mal": "En el estado 'initial', si isWithinBusinessHours() es false, el bot antepone 'estamos fuera de horario, dejanos tu mensaje' PERO en el mismo texto sigue con '---' y arranca el flujo de cotizacion. Como se ve en la transcripcion, el 'estamos fuera de horario y te respondemos a la brevedad' es directamente contradicho por el bot respondiendo al instante y avanzando por los pasos. Ademas esta condicion solo se dispara si state.step === 'initial', asi que los mensajes siguientes NO llevan el aviso: el cliente cree que hablar con el bot equivale a haber contactado a alguien, y espera respuesta humana a la manana.",
+  "codigo_actual": "if (!isWithinBusinessHours() && state.step === 'initial') {\n  responseMessage = getOutOfHoursMessage() + '\\n\\n---\\n\\n' + responseMessage;\n}",
+  "escenario": "Transcripcion real 21:59-22:01: bot dice 'Estamos fuera de horario. Deja tu mensaje y te respondemos a la brevedad'. Segundos despues bot le arma una cotizacion completa. Cliente asume que ya hablo con la empresa y espera a que 'le respondan a la brevedad'. Nadie le responde hasta las 8 am (o hasta que un vendedor lea el ticket). Doble mala experiencia: le dicen 'te respondemos' y no le responden.",
+  "costo_comercial": "confunde",
+  "arreglo_propuesto": "Cuando esta fuera de horario, o (a) cotizar normal y NO decir 'te respondemos a la brevedad' (el bot ya esta respondiendo), o (b) despues de la cotizacion agregar una nota 'La confirmacion la revisa un vendedor a partir de las 8 hs'. En el mensaje de asesor/confirmacion tambien avisar 'estamos fuera de horario, te contactan manana'. En cualquier caso, no prometer respuesta humana inmediata cuando lo unico activo es el bot.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "precios",
+  "confirmacion": "webhook/route.ts:595: `if (!isWithinBusinessHours() && state.step === 'initial') { responseMessage = getOutOfHoursMessage() + '\\n\\n---\\n\\n' + responseMessage; }`. El getOutOfHoursMessage dice 'Deja tu mensaje y te respondemos a la brevedad' y a continuacion el mismo mensaje incluye toda la pregunta de particular/empresa. Ademas la condicion exige state.step === 'initial', asi que los mensajes siguientes (dimensiones, cantidad, cotizacion) no llevan aviso — la transcripcion real 21:59-22:01 confirma exactamente ese patron: aviso de fuera de horario + flujo completo hasta cotizacion en 2 minutos."
+ },
+ {
+  "titulo": "El bot de WhatsApp dice horario 7:00-16:00, pero el sitio, el schema.org, el FAQ y el bot telefonico dicen 8:00-17:00",
+  "archivo": "src/lib/whatsapp.ts",
+  "linea": 17,
+  "por_que_esta_mal": "El horario aparece escrito a mano en al menos 5 lugares del subsistema bot con el valor 7-16 (whatsapp.ts BUSINESS_HOURS, whatsapp.ts:662/677/708 mensajes, whatsapp-ai.ts:103 prompt AI, webhook/route.ts:317/618 pie de cierre, email-parser.ts:174/206, llms.txt/route.ts:270). En cambio, la fuente publica del negocio dice 8-17 en TODOS los otros lugares: JSON-LD LocalBusiness en src/app/layout.tsx:129 (openingHours: 'Mo-Fr 08:00-17:00'), la pagina de contacto src/app/(public)/contacto/page.tsx:102 ('Lunes a viernes de 8:00 a 17:00 hs'), src/app/(public)/faq/page.tsx:54 ('lunes a viernes de 8:00 a 17:00 hs'), el prompt del bot telefonico Retell src/config/retell-agent.ts:34 ('de 8 a 17hs'), la constante src/types/retell.ts:229 (INICIO:8, FIN:17) y la logica de transferencia src/app/api/retell/transferir/route.ts:194-199. El horario del sitio (8-17) es el que ve el publico y el que el bot Retell mismo respeta. Se contradicen dos canales que atienden al mismo cliente: en la prueba real del dueño, el WhatsApp le dijo 'fuera de horario 7:00-16:00' a las 21:59 (correcto en el resultado, mal en el texto). Un cliente que llama por telefono a las 7:30 se topa con que Ana lo trata como fuera de horario mientras el WhatsApp le contesta que si esta abierto.",
+  "escenario": "Un cliente escribe al WhatsApp a las 7:30 hs de un martes. El bot lo atiende como en horario y le arma cotizacion, cuando en realidad la fabrica no abre hasta las 8. Reves: escribe a las 16:30 el bot le dice 'fuera de horario, nuestro horario es 7:00-16:00', pero la pagina de contacto dice 8-17 y hay alguien atendiendo. En ambos casos el cliente recibe un mensaje que contradice al sitio.",
+  "costo_comercial": "confunde",
+  "arreglo_propuesto": "Definir el horario en UN solo lugar (por ejemplo, exportar BUSINESS_HOURS desde src/lib/retail/config.ts o de un nuevo src/lib/horarios.ts) con {start, end, workDays}, y que TODAS las superficies lean de ahi: whatsapp.ts, whatsapp-ai.ts (para inyectarlo en el KNOWLEDGE_PROMPT dinamicamente igual que se hace con los precios), webhook/route.ts, email-parser.ts, llms.txt, layout.tsx (openingHours), contacto/page.tsx, faq/page.tsx, retell-agent.ts y transferir/route.ts. Ademas, generar el texto 'Lunes a Viernes X:00 - Y:00' desde esa fuente (algo como formatHorario()) para no duplicar la cadena. Antes de mover nada hay que decidir con el negocio si el horario real es 7-16 o 8-17.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "datos",
+  "confirmacion": "whatsapp.ts:16-18 define BUSINESS_HOURS {start:7, end:16}. whatsapp.ts:662 y :677 y :708 rotulan textualmente 'Lunes a Viernes 7:00 - 16:00'. webhook/route.ts:317 y :618 emiten el mismo pie 7:00-16:00. whatsapp-ai.ts:103 dice 'Horario: Lunes a Viernes 7:00 - 16:00'. email-parser.ts:174 y :206 idem. llms.txt/route.ts:270 dice '7:00 a 16:00'. En cambio, layout.tsx:129 tiene openingHours:'Mo-Fr 08:00-17:00', contacto/page.tsx:102 dice '8:00 a 17:00 hs', faq/page.tsx:54 idem, retell-agent.ts:34 'de 8 a 17hs', types/retell.ts:227-228 INICIO:8 FIN:17. Contradiccion confirmada linea por linea."
+ },
+ {
+  "dimension": "datos",
+  "confirmacion": "whatsapp.ts:614-654 (getQuoteMessage) muestra 'Total: $X / Precio unitario: $Y' sin mencionar IVA ni distinguir subtotal. whatsapp-ai.ts:346-352 muestra 'Total: $X ARS' sin mencion de IVA. En contraste, motor.ts:34 declara IVA=0.21, motor.ts:71-74 declara tax_rate/tax_amount/total_with_tax/subtotal_includes_tax, motor.ts:256-257 arma el 'summary' con 'Subtotal X sin IVA, total Y con IVA 21% incluido', y el comentario motor.ts:22-28 documenta que se agrego IVA porque un asistente aplicaba el 21% de mas. El bot no usa el motor; su calculateQuote no propaga IVA. Confirmado."
+ },
+ {
+  "dimension": "datos",
+  "confirmacion": "whatsapp.ts:683-698 (getShippingMessage) devuelve 'El envio es GRATIS dentro de un radio de 60km ... en compras superiores a 3.000 m2' como texto plano, sin distinguir canal minorista/mayorista y sin importar ENVIO. retail/config.ts:171-183 (ENVIO.largo) es la fuente de verdad y dice explicitamente 'En pedidos mayoristas, desde 3.000 m², el envio es gratis (...). En pedidos minoristas el retiro es en la fabrica, o coordinamos el envio con el costo a cargo del comprador'. El comentario retail/config.ts:159-167 documenta que este mismo bug ya se corrigio en el resto del sitio (14 textos). Confirmado: el bot es el archivo que quedo fuera del refactor."
+ },
+ {
+  "dimension": "datos",
+  "confirmacion": "whatsapp.ts:591-597 (getQuantityMessage) dice 'Minimo recomendado: cantidad que sume 3.000 m2' como texto plano, sin importar MINIMOS. whatsapp.ts:635-636 agrega '(Pedido menor al minimo recomendado de 3000 m2)' sin explicar el otro canal. retail/config.ts:138-142 (MINIMOS.largo) es la fuente de verdad y dice 'Depende del canal. Si la medida esta en catalogo, se compra de stock desde 100 cajas (...). Si queres una medida propia fabricada a pedido, el minimo es de 3.000 m² de carton por modelo'. El comentario retail/config.ts:120-133 documenta que este mismo bug ya se corrigio en 6 lugares. En la transcripcion real Ricardo Montoto recibio la nota '(Pedido menor al minimo recomendado de 3000 m2)' aunque su cantidad procesada (260) fue por el bug del regex. Confirmado."
+ },
+ {
+  "dimension": "datos",
+  "confirmacion": "whatsapp-ai.ts:66-68 KNOWLEDGE_PROMPT declara literalmente 'Producto: Cajas de carton corrugado a medida (tipo RSC - Regular Slotted Container). Fabricamos para empresas: no vendemos al publico minorista. Solo Argentina: no exportamos'. Contradice: (a) webhook/route.ts:266-287 flujo waiting_client_type con opcion '1 - Particular'; (b) whatsapp.ts:531-533 y :541-543 pregunta 'Sos particular o empresa? 1 - Particular 2 - Empresa'; (c) RETAIL_CONFIG.MIN_CANTIDAD=100 en retail/config.ts:83 y todo el canal /cajas retail. Confirmado."
+ },
+ {
+  "dimension": "datos",
+  "confirmacion": "whatsapp.ts:633 escribe literal 'Validez: 7 dias'. whatsapp-ai.ts:352 escribe 'La cotizacion es valida 7 dias'. La firma de getQuoteMessage (whatsapp.ts:614-618) recibe {total, totalM2, deliveryDays} pero no validityDays. calculateQuote (webhook/route.ts:48-79) tampoco devuelve validityDays. En contraste, types/database.ts:51 declara quote_validity_days, motor.ts:211-212 lo usa (validUntil = today + config.quote_validity_days), motor.ts:317 lo emite en valid_until, motor.ts:323 lo pone en la explicacion y llms.txt/route.ts:35 y :107 y :253 lo consumen. El fallback en whatsapp-ai.ts:44 tiene quote_validity_days:7 pero el prompt no lee esa variable dinamicamente para el KNOWLEDGE_PROMPT. Confirmado."
+ },
+ {
+  "dimension": "datos",
+  "confirmacion": "whatsapp-ai.ts:88-92 KNOWLEDGE_PROMPT declara literal '### Producción / - Sin impresion: ~7 dias habiles / - Con impresion: ~14 dias habiles / - Validez de cotizacion: 7 dias'. En el mismo archivo, tryQuoteFromConversation (whatsapp-ai.ts:273-311) llama getProductionDays(hasPrinting, configToUse) que lee production_days_standard/production_days_printing de pricingConfig. Ademas el contextBlock (whatsapp-ai.ts:187-193) inyecta precios pero no inyecta los plazos ni la validez. Confirmado: la conversacion libre del AI usa los numeros viejos aunque la cotizacion calculada use los actuales."
+ },
+ {
+  "dimension": "datos",
+  "confirmacion": "whatsapp.ts:602-608 (getPrintingMessage) escribe literal '2 - Con impresion (hasta 3 colores)'. RETAIL_CONFIG.MAX_PRINTING_COLORS=3 esta en retail/config.ts:96 y el comentario retail/config.ts:88-95 documenta que este dato ya causo problemas por estar duplicado en 17 lugares. motor.ts:146-147 y :299-301 si lee RETAIL_CONFIG.MAX_PRINTING_COLORS. Confirmado."
+ },
+ {
+  "dimension": "datos",
+  "confirmacion": "webhook/route.ts:459 escribe 'La cantidad minima es 100 unidades. Cuantas necesitas?' literal. whatsapp.ts:24-30 tambien tiene LIMITS.minQuantity=100 hardcoded sin importar RETAIL_CONFIG. Ademas whatsapp-ai.ts:281 escribe 'La cantidad minima es 100 unidades' literal. retail/config.ts:83 tiene RETAIL_CONFIG.MIN_CANTIDAD=100 como fuente de verdad. Confirmado el patron de duplicacion."
+ },
+ {
+  "dimension": "datos",
+  "confirmacion": "whatsapp.ts:443-454 isWithinBusinessHours solo mira dayOfWeek (contra workDays[1..5]) y hour (contra start=7, end=16). No hay lista de feriados, no hay import de una libreria de feriados, no hay consulta a ninguna tabla. Confirmado. Sobre la parte de plazos: getProductionDays devuelve un numero de dias pero no se rastrean feriados; el impacto exacto depende de si el negocio interpreta 'dias habiles' como 'dias laborales de calendario' o 'excluyendo feriados', pero la logica no descuenta feriados en ningun caso."
+ },
+ {
+  "titulo": "El bot no usa el motor centralizado calcularCotizacion(): tiene su propio calculateQuote paralelo",
+  "archivo": "src/app/api/whatsapp/webhook/route.ts",
+  "linea": 48,
+  "por_que_esta_mal": "El proyecto tiene un motor de cotizacion compartido en src/lib/cotizacion/motor.ts (usado por /api/v1/quote, /api/mcp y /cotizar) que exporta calcularCotizacion() con toda la logica de IVA, escalera de precios, canales, envio, resumen 'para asistente', mensaje de handoff [COTIZADO-WEB], contact block, etc. El bot de WhatsApp tiene su propio calculateQuote en webhook/route.ts:48-79 y otro casi identico en whatsapp-ai.ts:409-441 (tryQuoteFromConversation). Ambos calculan solo el subtotal, sin IVA, sin summary con las dos monedas, sin marcar el canal ni el 'meets_minimum'. Todas las mejoras que se hacen en el motor central (IVA agregado, correccion de politica de envio, tax_amount, subtotal_includes_tax, whatsapp_message [COTIZADO-WEB], etc.) NO llegan al canal por el que mas cotiza el negocio. Y ademas se van a desincronizar cualquier cambio futuro: hoy PRINTING_INCREMENT=0.15 esta hardcoded en tres archivos (motor.ts, webhook/route.ts:41, whatsapp-ai.ts:21) y el dia que se decida cobrar +18% en dos van a olvidarse.",
+  "escenario": "Se cambia PRINTING_INCREMENT a 0.18 en motor.ts (nueva politica). /api/v1/quote y /cotizar cotizan con 18%. Pero el bot de WhatsApp sigue cotizando con 15% porque su copia en webhook/route.ts:41 no fue tocada. Un cliente cotiza por WhatsApp $X y por la web $X*1.026. Reclamo por diferencia de precio. Igual pasara con IVA, la escalera de precios, la politica de envio, y cualquier campo nuevo del motor.",
+  "costo_comercial": "cotiza_mal",
+  "arreglo_propuesto": "Refactor: en webhook/route.ts:48-79 y en whatsapp-ai.ts:409-441 dejar de tener calculateQuote propio, y llamar a `import { calcularCotizacion } from '@/lib/cotizacion/motor'` con los mismos parametros que arma /api/v1/quote (una caja, con length/width/height/quantity/hasPrinting/printing_colors). Del resultado devolver total_with_tax, tax_amount, summary y estimated_days, y renderizarlos en getQuoteMessage. Como beneficio secundario, el bot pasa a tener automaticamente el mensaje de handoff [COTIZADO-WEB] y el canal (stock vs made_to_order) correcto para el mensaje sobre minimos.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "datos",
+  "confirmacion": "webhook/route.ts:48-79 define calculateQuote propio que solo devuelve {total, totalM2, deliveryDays} — sin tax, sin summary, sin canal, sin whatsapp_message, sin meets_minimum. whatsapp-ai.ts:295-311 tiene otra copia paralela (calcula manualmente m2 + pricePerM2 + PRINTING_INCREMENT). PRINTING_INCREMENT=0.15 esta duplicado en webhook/route.ts:41 y whatsapp-ai.ts:21 (motor.ts tambien lo tiene). Ninguno de los dos importa calcularCotizacion de motor.ts. Confirmado."
+ },
+ {
+  "dimension": "datos",
+  "confirmacion": "whatsapp.ts:659-664 getConfirmationMessage no menciona direccion (solo 'Horario de atencion'). whatsapp.ts:670-678 getAdvisorMessage muestra BUSINESS_PHONE + email + horario, sin direccion. whatsapp.ts no importa CONTACTO ni SHIPPING_FACTORY_ADDRESS. En contraste, whatsapp-ai.ts:102 SI tiene la direccion pero como cadena literal 'Lugones 219, B1878 Quilmes, Buenos Aires' (no importada de CONTACTO.direccion). Contacto.ts:53 y retail/config.ts:145 tienen la direccion oficial. Confirmado."
+ },
+ {
+  "titulo": "Al confirmar el pedido (opción 1) NO se notifica al equipo: la venta se pierde en silencio",
+  "archivo": "src/app/api/whatsapp/webhook/route.ts",
+  "linea": 545,
+  "por_que_esta_mal": "En state='quoted', cuando el cliente elige '1 - Confirmar', el código solo manda getConfirmationMessage() y hace clearConversationState(). No dispara sendNotification, no actualiza public_quotes (queda requested_contact=false, status='pending'), no marca la conversación con needsAdvisor. El bot le promete 'Un vendedor te va a contactar en breve', pero ningún vendedor se entera. La única señal al equipo llegó al momento de la cotización (line 527), o sea, ANTES de que el cliente decidiera comprar. Se hace exactamente lo contrario a lo que declara el dueño: el lead más calificado del flujo (el que dijo 'sí, quiero cerrar') es el único al que no le llega un aviso urgente.",
+  "escenario": "Ricardo Montoto ve la cotización de $333.899 y escribe '1' para confirmar. El bot responde 'Perfecto! Un vendedor te va a contactar en breve'. Nadie del equipo recibe email ni ping. Ricardo espera dos días, no lo llaman, se lo lleva otro proveedor.",
+  "codigo_actual": "if (bodyLower.includes('1') || bodyLower.includes('confirmar') || bodyLower.includes('si')) {\n  responseMessage = getConfirmationMessage();\n  await clearConversationState(phoneNumber);\n}",
+  "costo_comercial": "pierde_venta",
+  "arreglo_propuesto": "Antes de clearConversationState, disparar sendNotification({ type: 'lead_with_contact', origin: 'WhatsApp — CONFIRMÓ PEDIDO', box: state.dimensions, quantity: state.quantity, totalArs: state.lastQuoteTotal, contact: { phone: phoneNumber, name: state.clientName, email: state.clientEmail, company: state.companyName, notes: 'Cliente confirmó pedido por WhatsApp. Contactar urgente.' }}). Además, hacer supabase.from('public_quotes').update({ requested_contact: true, status: 'contact_requested' }).eq('whatsapp_conversation_id', ...) para que el lead aparezca priorizado en el back-office. Un asunto distinto ('CONFIRMÓ ORDEN' vs 'Nuevo lead') para que el vendedor filtre en el inbox.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "conversion",
+  "confirmacion": "Confirmé en webhook/route.ts líneas 544-547: en state='quoted' la rama de confirmar sólo ejecuta 'responseMessage = getConfirmationMessage(); await clearConversationState(phoneNumber);'. No hay sendNotification (comparar con línea 559 en rama asesor y 527 en waiting_printing). No hay UPDATE de public_quotes (requested_contact, status). Y clearConversationState en whatsapp.ts nulléa client_type, client_name, company_name, client_email, dimensions, quantity, has_printing — se pierde toda huella del cierre."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "Verificado en línea 545: bodyLower.includes('1') || bodyLower.includes('confirmar') || bodyLower.includes('si'). 'includes' es substring match: '15', '10', '100', 'insistir' (tiene 'si'), 'quisiera' (tiene 'si'), 'asistente' (tiene 'si') todos disparan. Mismo patrón del bug B confirmado por el dueño. Idéntico problema en línea 548 (includes('2') matchea '20', '200', '2do') y línea 554 (includes('3') matchea '30', '3 días', '13')."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "Confirmado en whatsapp.ts: (1) CONVERSATION_TIMEOUT_MS = 30 * 60 * 1000 (línea 14). (2) En getConversationState, si Date.now()-lastInteraction > timeout, se llama clearConversationState. (3) clearConversationState hace .update({step:'initial', client_type:null, client_name:null, company_name:null, client_email:null, dimensions:null, quantity:null, has_printing:null}). O sea: sí, después de 30 min de silencio se pierden todos los datos de contacto ya cargados."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "Confirmado: createWhatsAppLead y sendNotification sólo se ejecutan en la rama waiting_printing (líneas 514-539). Ningún paso previo (waiting_name, waiting_company_info, waiting_dimensions, waiting_quantity) inserta fila en public_quotes ni notifica. Sumado al bug 3 (nullado por timeout), el lead se pierde por completo si el cliente se distrae antes de responder impresión."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "Leí getQuoteMessage completa en whatsapp.ts: arma texto plano con boxDesc, cantidad, m2, total, unitario, deliveryDays y validez, pero no incluye ninguna URL. No hay import de siteUrl/SITE_URL en whatsapp.ts. La página /cotizar/[medidas]/[cantidad] existe según el contexto pero el bot no la referencia."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "En whatsapp.ts línea 17: BUSINESS_HOURS = { start: 7, end: 16 }. Los textos getOutOfHoursMessage, getConfirmationMessage, getAdvisorMessage y el mensaje de cierre repiten 'Lunes a Viernes 7:00 - 16:00'. En whatsapp-ai.ts línea 103 del KNOWLEDGE_PROMPT también '7:00 - 16:00'. En src/app/(public)/contacto/page.tsx línea 102: 'Lunes a viernes de 8:00 a 17:00 hs'. Confirmado desincronizado en tres archivos."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "Línea 367-378: única validación es 'if (name.length >= 3)'. Cualquier string de 3+ caracteres pasa como clientName. Verifiqué también que ANTES del switch por state.step no hay chequeo de escape hatch: los patterns 'asesor'/'humano' sólo aparecen en state='quoted' (línea 554) y en la rama Groq del else final (línea 621). Un pedido 'asesor por favor' en waiting_name se toma como nombre."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "Línea 577-598: el estado inicial siempre pasa a 'waiting_client_type'. No hay intento de parseBoxDimensions sobre el mensaje inicial ni short-circuit para cotizar directo. En el mensaje 'cotizar 500x400x300, 2000 unidades' el bot responde con getWelcomeMessage que pide 1/2 particular/empresa. La cotización queda detrás de al menos 2-3 preguntas."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "Confirmado en líneas 707-718: si hay boxTemplateToSend o boxTemplateDims, se llama sendWhatsAppDocument PRIMERO (líneas 710/714). sendWhatsAppMessage se llama DESPUÉS en línea 718. En whatsapp.ts getQuoteMessage con hasPrinting agrega el texto 'Te enviamos el desplegado de la caja en el siguiente mensaje...'. El texto queda mintiendo: el PDF llega antes."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "Línea 596: responseMessage = getOutOfHoursMessage() + '\\n\\n---\\n\\n' + responseMessage. Es un único string que se envía en una sola llamada a sendWhatsAppMessage. La transcripción real del dueño confirma exactamente ese formato ('---' entre bloques)."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "Líneas 296-306: closingPatterns incluye 'ok', 'okay', 'okey', 'dale', 'listo', 'perfecto', 'entendido', 'buenísimo', 'excelente', 'genial', 'bárbaro', 'recibido', 'anotado'. La condición usa 'bodyLower === pattern || bodyLower.startsWith(pattern + \" \") || bodyLower.endsWith(\" \" + pattern)'. Por lo tanto 'ok voy a confirmar con mi socio' matchea startsWith('ok ') y cierra la conversación con el mensaje de cierre."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "En waiting_name (línea 366-378) sólo se guarda clientName. No hay paso adicional que pida email para particular. En createWhatsAppLead línea 139: requester_email: data.clientEmail || null → siempre null para particulares. El phoneNumber sí se guarda (línea 140) pero el email nunca se solicita."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "getQuantityMessage en whatsapp.ts dice 'Minimo recomendado: cantidad que sume 3.000 m2'. Webhook línea 459-460: 'if (quantity < 100) responseMessage = \"La cantidad minima es 100 unidades.\"'. getQuoteMessage además agrega '(Pedido menor al minimo recomendado de 3000 m2)' cuando totalM2<3000. Dos mínimos distintos (100 unidades vs 3.000 m²) sin explicar la relación. Además ninguno importa MINIMOS de src/lib/retail/config.ts."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "Webhook líneas 51-78: calculateQuote local que hace 'totalM2 * pricePerM2 * (1+PRINTING_INCREMENT)' y devuelve {total, totalM2, deliveryDays} — sin tax_amount, tax_rate ni total_with_tax. No importa calcularCotizacion de src/lib/cotizacion/motor.ts. Verifiqué en motor.ts: exporta tax_rate, tax_amount, total_with_tax, subtotal_includes_tax. El bot usa la function local y el mensaje 'Total: $X' es ambiguo (¿con o sin IVA?). En whatsapp-ai.ts hay una segunda calculateQuote local con el mismo problema."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "getQuoteMessage en whatsapp.ts: cuando totalM2<3000, sólo agrega '(Pedido menor al minimo recomendado de 3000 m2)'. No calcula unidadesFaltantes ni el precio simulado con más cajas. Es un upsell obvio que no se hace."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "En whatsapp.ts getShippingMessage: '60km' y '3.000 m2' como literals en el string. No importa RETAIL_CONFIG ni ENVIO de src/lib/retail/config.ts (que existen y exportan micro/corto/largo justamente para este caso). Además el texto no explicita la política nueva: 'retirás en fábrica o cotizamos envío' para minorista — sólo dice 'Para otras zonas o cantidades menores, consultanos'. Verifiqué también en whatsapp-ai.ts línea 103 y línea 252 que el KNOWLEDGE_PROMPT usa pricing.wholesale_min_m2 desde runtime pero no ENVIO."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "Verificado con grep en ambos archivos. whatsapp.ts: 'COTIZACION', 'atencion', 'automatico', 'impresion', 'cuantas', 'minimo', 'dias habiles'. whatsapp-ai.ts línea 21+: 'cotización', 'información', 'atención', 'impresión', 'días hábiles', 'áreas verdes', 'está'. Ambos van a WhatsApp/Twilio (UTF-8, sin problema técnico). Los textos hardcoded del webhook (líneas 311, 315, 359, 411, 460, 469, 484, 550, 570) también van sin tildes."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "Recorrí todo el switch por state.step: 'asesor'/'humano' sólo se chequean explícitamente en state='quoted' (línea 554). En waiting_client_type, waiting_name, waiting_company_info, waiting_dimensions, waiting_quantity, waiting_printing NO hay corto-circuito para escape. La clasificación por Groq (línea 601-666) sólo corre en el else final (estado desconocido); los pasos con state definido no llegan a Groq. Confirmado: escribir 'asesor' en waiting_dimensions cae en 'No pude entender las medidas' (línea 444)."
+ },
+ {
+  "dimension": "conversion",
+  "confirmacion": "getWelcomeMessage(true, lastQuote) muestra '$X - Y m2' y luego 'Queres cotizar de nuevo? Para empezar, contame: Sos particular o empresa?'. Después updateConversationState a 'waiting_client_type' (línea 589), o sea que arranca de cero. No hay atajo tipo 'quiero lo mismo con Y unidades' ni pre-completación de clientType/name (ya nulleados por el timeout, ver bug 3)."
+ },
+ {
+  "titulo": "Firma de Twilio en modo observacion: el webhook acepta POSTs no firmados",
+  "archivo": "src/app/api/whatsapp/webhook/route.ts",
+  "linea": 228,
+  "por_que_esta_mal": "El bloque de validacion computa `valida` pero cuando `!valida` solo hace `console.error(...)` y sigue el flujo. No hay `return NextResponse.json({...}, {status: 403})`. El comentario lo dice explicito: 'MODO OBSERVACION, a proposito y por poco tiempo'. Peor aun, el destinatario del mensaje saliente sale de `formData.get('From')` (linea 258) y se reusa como `to` en `sendWhatsAppMessage` (linea 718). Es decir: quien POSTee al webhook elige a quien Twilio va a mandar un WhatsApp facturado a esta cuenta. La compuerta del proxy.ts deja pasar `/api/whatsapp/webhook` a proposito (lo delega a la validacion de firma del propio handler), asi que no hay otra capa que frene el POST. El propio comentario en proxy.ts dice: 'webhook: valida firma de Twilio' — pero no la valida, solo la loguea.",
+  "escenario": "Un atacante hace `curl -X POST https://www.quilmescorrugados.com.ar/api/whatsapp/webhook -d 'From=whatsapp:+549XXXXXXXXXX&Body=hola'` sin la cabecera `X-Twilio-Signature`. El bot: (1) manda un mensaje de bienvenida via API de Twilio al numero XXXX (Quilmes paga); (2) si repite el flujo con Body=Ricardo, Body=300x380x420, Body=500, Body=2, crea un lead falso en `public_quotes` con datos inventados; (3) dispara una notificacion `advisor_request` al equipo si escribe '3'. Repetido a escala: factura Twilio inflada, el numero de negocio marcado como spam por Meta (que es EL canal de ventas), la lista de leads envenenada, y notificaciones a los vendedores que los desensibilizan a las reales.",
+  "costo_comercial": "pierde_venta",
+  "arreglo_propuesto": "Reemplazar el `console.error` del bloque `if (!valida)` por `return new NextResponse('', { status: 403 })`. Antes del switch, correr la comparacion en produccion con logs por 24h para confirmar que la firma cierra bien contra las dos URLs. Y ademas: si `!authToken`, no atender (`return new NextResponse('', { status: 503 })`) en vez de servir sin verificar — la falla de configuracion tiene que ser visible, no una puerta abierta silenciosa.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "robustez",
+  "confirmacion": "Confirmado en route.ts lineas 217-256. El bloque `if (authToken)` computa `valida` (linea 226) y en `if (!valida)` (linea 228) solo hace `console.error(...)` sin `return`. El comentario en la linea 229 dice explicito 'MODO OBSERVACION'. La rama `else` cuando `!authToken` (lineas 248-255) tambien solo loguea. El `to` del outbound sale de `from = formData.get('From')` (linea 258) y se pasa como `to: from` a `sendWhatsAppMessage` (linea 718). En proxy.ts linea 80 el patron `/^\\/api\\/whatsapp\\/webhook$/` esta en la lista de rutas que se dejan pasar con nota 'webhook: valida firma de Twilio' — pero no la valida, solo la loguea."
+ },
+ {
+  "titulo": "Sin idempotencia por MessageSid: los reintentos de Twilio duplican leads, notificaciones y WhatsApps facturados",
+  "archivo": "src/app/api/whatsapp/webhook/route.ts",
+  "linea": 196,
+  "por_que_esta_mal": "El handler nunca lee `MessageSid` (el id unico del mensaje que Twilio envia y reintenta si no recibe 200 en ~15 segundos), y no hay tabla de mensajes procesados. El camino critico incluye llamadas potencialmente lentas: `classifyIntent` a Groq (linea 335, 603), `generateConversationalResponse` a Groq LLM (linea 640, 656, 671), 2 llamadas a la API de Twilio (`sendWhatsAppDocument` linea 710/714 y `sendWhatsAppMessage` linea 718), varias queries a Supabase, `sendNotification` (email), `createWhatsAppLead` (linea 514). Si el total pasa 15s, Twilio reenvia el MISMO POST. El handler lo procesa como si fuera nuevo: al llegar el segundo POST, el estado ya avanzo (por ej. a `quoted`), pero como el body es el mismo (\"2\") el codigo entra en la rama `quoted`, hace `includes('2')` → 'modificar medidas', y sobreescribe el estado a `waiting_dimensions`. En el caso 'con impresion', si el primer POST alcanzo a insertar el lead pero se colgo en `sendWhatsAppDocument`, el reintento: (a) inserta OTRO lead en `public_quotes` con los mismos datos, (b) dispara OTRA `sendNotification` de tipo `lead_with_contact` al equipo, (c) llama de nuevo a `sendWhatsAppDocument` y `sendWhatsAppMessage` (Twilio factura los dos).",
+  "escenario": "Un cliente cotiza a las 21:59:30 con impresion (caja 300x380x420, 500 unidades). El handler entra a la rama `waiting_printing` (linea 475), llama `getActivePricingConfig` (200ms), `calculateQuote`, `createWhatsAppLead` (500ms), `sendNotification` (2s, envia email), `sendWhatsAppDocument` con la URL del PDF (Twilio tarda 3s en descargarla), `sendWhatsAppMessage` (1s). Se acumulan 8s + latencia inicial de Groq + arranque de la lambda: total 16s. Twilio no recibe respuesta, reintenta. Segundo POST: la rama `waiting_printing` no aplica (state ya es `quoted`), pero el bodyLower='2' entra a `quoted` linea 548 → `getAdvisorMessage`... o modificar medidas. Resultado: dos leads en `public_quotes` con los mismos datos, dos notificaciones al vendedor (que ya empezo a llamar al cliente por la primera), dos mensajes de WhatsApp facturados al cliente, y estado corrupto.",
+  "costo_comercial": "cotiza_mal",
+  "arreglo_propuesto": "1) Leer `formData.get('MessageSid')` al inicio; si ya existe en una tabla `whatsapp_processed_sids` (con TTL corto), responder 200 con TwiML vacio sin procesar. 2) Insertar el SID con `ON CONFLICT DO NOTHING`; solo si el insert 'gano' (retorno con id), procesar. 3) Sacar las llamadas lentas del camino sincronico: responder TwiML inmediato y disparar el trabajo pesado en `waitUntil` (Vercel) o en una cola. 4) Mientras tanto, subir el timeout del webhook en el panel de Twilio si es configurable, aunque la solucion real es (1)-(3).",
+  "confianza": "verificado_en_codigo",
+  "dimension": "robustez",
+  "confirmacion": "Grepe el archivo entero: `MessageSid` no aparece en ningun lado del handler. `formData.get(...)` solo se usa para 'From', 'Body' y los campos de media. No hay tabla whatsapp_processed_sids ni chequeo de duplicados. El camino sincronico incluye classifyIntent (Groq, linea 335/603), generateConversationalResponse (linea 640/656/671), sendWhatsAppDocument (linea 710/714), sendWhatsAppMessage (linea 718), createWhatsAppLead (linea 514), sendNotification (linea 527/559) — todo dentro del handler, ninguno detras de after()/waitUntil. Sobre el escenario del segundo POST llegando en estado 'quoted' con body '2': se cumple porque en linea 548 `bodyLower.includes('2')` es true, entra a 'modificar medidas' y sobrescribe a waiting_dimensions."
+ },
+ {
+  "titulo": "Race condition: dos mensajes en paralelo del mismo numero se procesan sobre el mismo estado leido",
+  "archivo": "src/app/api/whatsapp/webhook/route.ts",
+  "linea": 264,
+  "por_que_esta_mal": "El patron `getConversationState` (linea 264) → decision del state machine → `updateConversationState` (varias lineas) no tiene bloqueo ni transaccion. En Supabase, el upsert de `whatsapp_conversations` (whatsapp.ts linea ~275) simplemente sobreescribe last_write_wins. El memoryCache local (whatsapp.ts linea 68) no ayuda porque en serverless cada request puede caer en una instancia distinta, y `getConversationState` solo lo usa como fallback si Supabase falla — la lectura normal siempre va a la DB, no al cache. Ademas, en `waiting_printing` (linea 475), si dos mensajes '2' del mismo numero entran a la vez, los dos leen `state = waiting_printing`, los dos calculan cotizacion, los dos hacen `createWhatsAppLead` (INSERT sin dedupe), los dos hacen `sendNotification`, los dos hacen `sendWhatsAppMessage`.",
+  "escenario": "Un cliente hace tap dos veces rapido en 'Enviar' con el mismo mensaje '2' cuando esta en `waiting_printing` (caso muy real en mobile con lag). WhatsApp entrega los dos a Twilio, Twilio lanza dos POST al webhook casi simultaneos. Ambos leen `state.step='waiting_printing'`, ambos calculan la misma cotizacion, ambos insertan en `public_quotes` (dos filas identicas), ambos disparan `sendNotification({type:'lead_with_contact', ...})` (el vendedor recibe dos emails/pings), y ambos hacen `sendWhatsAppMessage` con la misma cotizacion (el cliente ve dos mensajes iguales pegados). Twilio factura los dos envios.",
+  "costo_comercial": "cotiza_mal",
+  "arreglo_propuesto": "Usar un lock optimista: agregar columna `version int` en `whatsapp_conversations` y hacer `UPDATE ... SET step=... , version=version+1 WHERE phone_number=$1 AND version=$2`. Si el UPDATE afecto 0 filas, otro POST gano — no seguir procesando este. Alternativa: `SELECT ... FOR UPDATE` dentro de una transaccion. Combinado con la dedupe por MessageSid (finding anterior) cierra el gap.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "robustez",
+  "confirmacion": "En whatsapp.ts confirme que `getConversationState` (linea 264 del router) hace SELECT y `updateConversationState` hace `upsert({...}, {onConflict: 'phone_number'})` sin columna version ni chequeo de version previa. No hay SELECT FOR UPDATE. El memoryCache es local a la instancia (whatsapp.ts linea 68) y en getConversationState solo se usa dentro del `catch` como fallback (linea ~292), no como lectura primaria. La lectura normal siempre pega a Supabase. En waiting_printing (route.ts 475-540) el insert en public_quotes (createWhatsAppLead) no tiene UNIQUE que dedupe por phone+timestamp, y sendNotification/sendWhatsAppMessage no son idempotentes."
+ },
+ {
+  "dimension": "robustez",
+  "confirmacion": "Verificado: saveCommunication linea 91 hace `await createClient()` importado de '@/lib/supabase/server' (linea 32); createWhatsAppLead linea 123 idem. Abri src/lib/supabase/server.ts: usa `createServerClient` de @supabase/ssr con `NEXT_PUBLIC_SUPABASE_ANON_KEY` y cookies de next/headers — rol anon sin sesion en un webhook. En contraste, src/lib/whatsapp.ts (linea 2) importa `createAdminClient` de '@/lib/supabase/admin' y src/lib/supabase/admin.ts usa `SUPABASE_SERVICE_ROLE_KEY`. Migracion 020_enable_rls.sql linea 39-40 activa RLS en 'communications' y 'whatsapp_conversations', migracion 021 dropea las policies permisivas. No vi ninguna migracion que agregue una policy de INSERT para rol anon en communications/public_quotes — la 020 comenta que 'sin policies, RLS deniega todo a anon y authenticated'. Los inserts fallan devolviendo {error} en la respuesta (no throw), y como saveCommunication ni siquiera destructura el error (lineas 92-101), el catch tampoco fira. Silencio total."
+ },
+ {
+  "titulo": "El catch principal come el error y devuelve TwiML vacio: el cliente ve silencio y no hay recuperacion",
+  "archivo": "src/app/api/whatsapp/webhook/route.ts",
+  "linea": 729,
+  "por_que_esta_mal": "El bloque `catch (error)` de la linea 729 loguea y devuelve `<Response></Response>` con status 200. Cualquier throw en el camino critico (Groq caido, Supabase caido, Twilio API caida, un parseo que rompe) se traga sin mandar respuesta al usuario. Peor: el status 200 le dice a Twilio 'todo bien', asi que Twilio NO reintenta. El cliente escribe algo y no recibe nada — no hay ni siquiera un 'estamos con problemas, escribi de nuevo' ni derivacion a asesor.",
+  "escenario": "Groq empieza a rate-limitar a las 22:00 (hora pico). El cliente escribe algo que cae en la rama `unknown` (linea 599) y dispara `classifyIntent(body, state.step)`. Groq tira 429 desde adentro y el catch de linea 667 tampoco resuelve. Sube al catch de linea 729. El cliente ve conversacion muerta: escribio 'hola' y no le contestaron. Prueba de nuevo, mismo silencio. Se va a la competencia. En los logs queda '[WhatsApp] Webhook error' pero nadie mira los logs de Vercel en tiempo real.",
+  "costo_comercial": "pierde_venta",
+  "arreglo_propuesto": "En el catch de la linea 729: intentar mandar un mensaje minimo de fallback via Twilio API antes de responder — algo tipo 'Disculpanos, tuvimos un problema tecnico. Escribinos al +54 9 11 3341 1781 o esperanos unos minutos'. Ademas: emitir una alarma real (Sentry, email al equipo) cuando esto se dispara, no solo console.error.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "robustez",
+  "confirmacion": "Lineas 729-735: `} catch (error) { console.error('[WhatsApp] Webhook error:', error); return new NextResponse('<?xml...><Response></Response>', { status: 200, headers: {'Content-Type': 'text/xml'} }); }`. El status 200 le dice a Twilio 'todo bien' asi que no reintenta, y no se manda mensaje fallback al usuario. Sin alerta ni Sentry — solo console.error."
+ },
+ {
+  "dimension": "robustez",
+  "confirmacion": "Verificado: whatsapp.ts linea 65 `sendWhatsAppMessage` retorna `Promise<boolean>` y captura errores devolviendo false (linea 88). En route.ts linea 718 se hace `await sendWhatsAppMessage({ to: from, body: textToSend });` sin usar el retorno. Linea 721 hace `saveCommunication(phoneNumber, 'outbound', textToSend, outboundMetadata, clientId)` inmediatamente despues, sin condicionar. Igual pasa con sendWhatsAppDocument (retorna boolean segun whatsapp.ts linea ~105) en lineas 710 y 714 — no se lee el retorno. sendNotification (linea 527, 559) — no se chequea el retorno tampoco."
+ },
+ {
+  "dimension": "robustez",
+  "confirmacion": "Confirmado en todos los sitios citados: linea 321 `bodyLower.includes('1')`, linea 326 `bodyLower.includes('2')`, linea 476 `bodyLower.includes('2')`, linea 545 `bodyLower.includes('1')`, linea 548 `bodyLower.includes('2')`, linea 554 `bodyLower.includes('3')`. Y confirmado el `bodyLower.includes('yo')` en linea 324. Los escenarios que da el auditor (numeros dentro de frases libres, 'voy' matcheando 'yo', 'apoyo' matcheando 'yo', '200000' matcheando '2', '12' matcheando '1' Y '2') se cumplen: `includes` es substring puro. En waiting_client_type, si ambas flags son true, isParticular gana por el orden del `if/else if` (linea 346)."
+ },
+ {
+  "titulo": "Camino critico con dos llamadas a Groq y dos a la API de Twilio puede pasar los 15s que Twilio espera",
+  "archivo": "src/app/api/whatsapp/webhook/route.ts",
+  "linea": 640,
+  "por_que_esta_mal": "En la rama 'unknown' (linea 599) el handler puede encadenar: `classifyIntent` (Groq, 500-3000ms) + `generateConversationalResponse` (Groq LLM 70b, 2000-8000ms) + `sendWhatsAppDocument` (Twilio con descarga del PDF externo, 1000-5000ms) + `sendWhatsAppMessage` (Twilio, 500-1500ms) + 3 queries a Supabase. Total peor caso: 15-20s. Twilio da por muerta la request a los ~15s y reintenta (feed al finding de idempotencia). En la rama `waiting_printing` (linea 475) es similar: `getActivePricingConfig` + `createWhatsAppLead` + `sendNotification` (que puede mandar email SMTP sincronico) + dos llamadas Twilio.",
+  "escenario": "Un dia con Groq lento (backpressure, 4s p95), un cliente en la rama `unknown` con impresion en su ultima cotizacion. Handler tarda 16s. Twilio reintenta a los 15s → segundo POST. Sin idempotencia, el cliente termina recibiendo el mismo mensaje dos veces y aparece un segundo lead. Ademas, Vercel factura dos ejecuciones y las lambdas concurrentes pueden llegar al limite del plan.",
+  "costo_comercial": "cotiza_mal",
+  "arreglo_propuesto": "1) Responder 200 con TwiML vacio al principio del handler, y hacer el trabajo con `after()` de Next 15/16 o `context.waitUntil`. 2) Para las respuestas que necesitan usar TwiML (no es el caso hoy, el bot usa la API de Twilio) esto no aplica, y aqui ya se puede hacer. 3) Mover `sendNotification` a una cola (evento post-handler) porque el usuario final no depende de eso. 4) Cachear `getActivePricingConfig` en memoria por 60s con `unstable_cache`.",
+  "confianza": "verificado_en_codigo",
+  "dimension": "robustez",
+  "confirmacion": "Confirmado leyendo la rama 'unknown' (lineas 599-681): puede encadenar classifyIntent (Groq) + generateConversationalResponse (Groq LLM 70b) + queries a Supabase + sendWhatsAppDocument (con URL externa que Twilio descarga) + sendWhatsAppMessage + saveCommunication. La rama waiting_printing (lineas 475-541) encadena getActivePricingConfig + calculateQuote + updateConversationState + createWhatsAppLead + sendNotification + posible sendWhatsAppDocument + sendWhatsAppMessage. Todo es await sincronico, sin after() ni waitUntil, sin cache de pricingConfig visible en route.ts. El limite de 15s de Twilio combinado con la falta de idempotencia (finding 2) alimenta el ciclo de reintentos duplicados."
+ },
+ {
+  "dimension": "robustez",
+  "confirmacion": "Grepee el archivo: `MessageSid` no aparece. En route.ts linea 258 solo se lee 'From'; en saveCommunication (linea 92-101) la metadata que se guarda es `{phone, hasMedia}` (inbound linea 280-282) o `{state, quote?, needsAdvisor?}` (outbound linea 686-694, 721) — sin ningun ID de Twilio. En whatsapp.ts linea 65-91 (sendWhatsAppMessage), `client.messages.create` (linea 82) no captura el retorno; se hace await sin `const msg =`. El SID no vuelve al caller. No hay endpoint /api/whatsapp/status. Confirmado."
+ }
+]

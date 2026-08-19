@@ -16,6 +16,7 @@ import type { PricingConfig } from '@/lib/types/database';
 
 import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { HORARIO } from '@/lib/retail/config';
 
 const BASE_URL = SITE_URL;
 
@@ -267,7 +268,7 @@ producción.
 - WhatsApp: +54 9 11 3341-1781 — https://wa.me/5491133411781
 - Email: ventas@quilmescorrugados.com.ar
 - Dirección: Lugones 219, B1878 Quilmes, Buenos Aires, Argentina
-- Horario: lunes a viernes, 7:00 a 16:00 (hora de Argentina)
+- Horario: ${HORARIO.texto.toLowerCase()} (hora de Argentina)
 
 ## Links
 

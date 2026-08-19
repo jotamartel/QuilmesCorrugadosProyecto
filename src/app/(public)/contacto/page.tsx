@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { SITE_URL } from '@/lib/site';
-import { ENVIO } from '@/lib/retail/config';
+import { ENVIO, HORARIO } from '@/lib/retail/config';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
@@ -99,7 +99,7 @@ export default function ContactoPage() {
                   <Clock className="w-5 h-5 text-[#002E55] mt-0.5 shrink-0" />
                   <div>
                     <h3 className="font-semibold text-gray-900">Horario de atención</h3>
-                    <p className="text-gray-600">Lunes a viernes de 8:00 a 17:00 hs</p>
+                    <p className="text-gray-600">{HORARIO.texto}</p>
                   </div>
                 </div>
               </div>

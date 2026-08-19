@@ -18,6 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 import { SITE_URL } from "@/lib/site";
+import { HORARIO } from '@/lib/retail/config';
 
 const BASE_URL = SITE_URL;
 
@@ -126,7 +127,7 @@ const jsonLdBusiness = {
     name: "Argentina",
   },
   priceRange: "$$",
-  openingHours: "Mo-Fr 08:00-17:00",
+  openingHours: HORARIO.schema,
   sameAs: [],
   hasOfferCatalog: {
     "@type": "OfferCatalog",

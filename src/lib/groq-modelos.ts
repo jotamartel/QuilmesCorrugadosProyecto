@@ -58,6 +58,20 @@ function esModeloInexistente(error: unknown): boolean {
 }
 
 /**
+ * Groq cuenta los tokens por minuto POR MODELO, no por cuenta. Asi que un 429
+ * en uno no dice nada del siguiente: conviene probarlo.
+ *
+ * Importa mas de lo que parece con el plan gratuito. El techo es de 8.000
+ * tokens por minuto y una consulta de este chat pesa unos 7.500 entre el prompt
+ * de sistema y el historial, o sea que entra poco mas de una por minuto. Sin
+ * esta caida, la segunda persona que escribe en el mismo minuto recibe una
+ * disculpa.
+ */
+function esLimiteDeTasa(error: unknown): boolean {
+  return (error as { status?: number })?.status === 429;
+}
+
+/**
  * Los tipos se derivan de la firma del propio método en vez de nombrarlos.
  * El SDK los cuelga de un namespace que no es alcanzable desde el import por
  * defecto, y los nombres cambian entre versiones; esto no se rompe con eso.
@@ -82,6 +96,7 @@ export async function completarConCascada(
   etiqueta: string,
 ): Promise<Extract<Respuesta, { choices: unknown }>> {
   const retirados: string[] = [];
+  let ultimoLimite: unknown = null;
 
   for (const model of modelos) {
     try {
@@ -93,17 +108,35 @@ export async function completarConCascada(
       } as CrearParams);
       return respuesta as Extract<Respuesta, { choices: unknown }>;
     } catch (error) {
-      if (!esModeloInexistente(error)) throw error;
-      retirados.push(model);
-      console.error(
-        `[${etiqueta}] El modelo "${model}" ya no existe en Groq. ` +
-          `Probando el siguiente de la cascada. Actualizar groq-modelos.ts.`,
-      );
+      if (esModeloInexistente(error)) {
+        retirados.push(model);
+        console.error(
+          `[${etiqueta}] El modelo "${model}" ya no existe en Groq. ` +
+            `Probando el siguiente de la cascada. Actualizar groq-modelos.ts.`,
+        );
+        continue;
+      }
+      if (esLimiteDeTasa(error)) {
+        ultimoLimite = error;
+        console.warn(`[${etiqueta}] "${model}" sin cupo por ahora, probando el siguiente.`);
+        continue;
+      }
+      // Sin crédito, red caída, prompt inválido: cambiar de modelo no lo
+      // arregla y reintentar solo esconde el problema real.
+      throw error;
     }
   }
 
-  throw new Error(
-    `[${etiqueta}] Ningún modelo de la cascada existe en Groq: ${retirados.join(', ')}. ` +
-      `Revisar https://console.groq.com/docs/models y actualizar groq-modelos.ts.`,
-  );
+  if (retirados.length === modelos.length) {
+    throw new Error(
+      `[${etiqueta}] Ningún modelo de la cascada existe en Groq: ${retirados.join(', ')}. ` +
+        `Revisar https://console.groq.com/docs/models y actualizar groq-modelos.ts.`,
+    );
+  }
+
+  // Quedarse sin cupo en todos es un estado distinto de que no exista ninguno,
+  // y quien llama puede querer decir "estamos con mucha demanda" en vez de
+  // "hubo un error".
+  throw ultimoLimite ??
+    new Error(`[${etiqueta}] Ningún modelo de la cascada pudo responder.`);
 }

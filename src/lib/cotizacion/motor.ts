@@ -180,27 +180,74 @@ export function urlPlantilla(largo: number, ancho: number, alto: number): string
   return `${SITIO}/api/box-template?length=${largo}&width=${ancho}&height=${alto}`;
 }
 
-/** Valida una lista de cajas. Devuelve los errores encontrados. */
+/**
+ * Valida una lista de cajas y devuelve los motivos, en castellano.
+ *
+ * Faltaba el limite del rollo, que es el que mas se choca en la practica: el
+ * ancho de plancha es ancho + alto y no puede pasar de 1.200 mm. Sin esa
+ * validacion el servidor MCP cotizo 400x700x700 —1.400 mm de plancha— y
+ * devolvio un precio para una caja que la fabrica no puede producir. Una
+ * cotizacion imposible es peor que un rechazo: la persona la lleva a su jefe.
+ *
+ * Los mensajes van en castellano y sin nombres de campo. Antes salia
+ * "boxes[0].length_mm must be between 200 and 2000" y eso terminaba en la
+ * pantalla de un cliente, o peor, en la respuesta que un asistente le lee.
+ */
 export function validarCajas(boxes: BoxInput[]): string[] {
   const errors: string[] = [];
+
   boxes.forEach((box, index) => {
-    const prefix = `boxes[${index}]`;
-    if (!box.length_mm || box.length_mm < MEDIDA_MINIMA.largo || box.length_mm > 2000) {
-      errors.push(`${prefix}.length_mm must be between ${MEDIDA_MINIMA.largo} and 2000`);
+    const cual = boxes.length > 1 ? `Caja ${index + 1}: ` : '';
+
+    if (!box.length_mm || !box.width_mm || !box.height_mm) {
+      errors.push(`${cual}faltan medidas. Hacen falta largo, ancho y alto en milímetros.`);
+      return;
     }
-    if (!box.width_mm || box.width_mm < MEDIDA_MINIMA.ancho || box.width_mm > 2000) {
-      errors.push(`${prefix}.width_mm must be between ${MEDIDA_MINIMA.ancho} and 2000`);
+
+    if (
+      box.length_mm < MEDIDA_MINIMA.largo ||
+      box.width_mm < MEDIDA_MINIMA.ancho ||
+      box.height_mm < MEDIDA_MINIMA.alto
+    ) {
+      errors.push(
+        `${cual}la medida mínima que fabricamos es ` +
+          `${MEDIDA_MINIMA.largo}x${MEDIDA_MINIMA.ancho}x${MEDIDA_MINIMA.alto} mm y pediste ` +
+          `${box.length_mm}x${box.width_mm}x${box.height_mm} mm.`,
+      );
     }
-    if (!box.height_mm || box.height_mm < MEDIDA_MINIMA.alto || box.height_mm > 1500) {
-      errors.push(`${prefix}.height_mm must be between ${MEDIDA_MINIMA.alto} and 1500`);
+
+    if (box.length_mm > 2000 || box.width_mm > 2000 || box.height_mm > 1500) {
+      errors.push(
+        `${cual}la medida máxima es 2000x2000x1500 mm y pediste ` +
+          `${box.length_mm}x${box.width_mm}x${box.height_mm} mm.`,
+      );
     }
+
+    // El limite que mas se choca: la plancha sale de ancho + alto y el rollo
+    // de carton mide 1.200 mm. El largo no entra en esta cuenta.
+    const plancha = box.width_mm + box.height_mm;
+    if (plancha > RETAIL_CONFIG.MAX_SHEET_WIDTH) {
+      errors.push(
+        `${cual}no se puede fabricar: ancho más alto dan ${plancha} mm y el ancho ` +
+          `máximo de plancha es ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho del rollo ` +
+          `de cartón. Bajando el ancho o el alto entra; el largo no tiene ese límite.`,
+      );
+    }
+
     if (!box.quantity || box.quantity < 1 || !Number.isInteger(box.quantity)) {
-      errors.push(`${prefix}.quantity must be a positive integer`);
+      errors.push(`${cual}la cantidad tiene que ser un número entero de cajas.`);
     }
-    if (box.printing_colors !== undefined && (box.printing_colors < 0 || box.printing_colors > RETAIL_CONFIG.MAX_PRINTING_COLORS)) {
-      errors.push(`${prefix}.printing_colors must be between 0 and ${RETAIL_CONFIG.MAX_PRINTING_COLORS}`);
+
+    if (
+      box.printing_colors !== undefined &&
+      (box.printing_colors < 0 || box.printing_colors > RETAIL_CONFIG.MAX_PRINTING_COLORS)
+    ) {
+      errors.push(
+        `${cual}imprimimos hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores y pediste ${box.printing_colors}.`,
+      );
     }
   });
+
   return errors;
 }
 

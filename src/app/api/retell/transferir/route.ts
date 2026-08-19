@@ -196,7 +196,7 @@ function verificarHorarioLaboral(fecha: Date): boolean {
     return false;
   }
 
-  // Verificar hora (8:00 - 17:00)
+  // Verificar hora contra el horario vigente, que sale de HORARIO
   if (hora < HORARIO_LABORAL.INICIO || hora >= HORARIO_LABORAL.FIN) {
     return false;
   }

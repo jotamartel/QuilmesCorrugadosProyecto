@@ -251,14 +251,33 @@ export function parseBoxDimensions(message: string): {
     }
   }
 
-  // Quantity: patrones específicos para no confundir con números de dimensiones (ej: 450 de "450x380x45")
+  // Cantidad. Cada patron termina en un limite de palabra a proposito: sin eso
+  // el motor de regex retrocede DENTRO de un numero y parte una medida al medio.
+  //
+  // El primero era /...(\d+)\s*[,.;]?\s*(\d{2,})/ y con "2600 cajas de
+  // 300x380x420" el tercer grupo cedia hasta "4" para dejarle "20" a la
+  // cantidad: el bot cotizaba 20 cajas en vez de 2.600. Con "500 cajas de
+  // 400x300x300" cedia los dos ceros y la cantidad quedaba en 0. El \b entre
+  // el alto y lo que sigue lo impide, porque entre dos digitos no hay limite
+  // de palabra y el retroceso deja de ser posible.
+  //
+  // El grupo de miles va con + y no con *: con * la primera alternativa
+  // matchea tres digitos sueltos, tiene exito, y da por buena una cantidad
+  // truncada. Es el mismo error que tenia el webhook con "2600 unidades".
   const qtyPatterns = [
-    /(\d+)\s*[x×]\s*(\d+)\s*[x×]\s*(\d+)\s*[,\.;]?\s*(\d{2,})/i,
-    /(\d{1,3}(?:\.\d{3})*|\d+)\s*(unidades|cajas|piezas|u\.)/i,
-    /cantidad\s*:?\s*(\d{1,3}(?:\.\d{3})*|\d+)/i,
-    /(\d{2,})\s+(?:quiero|necesito|unidades|cajas|piezas|mas|más|menos)/i,
-    /[,\.;]\s*(\d{2,})(?:\s|$)/,
-    /(\d{2,})\s+(?=\d+\s*[x×]\s*\d+\s*[x×]\s*\d+)/i,
+    // "300x380x420, 2600" — la cantidad despues de las medidas
+    /(\d+)\s*[x×]\s*(\d+)\s*[x×]\s*(\d+)\b[\s,;]+(\d{1,3}(?:\.\d{3})+|\d+)\b(?!\s*[x×])/i,
+    // "2600 cajas", "1.500 unidades"
+    /(\d{1,3}(?:\.\d{3})+|\d+)\s*(?:unidades|cajas|piezas|u\.)\b/i,
+    // "cantidad: 2600"
+    /cantidad\s*:?\s*(\d{1,3}(?:\.\d{3})+|\d+)\b/i,
+    // "necesito 500" — el verbo antes del numero. La mirada adelante evita que
+    // "necesito 300x380x420" tome el largo como cantidad.
+    /(?:quiero|necesito|preciso|dame|serian|ser[ií]an|son)\s+(?:unas?\s+)?(\d{1,3}(?:\.\d{3})+|\d+)\b(?!\s*[x×])/i,
+    // "2600 quiero"
+    /(\d{1,3}(?:\.\d{3})+|\d+)\s+(?:quiero|necesito|mas|más|menos)\b/i,
+    // "2600 300x380x420" — la cantidad antes de las medidas
+    /(\d{1,3}(?:\.\d{3})+|\d+)\s+(?=\d+\s*[x×]\s*\d+\s*[x×]\s*\d+)/i,
   ];
 
   let quantity: number | undefined;

@@ -16,6 +16,24 @@ import type { PricingConfig } from '@/lib/types/database';
 import { HORARIO } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
 import { completarConCascada, MODELOS_CONVERSACION } from '@/lib/groq-modelos';
+import { calcularCotizacion, precioUnitarioARS } from '@/lib/cotizacion/motor';
+import { RETAIL_CONFIG } from '@/lib/retail/config';
+
+/** El catálogo de stock, para que el motor sepa si el pedido sale ya o se fabrica. */
+async function leerCatalogoDeStock() {
+  try {
+    const { data } = await createAdminClient()
+      .from('boxes')
+      .select('length_mm, width_mm, height_mm, stock')
+      .eq('is_standard', true)
+      .eq('is_active', true);
+    return data || [];
+  } catch {
+    // Sin catálogo el motor asume producción a medida, que es la promesa más
+    // conservadora: nunca promete una entrega en 48 horas que no se pueda dar.
+    return [];
+  }
+}
 
 const groq = process.env.GROQ_API_KEY
   ? new Groq({ apiKey: process.env.GROQ_API_KEY })
@@ -51,7 +69,7 @@ function getFallbackPricingConfig(): PricingConfig {
   };
 }
 
-const BUSINESS_PHONE = process.env.WHATSAPP_BUSINESS_NUMBER || '+5491133411781';
+const BUSINESS_PHONE = process.env.WHATSAPP_BUSINESS_NUMBER || CONTACTO.telefonoVisible;
 
 /** Prompt del sistema con todo el conocimiento del negocio */
 const KNOWLEDGE_PROMPT = `Sos el asistente de WhatsApp de Quilmes Corrugados, una fábrica argentina de cajas de cartón corrugado en Quilmes, Buenos Aires.
@@ -67,13 +85,14 @@ const KNOWLEDGE_PROMPT = `Sos el asistente de WhatsApp de Quilmes Corrugados, un
 
 ### Producto
 - Cajas de cartón corrugado a medida (tipo RSC - Regular Slotted Container)
-- Fabricamos para empresas: no vendemos al público minorista
+- Dos canales: mayorista a medida (desde 3.000 m² por modelo) y minorista de
+  stock desde 100 cajas, que se compra online en /cajas
 - Solo Argentina: no exportamos
 
 ### Medidas y límites
 - Mínimo por caja: 200 x 200 x 100 mm
 - Máximo: ancho + alto no puede superar 1200 mm (limitación de plancha)
-- Cantidad mínima: 100 unidades por modelo
+- Cantidad mínima: 100 unidades de stock, o 3.000 m² por modelo a medida
 
 ### Precios
 Los precios y los cortes de tramo NO van escritos acá: llegan en el bloque
@@ -81,8 +100,8 @@ Los precios y los cortes de tramo NO van escritos acá: llegan en el bloque
 Usar SOLO esos valores. Nunca inventar un precio, ni ofrecer descuentos,
 rebajas o condiciones especiales que no estén en ese bloque: si el cliente
 pide una mejora, derivar a un asesor.
-- Impresión: +15% por cada color adicional
-- Moneda: ARS, sin IVA en la cotización
+- Impresión: hasta 3 colores, +15% por cada uno
+- Moneda: ARS. El subtotal va sin IVA; el total con IVA 21% se informa aparte
 
 ### Envíos
 - Hay envío gratis por volumen y cercanía; el mínimo de m² y el radio en km
@@ -380,8 +399,8 @@ async function tryQuoteFromConversation(
 
   const configToUse = config || getFallbackPricingConfig();
 
-  if (parsed.quantity < 100) {
-    return `La cantidad mínima es 100 unidades. Indicaste ${parsed.quantity}. ¿Querés cotizar con la cantidad mínima o más?`;
+  if (parsed.quantity < RETAIL_CONFIG.MIN_CANTIDAD) {
+    return `La cantidad mínima es ${RETAIL_CONFIG.MIN_CANTIDAD} unidades. Indicaste ${parsed.quantity.toLocaleString('es-AR')}. ¿Querés cotizar con la cantidad mínima o más?`;
   }
 
   const validation = validateDimensions(parsed.length, parsed.width, parsed.height);
@@ -393,27 +412,41 @@ async function tryQuoteFromConversation(
     /impres[ií]on|impreso|logo|2\s*colores?|dos\s*colores?|con\s*impres[ií]on|con\s*impreso/i.test(combinedText) ||
     /^si$/i.test(combinedText);
 
-  const { m2 } = calculateUnfolded(parsed.length, parsed.width, parsed.height);
-  const totalM2 = calculateTotalM2(m2, parsed.quantity);
-  const pricePerM2 = getPricePerM2(totalM2, configToUse);
-  let total = totalM2 * pricePerM2;
-  if (hasPrinting) total *= 1 + PRINTING_INCREMENT;
-  const deliveryDays = getProductionDays(hasPrinting, configToUse);
+  // Contra el mismo motor que la web, la API, el MCP y el bot de WhatsApp.
+  // Esta era la tercera copia del calculo: no aplicaba IVA, escribia "válida 7
+  // días" a mano y no sabia por que canal sale el pedido. Un mismo cliente
+  // podia ver un numero acá y otro en la página.
+  const catalogo = await leerCatalogoDeStock();
+  const cotizacion = calcularCotizacion(
+    [{
+      length_mm: parsed.length,
+      width_mm: parsed.width,
+      height_mm: parsed.height,
+      quantity: parsed.quantity,
+      printing_colors: hasPrinting ? 1 : 0,
+    }],
+    configToUse,
+    catalogo,
+  );
 
-  const totalFormatted = Math.round(total).toLocaleString('es-AR');
-  const m2Formatted = totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 });
+  const ars = (n: number) => '$' + Math.round(n).toLocaleString('es-AR');
+  const m2Formatted = cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits: 1 });
 
   const dimNote = parsed.convertedFromCm
     ? ` (${Math.round(parsed.length / 10)}x${Math.round(parsed.width / 10)}x${Math.round(parsed.height / 10)} cm → mm)`
     : '';
 
-  const quoteText = `Cotización para ${parsed.quantity} cajas ${parsed.length}x${parsed.width}x${parsed.height} mm${dimNote}${hasPrinting ? ' con impresión' : ''}:
+  const quoteText = `Cotización para ${parsed.quantity.toLocaleString('es-AR')} cajas ${parsed.length}x${parsed.width}x${parsed.height} mm${dimNote}${hasPrinting ? ' con impresión' : ''}:
 
-• Total: $${totalFormatted} ARS
+• Precio por caja: ${precioUnitarioARS(cotizacion.boxes[0].unit_price)} + IVA
+• Subtotal: ${ars(cotizacion.subtotal)} + IVA
+• Total con IVA 21%: ${ars(cotizacion.total_with_tax)}
 • Superficie total: ${m2Formatted} m²
-• Entrega estimada: ~${deliveryDays} días hábiles
+• Entrega estimada: ~${cotizacion.estimated_days} días hábiles
 
-La cotización es válida 7 días.`;
+${cotizacion.channel_note}
+
+Podés verla y compartirla acá: ${SITE_URL}/cotizar/${parsed.length}x${parsed.width}x${parsed.height}/${parsed.quantity}`;
 
   // Con impresión: ofrecer el desplegado PDF inmediatamente para que carguen el diseño
   if (hasPrinting) {

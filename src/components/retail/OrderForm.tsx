@@ -45,6 +45,15 @@ function motivoSinImpresion(boxes: BoxQuoteLine[]): string | null {
   const totalM2 = boxes.reduce((s, b) => s + b.totalM2, 0);
   const hayDeCatalogo = boxes.some((b) => !!b.standardBoxId);
 
+  // Sin cajas configuradas todavia no hay pedido que evaluar: se dice la regla
+  // sin el numero. Nombrar "0 m²" se lee como un error del sitio.
+  if (totalM2 <= 0) {
+    return (
+      'La impresión se hace desde 1.000 m² de cartón y sobre medidas propias, no sobre ' +
+      'las estándar de catálogo. Contanos qué necesitás y te decimos si tu pedido entra.'
+    );
+  }
+
   if (hayDeCatalogo && totalM2 < 1000) {
     return (
       'Este pedido no puede llevar impresión por dos motivos: la impresión se hace ' +

@@ -45,8 +45,8 @@ export function createClient() {
   if (instancia) return instancia;
 
   instancia = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(),
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!.trim(),
     {
       auth: {
         lock: async <R,>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> =>

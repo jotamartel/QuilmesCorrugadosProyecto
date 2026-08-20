@@ -641,9 +641,8 @@ export function getQuoteMessage(
   quantity: number,
   cotizacion: QuoteResult,
 ): string {
-  const caja = cotizacion.boxes[0];
   const boxDesc = `${dimensions.length}x${dimensions.width}x${dimensions.height}mm`;
-  const colores = caja.printing_colors;
+  const colores = cotizacion.boxes[0].printing_colors;
   const ars = (n: number) => '$' + Math.round(n).toLocaleString('es-AR');
 
   // El detalle de impresion dice cuantos colores, no un "si" pelado: antes el
@@ -651,6 +650,28 @@ export function getQuoteMessage(
   const impresion = colores > 0
     ? `(impresion ${colores} ${colores === 1 ? 'color' : 'colores'})`
     : '(lisa)';
+
+  // Sin precio no hay cotizacion. El minimo de compra es excluyente: no se
+  // manda un numero "de referencia" con la aclaracion al pie, porque eso
+  // abre la negociacion de cantidad que el minimo existe para evitar.
+  if (!cotizacion.cotizable) {
+    const imp = cotizacion.impedimento;
+    return `QUILMES CORRUGADOS
+
+Caja: ${boxDesc}
+Cantidad: ${quantity.toLocaleString('es-AR')} unidades
+Total m2: ${cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits: 1 })}
+
+${imp.motivo}
+
+No cotizamos por debajo de ese volumen.${
+      imp.cajas_necesarias
+        ? `\n\nSi te sirven ${imp.cajas_necesarias.toLocaleString('es-AR')} cajas, escribi esa cantidad y te paso el precio.`
+        : ''
+    }`;
+  }
+
+  const caja = cotizacion.boxes[0];
 
   let message = `COTIZACION QUILMES CORRUGADOS
 
@@ -669,18 +690,6 @@ Entrega: ${cotizacion.estimated_days} dias habiles
 Cotizacion valida hasta el ${new Date(cotizacion.valid_until + 'T12:00:00').toLocaleDateString('es-AR')}
 
 Ver online: ${SITE_URL}/cotizar/${dimensions.length}x${dimensions.width}x${dimensions.height}/${quantity}`;
-
-  // El minimo se mide en m² de carton, no en cajas: 100 chicas son 34 m² y 100
-  // grandes pasan los 100 m². Avisar "el minimo es 100 unidades" rechazaba un
-  // pedido grande de pocas cajas y dejaba pasar uno chico de muchas.
-  if (cotizacion.total_m2 < RETAIL_CONFIG.MIN_M2_PEDIDO) {
-    const m2PorCaja = cotizacion.total_m2 / quantity;
-    const faltan = Math.ceil((RETAIL_CONFIG.MIN_M2_PEDIDO - cotizacion.total_m2) / m2PorCaja);
-    message +=
-      `\n\n(El minimo de compra es ${RETAIL_CONFIG.MIN_M2_PEDIDO} m2 de carton y este pedido ` +
-      `son ${cotizacion.total_m2.toFixed(1)} m2. Con esta medida te faltan ` +
-      `${faltan.toLocaleString('es-AR')} cajas.)`;
-  }
 
   if (colores > 0) {
     message += `

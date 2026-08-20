@@ -473,6 +473,19 @@ async function tryQuoteFromConversation(
   const ars = (n: number) => '$' + Math.round(n).toLocaleString('es-AR');
   const m2Formatted = cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits: 1 });
 
+  // El minimo de compra es excluyente: por debajo no hay precio que dar. Antes
+  // se cotizaba igual y se aclaraba al pie, que es lo mismo que invitar a
+  // negociar la cantidad.
+  if (!cotizacion.cotizable) {
+    const imp = cotizacion.impedimento;
+    return (
+      `${imp.motivo} No cotizamos por debajo de ese volumen.` +
+      (imp.cajas_necesarias
+        ? ` Si te sirven ${imp.cajas_necesarias.toLocaleString('es-AR')} cajas de esa medida, decime y te paso el precio.`
+        : '')
+    );
+  }
+
   const dimNote = parsed.convertedFromCm
     ? ` (${Math.round(parsed.length / 10)}x${Math.round(parsed.width / 10)}x${Math.round(parsed.height / 10)} cm → mm)`
     : '';

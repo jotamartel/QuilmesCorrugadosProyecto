@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { calcularCotizacion, validarCajas } from '@/lib/cotizacion/motor';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import { SITE_URL } from '@/lib/site';
+import { CONTACTO } from '@/lib/contacto';
 import type { PricingConfig } from '@/lib/types/database';
 import { precioUnitarioARS } from '@/lib/cotizacion/motor';
 
@@ -172,6 +173,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const q = r.cotizacion;
   const { caja } = r;
+
+  // Sin precio no hay nada que indexar ni que mostrar en un resultado de
+  // busqueda: esta URL existe solo para explicarle el minimo a quien llego.
+  if (!q.cotizable) {
+    return {
+      title: `${caja.quantity.toLocaleString('es-AR')} cajas de ${caja.length_mm}x${caja.width_mm}x${caja.height_mm} mm: no llega al mínimo`,
+      description: q.summary,
+      robots: { index: false },
+      alternates: { canonical: url },
+    };
+  }
+
   return {
     // El title lleva el precio: es lo primero que ve un asistente en un
     // resultado de busqueda, antes de decidir si abre la pagina.
@@ -232,8 +245,56 @@ export default async function CotizarPage({ params }: Props) {
   }
 
   const q = r.cotizacion;
-  const b = q.boxes[0];
   const { caja } = r;
+
+  // El minimo de compra es excluyente: por debajo no se publica un precio, ni
+  // en la pagina ni en el schema.org. Esta URL la comparte el agente, asi que
+  // un precio aca es un precio que despues hay que sostener.
+  if (!q.cotizable) {
+    const cajasMinimo = q.impedimento.cajas_necesarias;
+    return (
+      <div className="min-h-screen bg-white">
+        <LandingHeader />
+        <main className="mx-auto max-w-2xl px-4 pb-16 pt-28">
+          <h1 className="mb-4 text-3xl font-bold text-gray-900">
+            {caja.quantity.toLocaleString('es-AR')} cajas de {caja.length_mm}×{caja.width_mm}×
+            {caja.height_mm} mm
+          </h1>
+          <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-5">
+            <p className="text-amber-900 leading-relaxed">{q.impedimento.motivo}</p>
+            <p className="mt-2 text-sm text-amber-800">
+              No cotizamos por debajo de ese volumen.
+            </p>
+          </div>
+          {cajasMinimo && (
+            <p className="mb-6 text-gray-700">
+              Con esta medida, el pedido más chico que podemos hacer son{' '}
+              <strong>{cajasMinimo.toLocaleString('es-AR')} cajas</strong>.{' '}
+              <Link
+                href={`/cotizar/${caja.length_mm}x${caja.width_mm}x${caja.height_mm}/${cajasMinimo}`}
+                className="font-semibold text-[#002E55] underline underline-offset-2"
+              >
+                Ver el precio de esa cantidad
+              </Link>
+            </p>
+          )}
+          <p className="text-gray-700">
+            Si necesitás menos volumen del que podemos producir, escribinos por{' '}
+            <a
+              href={CONTACTO.whatsapp}
+              className="text-[#002E55] underline underline-offset-2"
+            >
+              WhatsApp
+            </a>{' '}
+            y te decimos qué medida de catálogo se ajusta mejor a lo que buscás.
+          </p>
+        </main>
+        <LandingFooter />
+      </div>
+    );
+  }
+
+  const b = q.boxes[0];
 
   // Offer con el precio real de ESTA caja. Es lo que permite que un buscador
   // muestre el precio sin abrir la pagina.

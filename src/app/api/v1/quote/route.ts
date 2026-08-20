@@ -359,7 +359,7 @@ export async function POST(request: NextRequest) {
     const totalSubtotal = quote.subtotal;
 
     // Log exitoso
-    await logRequest(200, totalM2, totalSubtotal, boxResults.length);
+    await logRequest(200, totalM2, totalSubtotal ?? undefined, boxResults.length);
 
     // Obtener IP para notificaciones
     const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
@@ -375,8 +375,9 @@ export async function POST(request: NextRequest) {
     // Usar la primera caja para las notificaciones (simplificacion)
     const firstBox = boxResults[0];
 
-    // Notificar si hay datos de contacto (lead calificado)
-    if (body.contact && (body.contact.email || body.contact.phone)) {
+    // Notificar si hay datos de contacto (lead calificado). Solo si el pedido
+    // se puede vender: sin precio no hay monto que notificar.
+    if (quote.cotizable && body.contact && (body.contact.email || body.contact.phone)) {
       // No bloquear la respuesta esperando la notificacion
       sendNotification({
         type: 'lead_with_contact',
@@ -387,12 +388,12 @@ export async function POST(request: NextRequest) {
           height: firstBox.height_mm,
         },
         quantity: firstBox.quantity,
-        totalArs: totalSubtotal,
+        totalArs: quote.subtotal,
         contact: body.contact,
       }).catch(err => console.error('Error sending lead notification:', err));
     }
     // Notificar si es cotizacion de alto valor (sin datos de contacto)
-    else if (totalSubtotal >= HIGH_VALUE_THRESHOLD) {
+    else if (quote.cotizable && quote.subtotal >= HIGH_VALUE_THRESHOLD) {
       sendNotification({
         type: 'high_value_quote',
         origin: detectedOrigin,
@@ -402,7 +403,7 @@ export async function POST(request: NextRequest) {
           height: firstBox.height_mm,
         },
         quantity: firstBox.quantity,
-        totalArs: totalSubtotal,
+        totalArs: quote.subtotal,
         ip: clientIp,
       }).catch(err => console.error('Error sending high value notification:', err));
     }
@@ -680,9 +681,9 @@ export async function GET(request: NextRequest) {
     // que sale bien pero NO llega al minimo. El asistente recibe un precio
     // correcto y aun asi el negocio no puede vender eso, asi que cuenta como
     // demanda no atendida aunque el status sea 200.
-    registrar(200, quote.meets_minimum ? 'cotizado' : 'cotizado_bajo_minimo', {
+    registrar(200, quote.cotizable ? 'cotizado' : 'rechazado_bajo_minimo', {
       total_m2: quote.total_m2,
-      total_amount: quote.subtotal,
+      total_amount: quote.subtotal ?? undefined,
       rateLimitRemaining: rateLimitCheck.remaining,
     });
 

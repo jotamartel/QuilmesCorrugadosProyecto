@@ -304,6 +304,10 @@ export default async function PreciosPage() {
                     // esos campos con valores inventados.
                     config as PricingConfig,
                   );
+                  // Un ejemplo por debajo del minimo no tiene precio. No
+                  // deberia haberlos, pero si alguien agrega uno la tabla no
+                  // puede inventarle un numero: se omite la fila.
+                  if (!q.cotizable) return null;
                   return (
                     <tr key={rutaEjemplo(e)} className="hover:bg-gray-50">
                       <td className="px-4 py-3">

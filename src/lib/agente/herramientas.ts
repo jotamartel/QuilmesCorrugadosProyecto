@@ -144,6 +144,31 @@ export function crearHerramientas(ctx: ContextoAgente) {
       config,
       await leerCatalogoDeStock(),
     );
+    // El minimo de compra es excluyente. Antes esta tool devolvia el precio
+    // igual y el agente lo leia: cotizo 272 m² —por debajo de los 500— y cerro
+    // ofreciendo "coordinarlo por WhatsApp", que es la negociacion de cantidad
+    // que no queremos abrir. Si no se puede vender, no hay numero que mostrar.
+    if (!q.cotizable) {
+      const imp = q.impedimento!;
+      return JSON.stringify({
+        se_puede_cotizar: false,
+        medidas_mm: `${largo_mm}x${ancho_mm}x${alto_mm}`,
+        cantidad,
+        metros_cuadrados: q.total_m2,
+        minimo_de_compra_m2: RETAIL_CONFIG.MIN_M2_PEDIDO,
+        motivo: imp.motivo,
+        cajas_necesarias_de_esta_medida: imp.cajas_necesarias,
+        m2_faltantes: imp.m2_faltantes,
+        instruccion:
+          'NO des ningun precio: no lo tenés y no existe para este pedido. Deci el mínimo, ' +
+          'cuántos m² son y cuántas cajas de esa medida hacen falta, y ofrecé recotizar con ' +
+          'esa cantidad. NO ofrezcas coordinarlo por WhatsApp, ni consultarlo, ni preguntar ' +
+          'si se puede hacer una excepción: el mínimo es excluyente y no se negocia. Si la ' +
+          'medida no está en catálogo y el volumen solo alcanza para catálogo, ofrecé buscar ' +
+          'una medida estándar parecida con medidas_estandar_en_stock.',
+      });
+    }
+
     const caja = q.boxes[0];
 
     return JSON.stringify({

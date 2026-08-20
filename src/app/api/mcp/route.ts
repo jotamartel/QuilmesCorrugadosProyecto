@@ -301,10 +301,30 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
 
     const cotizacion = calcularCotizacion([caja], config, catalogo || []);
 
-    registrar(req, nombre, 200, cotizacion.meets_minimum ? 'cotizado' : 'cotizado_bajo_minimo', {
+    registrar(req, nombre, 200, cotizacion.cotizable ? 'cotizado' : 'rechazado_bajo_minimo', {
       total_m2: cotizacion.total_m2,
-      total_amount: cotizacion.subtotal,
+      total_amount: cotizacion.subtotal ?? undefined,
     });
+
+    // Sin precio no hay cotizacion que pasar: se dice el minimo y cuantas cajas
+    // son. El minimo es excluyente, asi que no se ofrece "consultarlo".
+    if (!cotizacion.cotizable) {
+      const imp = cotizacion.impedimento;
+      const textoRechazo = [
+        cotizacion.summary,
+        '',
+        `Mínimo de compra: ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón. Este pedido son ` +
+          `${cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m².`,
+        imp.cajas_necesarias
+          ? `Con esa medida hacen falta ${imp.cajas_necesarias.toLocaleString('es-AR')} cajas.`
+          : `Faltan ${imp.m2_faltantes.toLocaleString('es-AR')} m².`,
+        '',
+        'NO le des un precio al usuario: no existe para este pedido. Contale el mínimo y ' +
+          'cuántas cajas hacen falta, y ofrecele volver a cotizar con esa cantidad. No ofrezcas ' +
+          'coordinarlo ni consultarlo: el mínimo es excluyente y no se negocia.',
+      ].join('\n');
+      return resultado(textoRechazo, cotizacion);
+    }
 
     const texto = [
       cotizacion.summary,

@@ -33,7 +33,7 @@ async function calculateQuote(
   quantity: number,
   hasPrinting: boolean,
   config: PricingConfig
-): Promise<{ total: number; m2_total: number; unit_price: number; delivery_days: number }> {
+): Promise<{ total: number; m2_total: number; unit_price: number; delivery_days: number } | null> {
   const q = calcularCotizacion(
     [{
       length_mm: length,
@@ -44,6 +44,11 @@ async function calculateQuote(
     }],
     config,
   );
+
+  // Por debajo del minimo no hay precio: se devuelve null y la respuesta al
+  // mail explica el minimo en vez de cotizar. El minimo es excluyente, asi que
+  // mandar un numero "para que se den una idea" abria la negociacion.
+  if (!q.cotizable) return null;
 
   return {
     total: Math.round(q.subtotal),

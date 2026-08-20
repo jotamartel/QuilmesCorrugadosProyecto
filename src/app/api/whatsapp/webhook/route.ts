@@ -635,6 +635,16 @@ Ejemplo: 500`;
               hasPrinting ? 1 : 0,
               pricingConfig,
             );
+          if (!cotizacion.cotizable) {
+            // El minimo es excluyente: no hay precio, no hay lead de venta y no
+            // se notifica al equipo como si fuera una oportunidad. Se le dice
+            // cuantas cajas hacen falta y se lo deja volver a pedir.
+            responseMessage = getQuoteMessage(dimensions, quantity, cotizacion);
+            await updateConversationState(phoneNumber, {
+              step: 'waiting_quantity',
+              hasPrinting,
+            });
+          } else {
             const quote = {
               total: cotizacion.subtotal,
               totalM2: cotizacion.total_m2,
@@ -681,6 +691,7 @@ Ejemplo: 500`;
                 company: state.companyName,
               },
             });
+          }
           }
         }
       }

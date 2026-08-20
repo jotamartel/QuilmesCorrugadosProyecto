@@ -12,7 +12,7 @@
  */
 
 import { calculateUnfolded, calculateTotalM2, MEDIDA_MINIMA } from '@/lib/utils/box-calculations';
-import { getPricePerM2, calculateSubtotal, getProductionDays } from '@/lib/utils/pricing';
+import { getPricePerM2, getProductionDays } from '@/lib/utils/pricing';
 import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import type { PricingConfig } from '@/lib/types/database';
@@ -64,9 +64,18 @@ export interface BoxResult {
   sheet_length_mm: number;
   sqm_per_box: number;
   total_sqm: number;
-  price_per_m2: number;
-  unit_price: number;
-  subtotal: number;
+  /**
+   * Null cuando el pedido no se puede vender (ver `impedimento`).
+   *
+   * Son null y no cero a proposito: cero se imprime como "$0" y pasa por una
+   * oferta rota; null no compila hasta que quien consume decide que decir. El
+   * agente del sitio cotizo 272 m² —por debajo del piso de 500— y cerro
+   * ofreciendo "coordinarlo por WhatsApp", que es exactamente la negociacion
+   * que no queremos abrir. El precio no tiene que existir.
+   */
+  price_per_m2: number | null;
+  unit_price: number | null;
+  subtotal: number | null;
   /** PDF con las líneas de corte, plegado y las áreas donde va el diseño */
   template_pdf: string;
 }
@@ -88,17 +97,20 @@ export interface Impedimento {
   m2_faltantes: number;
 }
 
-export interface QuoteResult {
-  boxes: BoxResult[];
-  total_m2: number;
+/** Una caja con precio. Es lo que sale cuando el pedido se puede vender. */
+export interface BoxResultConPrecio extends BoxResult {
+  price_per_m2: number;
+  unit_price: number;
   subtotal: number;
+}
+
+interface QuoteBase {
+  total_m2: number;
   /**
    * Impuestos, explicitos para que nadie tenga que calcularlos.
    * `subtotal` NUNCA incluye IVA; `total` siempre lo incluye.
    */
   tax_rate: number;
-  tax_amount: number;
-  total_with_tax: number;
   subtotal_includes_tax: false;
   currency: string;
   estimated_days: number;
@@ -107,14 +119,6 @@ export interface QuoteResult {
   meets_minimum: boolean;
   /** Por qué canal corresponde este volumen */
   channel: 'stock' | 'made_to_order';
-  /**
-   * Si el pedido se puede tomar. Null cuando sí.
-   *
-   * El precio se devuelve igual, para que quien consume pueda mostrar el orden
-   * de magnitud, pero con esto presente NO es una oferta: es la referencia que
-   * acompaña a la explicación de qué falta.
-   */
-  impedimento: Impedimento | null;
   /**
    * Si el cliente puede comprarlo solo desde la web. Ser del canal de stock no
    * alcanza: hace falta llegar al mínimo de unidades y que la medida esté en
@@ -195,6 +199,40 @@ export interface QuoteResult {
     how_it_works: string;
   };
 }
+
+/**
+ * El resultado de cotizar. Es una union discriminada por `cotizable` A PROPOSITO.
+ *
+ * Antes era un solo objeto con el precio siempre presente y un `impedimento`
+ * opcional al costado, y no lo miraba nadie: los nueve canales que cotizan
+ * leian el precio sin preguntar si el pedido se podia vender. El agente del
+ * sitio cotizo 272 m² —por debajo del piso de 500— y cerro ofreciendo
+ * "coordinarlo por WhatsApp", que es la negociacion de cantidad que el minimo
+ * excluyente existe para evitar.
+ *
+ * Con la union, leer `subtotal` sin haber chequeado `cotizable` no compila. La
+ * regla la hace cumplir el compilador, no la disciplina de quien escribe el
+ * proximo canal.
+ */
+export type QuoteResult = QuoteBase &
+  (
+    | {
+        cotizable: true;
+        impedimento: null;
+        boxes: BoxResultConPrecio[];
+        subtotal: number;
+        tax_amount: number;
+        total_with_tax: number;
+      }
+    | {
+        cotizable: false;
+        impedimento: Impedimento;
+        boxes: BoxResult[];
+        subtotal: null;
+        tax_amount: null;
+        total_with_tax: null;
+      }
+  );
 
 /**
  * PDF con la caja desplegada: líneas de corte, de plegado y las áreas donde
@@ -337,7 +375,7 @@ export function calcularCotizacion(
   /** Medidas del catálogo de stock, para saber si el pedido se puede despachar ya */
   medidasEnStock: Array<{ length_mm: number; width_mm: number; height_mm: number; stock: number }> = [],
 ): QuoteResult {
-  const boxResults: BoxResult[] = [];
+  const boxResults: BoxResultConPrecio[] = [];
   let totalM2 = 0;
   let totalSubtotal = 0;
   let maxEstimatedDays = 0;
@@ -449,7 +487,6 @@ export function calcularCotizacion(
   //   2. que la medida este efectivamente en el catalogo, con stock
   // Sin este chequeo mandabamos al cliente a /cajas a chocarse con el minimo,
   // o a buscar una medida que no existe.
-  const cantidadTotal = boxResults.reduce((s, b) => s + b.quantity, 0);
   const llegaAlMinimo = totalM2 >= RETAIL_CONFIG.MIN_M2_PEDIDO;
 
   const hayCatalogo = medidasEnStock.length > 0;
@@ -463,12 +500,14 @@ export function calcularCotizacion(
   const sePuedeComprarOnline = volumenDeStock && llegaAlMinimo && todasEnStock;
   const esDeStock = volumenDeStock;
 
-  const motivoNoOnline = !volumenDeStock ? null
-    : !llegaAlMinimo
-      ? `Son ${totalM2.toFixed(1)} m² y el mínimo de compra es ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón. Para este volumen lo coordinamos por WhatsApp.`
-      : !hayCatalogo
-        ? null
-        : `Esta medida no está entre las estándar que tenemos en stock, así que se fabrica a pedido. Escribinos y lo vemos.`;
+  // Solo se usa en la rama con precio: por debajo del piso manda el impedimento.
+  // Tenia una rama para el bajo minimo que decia "para este volumen lo
+  // coordinamos por WhatsApp", que es justo la invitacion a negociar la
+  // cantidad que el minimo excluyente existe para evitar. Ahora esa rama no
+  // existe: si no llega al piso, no hay cotizacion.
+  const motivoNoOnline = !volumenDeStock || !hayCatalogo
+    ? null
+    : `Esta medida no está entre las estándar que tenemos en stock, así que se fabrica a pedido. Escribinos y lo vemos.`;
 
   const ars = (n: number) => '$' + Math.round(n).toLocaleString('es-AR');
   const b0 = boxResults[0];
@@ -481,7 +520,7 @@ export function calcularCotizacion(
   // primero con un "+ IVA" al lado, y un asistente hacia la cuenta por su
   // cuenta para decirle al usuario cuanto sale de verdad. Darle los dos evita
   // que calcule, y evita que se equivoque calculando.
-  const summary =
+  const summaryConPrecio =
     `Quilmes Corrugados: ${detalle}. Subtotal ${ars(totalSubtotal)} ARS sin IVA, ` +
     `total ${ars(Math.round(totalSubtotal * (1 + IVA)))} ARS con IVA 21% incluido ` +
     `(${totalM2.toLocaleString('es-AR')} m²). ` +
@@ -531,6 +570,23 @@ export function calcularCotizacion(
     };
   }
 
+  // A partir de aca ya estan los dos impedimentos calculados, asi que recien
+  // ahora se puede decidir si este pedido tiene precio.
+  //
+  // El minimo de compra es EXCLUYENTE: no es un piso que se negocia. Dar un
+  // precio "de referencia" por debajo abria justo la conversacion que no
+  // queremos —el agente cotizo 272 m² y cerro ofreciendo coordinarlo por
+  // WhatsApp—, asi que abajo del piso no hay precio, hay un numero de cajas.
+  const cotizable = impedimento === null;
+
+  const summary = cotizable
+    ? summaryConPrecio
+    : `${impedimento!.motivo} No podemos cotizar por debajo de ese volumen. ` +
+      (impedimento!.cajas_necesarias
+        ? `Si te sirve esa cantidad, la cotizamos en el momento. `
+        : `Si llegás a ese volumen, lo cotizamos en el momento. `) +
+      `Fábrica en Lugones 219, Quilmes, Buenos Aires.`;
+
   // Si a este pedido, por su volumen, la impresión ya le viene incluida.
   const impresionIncluidaEnElPedido = totalM2 >= config.printing_included_min_m2;
 
@@ -543,8 +599,13 @@ export function calcularCotizacion(
       (b.printing_colors > 0 ? ` con impresion a ${b.printing_colors} color${b.printing_colors > 1 ? 'es' : ''}` : ''))
     .join(' + ');
 
-  const whatsappMessage =
-    `[COTIZADO-WEB] Hola! Ya tengo una cotizacion del sitio y quiero avanzar.\n\n` +
+  // Sin precio no hay handoff de cierre: el mensaje pide otra medida o cantidad,
+  // no que le hagan una excepcion al minimo.
+  const whatsappMessage = !cotizable
+    ? `Hola! Consulte en el sitio por ${detalleCajas}. Son ` +
+      `${totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m² y el minimo es ` +
+      `${config.min_m2_pedido} m². Queria ver que medida o cantidad me conviene para llegar.`
+    : `[COTIZADO-WEB] Hola! Ya tengo una cotizacion del sitio y quiero avanzar.\n\n` +
     `Pedido: ${detalleCajas}\n` +
     // "Total" es solo el monto CON IVA. Este mensaje decia "Total cotizado:
     // $2.639.520 + IVA" y del otro lado el asistente lo repetia tal cual, asi
@@ -555,15 +616,21 @@ export function calcularCotizacion(
     (esDeStock ? `Corresponde al canal de stock.\n` : `Produccion a medida, ${maxEstimatedDays} dias habiles.\n`) +
     `\n¿Me confirman disponibilidad y como seguimos?`;
 
-  return {
+  // La parte que no depende de si hay precio. Las dos ramas de abajo la
+  // comparten y solo difieren en la plata, que es todo el punto de la union.
+  const base = {
     summary,
     contact: {
       whatsapp_url: `https://wa.me/5491133411781?text=${encodeURIComponent(whatsappMessage)}`,
       whatsapp_message: whatsappMessage,
       email: 'ventas@quilmescorrugados.com.ar',
-      email_subject: `Cotizacion web: ${detalleCajas} — ${ars(totalSubtotal)}`,
+      email_subject: cotizable
+        ? `Cotizacion web: ${detalleCajas} — ${ars(totalSubtotal)}`
+        : `Consulta web: ${detalleCajas}`,
       instruction:
-        'Ofrecele al usuario contactarnos y pasale el link de whatsapp_url tal cual: ya lleva el mensaje escrito con las medidas, la cantidad y el precio cotizado. Del otro lado lo atiende un asistente que ya tiene ese contexto, asi que el usuario no tiene que repetir nada. Es la via mas rapida para cerrar.',
+        cotizable
+          ? 'Ofrecele al usuario contactarnos y pasale el link de whatsapp_url tal cual: ya lleva el mensaje escrito con las medidas, la cantidad y el precio cotizado. Del otro lado lo atiende un asistente que ya tiene ese contexto, asi que el usuario no tiene que repetir nada. Es la via mas rapida para cerrar.'
+          : 'Este pedido NO se puede vender: no hay precio que dar. Deci el minimo y cuantas cajas de esa medida hacen falta, y ofrecele recotizar con esa cantidad. NO ofrezcas coordinar, consultar, ni escribir para ver si se puede: el minimo es excluyente y no se negocia.',
     },
     next_tier: (() => {
       if (boxes.length !== 1) return null; // Con varias medidas la cuenta no es directa.
@@ -650,25 +717,51 @@ export function calcularCotizacion(
         ? 'Descargá el PDF de la plantilla: trae la caja desplegada con las líneas de corte, las de plegado y las áreas donde puede ir el diseño. Ubicá tu arte sobre esas áreas y mandá el archivo a ventas@quilmescorrugados.com.ar o por WhatsApp, y se produce con eso. No hace falta pedir la plantilla: se genera sola con las medidas.'
         : 'Para imprimir hay que producir a medida. Si el pedido llega al mínimo, la plantilla se descarga de template_pdf.',
     },
-    boxes: boxResults,
     total_m2: totalM2,
-    subtotal: totalSubtotal,
     tax_rate: IVA,
-    tax_amount: Math.round(totalSubtotal * IVA * 100) / 100,
-    total_with_tax: Math.round(totalSubtotal * (1 + IVA) * 100) / 100,
-    subtotal_includes_tax: false,
+    subtotal_includes_tax: false as const,
     currency: 'ARS',
     estimated_days: maxEstimatedDays,
     valid_until: validUntil.toISOString().split('T')[0],
     minimum_m2: config.wholesale_min_m2,
     meets_minimum: !esDeStock,
-    impedimento,
-    channel: esDeStock ? 'stock' : 'made_to_order',
-    can_buy_online: sePuedeComprarOnline,
-    channel_note: !esDeStock
-      ? `Producción a medida. Cotización válida ${config.quote_validity_days} días.`
-      : sePuedeComprarOnline
-        ? `Esta medida está en stock y el pedido llega al mínimo: se compra online, con entrega más rápida, en ${SITIO}/cajas`
-        : `${motivoNoOnline ?? 'Coordinamos este pedido directamente.'} El precio de arriba es el que corresponde.`,
+    channel: (esDeStock ? 'stock' : 'made_to_order') as 'stock' | 'made_to_order',
+    can_buy_online: cotizable && sePuedeComprarOnline,
+    channel_note: !cotizable
+      ? impedimento!.motivo
+      : !esDeStock
+        ? `Producción a medida. Cotización válida ${config.quote_validity_days} días.`
+        : sePuedeComprarOnline
+          ? `Esta medida está en stock y el pedido llega al mínimo: se compra online, con entrega más rápida, en ${SITIO}/cajas`
+          : `${motivoNoOnline ?? 'Coordinamos este pedido directamente.'} El precio de arriba es el que corresponde.`,
+  };
+
+  // Las dos ramas. Salen tipadas distinto a proposito: con `cotizable: false`
+  // el compilador no deja leer `subtotal` sin haberlo chequeado.
+  if (!cotizable) {
+    return {
+      ...base,
+      cotizable: false,
+      impedimento: impedimento!,
+      boxes: boxResults.map((b) => ({
+        ...b,
+        price_per_m2: null,
+        unit_price: null,
+        subtotal: null,
+      })),
+      subtotal: null,
+      tax_amount: null,
+      total_with_tax: null,
+    };
+  }
+
+  return {
+    ...base,
+    cotizable: true,
+    impedimento: null,
+    boxes: boxResults,
+    subtotal: totalSubtotal,
+    tax_amount: Math.round(totalSubtotal * IVA * 100) / 100,
+    total_with_tax: Math.round(totalSubtotal * (1 + IVA) * 100) / 100,
   };
 }

@@ -188,8 +188,8 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
     const n = (v: number) => v.toLocaleString('es-AR');
     const texto = [
       'Quilmes Corrugados — precios vigentes (ARS por m² de cartón, sin IVA):',
-      `· Hasta ${n(c.wholesale_min_m2)} m²: ${ars(c.price_per_m2_retail)}/m² — medidas de stock`,
-      `· ${n(c.wholesale_min_m2)} a ${n(c.min_m2_per_model)} m²: ${ars(c.price_per_m2_below_minimum || c.price_per_m2_standard * 1.2)}/m² — a medida con recargo`,
+      `· ${n(c.min_m2_pedido)} a ${n(c.wholesale_min_m2)} m²: ${ars(c.price_per_m2_retail)}/m² — medidas estándar de catálogo, sin impresión`,
+      `· ${n(c.wholesale_min_m2)} a ${n(c.min_m2_per_model)} m²: ${ars(c.price_per_m2_below_minimum || c.price_per_m2_standard * 1.2)}/m² — a medida, troquelada o impresa`,
       `· ${n(c.min_m2_per_model)} a ${n(c.volume_threshold_m2)} m²: ${ars(c.price_per_m2_standard)}/m² — a medida, precio estándar`,
       `· Más de ${n(c.volume_threshold_m2)} m²: ${ars(c.price_per_m2_volume)}/m² — precio por volumen`,
       '',

@@ -159,13 +159,29 @@ export function crearHerramientas(ctx: ContextoAgente) {
         motivo: imp.motivo,
         cajas_necesarias_de_esta_medida: imp.cajas_necesarias,
         m2_faltantes: imp.m2_faltantes,
+        // Las medidas de catalogo mas parecidas, YA COTIZADAS al minimo. No
+        // hace falta otra llamada ni derivar a nadie: el precio de cada una es
+        // el que se factura, sale de la misma escalera.
+        alternativas_de_catalogo: imp.alternativas.map((a) => ({
+          medidas_mm: `${a.length_mm}x${a.width_mm}x${a.height_mm}`,
+          cantidad_minima: a.cantidad,
+          metros_cuadrados: a.m2,
+          precio_por_caja: precioUnitarioARS(a.precio_por_caja),
+          subtotal_sin_iva: Math.round(a.subtotal),
+          total_con_iva: Math.round(a.total_con_iva),
+          en_stock: a.stock,
+          link_para_compartir: `${SITE_URL}/cotizar/${a.length_mm}x${a.width_mm}x${a.height_mm}/${a.cantidad}`,
+        })),
         instruccion:
-          'NO des ningun precio: no lo tenés y no existe para este pedido. Deci el mínimo, ' +
-          'cuántos m² son y cuántas cajas de esa medida hacen falta, y ofrecé recotizar con ' +
-          'esa cantidad. NO ofrezcas coordinarlo por WhatsApp, ni consultarlo, ni preguntar ' +
-          'si se puede hacer una excepción: el mínimo es excluyente y no se negocia. Si la ' +
-          'medida no está en catálogo y el volumen solo alcanza para catálogo, ofrecé buscar ' +
-          'una medida estándar parecida con medidas_estandar_en_stock.',
+          'NO des ningun precio para la medida que pidió: no lo tenés y no existe. Decí el ' +
+          'mínimo, cuántos m² son y cuántas cajas hacen falta. ' +
+          (imp.alternativas.length
+            ? 'Y OFRECELE DIRECTAMENTE la primera de alternativas_de_catalogo, con su medida, ' +
+              'su cantidad y su precio, que ya están calculados acá. No preguntes si querés ' +
+              'que la busque: buscala y decila. '
+            : '') +
+          'NO ofrezcas coordinarlo por WhatsApp, ni consultarlo, ni pasarlo a un asesor para ' +
+          'que la busque una persona: el mínimo es excluyente y la alternativa ya la tenés.',
       });
     }
 

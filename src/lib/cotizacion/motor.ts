@@ -95,6 +95,45 @@ export interface Impedimento {
   /** Cuántas cajas de ESTA medida hacen falta para poder avanzar. */
   cajas_necesarias: number | null;
   m2_faltantes: number;
+  /**
+   * Medidas de catálogo parecidas, ya cotizadas al mínimo.
+   *
+   * Existe porque decir "no se puede" sin decir qué sí se puede termina en una
+   * derivación a un humano. Pasó tal cual: alguien pidió 400 cajas de
+   * 214x263x301, el asistente le explicó bien los dos mínimos y cuando le
+   * pidieron la medida estándar más cercana le pasó un link de WhatsApp para
+   * que se la buscara una persona. El catálogo estaba acá todo el tiempo.
+   *
+   * Van cotizadas y no solo listadas: la alternativa útil es "esta medida, esta
+   * cantidad, este precio", no un nombre de caja que después hay que cotizar.
+   */
+  alternativas: AlternativaDeCatalogo[];
+}
+
+/** Una medida de catálogo que sí se puede vender, con su precio al mínimo. */
+export interface AlternativaDeCatalogo {
+  length_mm: number;
+  width_mm: number;
+  height_mm: number;
+  /** Cuántas cajas de ESTA medida son el mínimo de compra. */
+  cantidad: number;
+  m2: number;
+  precio_por_caja: number;
+  subtotal: number;
+  total_con_iva: number;
+  stock: number;
+  /** Qué tan distinta es de lo que pidió, sumando las tres dimensiones en mm. */
+  diferencia_mm: number;
+  /**
+   * Si lo que iba a entrar en la caja pedida entra en esta.
+   *
+   * Se compara dimensión por dimensión, ordenadas de mayor a menor, porque una
+   * caja se puede rotar. Importa más que el parecido: la primera version de
+   * esto ordenaba por distancia y a alguien que pidió 214x263x301 le ofrecía
+   * una de 200x200x200, que es la mas "parecida" en milímetros y no le entra
+   * nada de lo que queria embalar.
+   */
+  entra: boolean;
 }
 
 /** Una caja con precio. Es lo que sale cuando el pedido se puede vender. */
@@ -369,6 +408,70 @@ export function precioUnitarioARS(n: number): string {
   );
 }
 
+/**
+ * Las medidas de catálogo más parecidas a la que pidieron, ya cotizadas al
+ * mínimo de compra.
+ *
+ * Se cotizan pasando por getPricePerM2, la misma escalera que factura: si el
+ * asistente ofrece una alternativa con un precio, ese precio se cobra.
+ */
+function buscarAlternativas(
+  pedida: BoxInput,
+  config: PricingConfig,
+  medidasEnStock: Array<{ length_mm: number; width_mm: number; height_mm: number; stock: number }>,
+  cuantas = 2,
+): AlternativaDeCatalogo[] {
+  return medidasEnStock
+    .filter((m) =>
+      !(m.length_mm === pedida.length_mm && m.width_mm === pedida.width_mm && m.height_mm === pedida.height_mm),
+    )
+    .map((m) => {
+      // Ordenadas de mayor a menor: una caja se puede rotar, asi que lo que
+      // importa es que cada dimension del candidato cubra a la que le toca.
+      const pedidas = [pedida.length_mm, pedida.width_mm, pedida.height_mm].sort((a, b) => b - a);
+      const candidatas = [m.length_mm, m.width_mm, m.height_mm].sort((a, b) => b - a);
+      const entra = candidatas.every((c, i) => c >= pedidas[i]);
+      const volumen = m.length_mm * m.width_mm * m.height_mm;
+
+      const { m2 } = calculateUnfolded(m.length_mm, m.width_mm, m.height_mm);
+      // La cantidad que hace falta para que ESTA medida llegue al piso de venta.
+      const cantidad = Math.ceil(config.min_m2_pedido / m2);
+      const totalM2 = calculateTotalM2(m2, cantidad);
+      const precioM2 = getPricePerM2(totalM2, config);
+      // Mismo redondeo que el motor: el unitario por la cantidad tiene que
+      // cerrar con el subtotal, porque es la cuenta que el cliente rehace.
+      const precioPorCaja = Math.round((totalM2 * precioM2 / cantidad) * 100) / 100;
+      const subtotal = Math.round(precioPorCaja * cantidad * 100) / 100;
+      return {
+        length_mm: m.length_mm,
+        width_mm: m.width_mm,
+        height_mm: m.height_mm,
+        cantidad,
+        m2: Math.round(totalM2 * 100) / 100,
+        precio_por_caja: precioPorCaja,
+        subtotal,
+        total_con_iva: Math.round(subtotal * (1 + IVA) * 100) / 100,
+        stock: m.stock ?? 0,
+        diferencia_mm:
+          Math.abs(m.length_mm - pedida.length_mm) +
+          Math.abs(m.width_mm - pedida.width_mm) +
+          Math.abs(m.height_mm - pedida.height_mm),
+        entra,
+        volumen,
+      };
+    })
+    // Primero las que sirven de verdad —donde entra lo que iba a embalar—, y
+    // entre esas la mas ajustada, que es la que menos cartón desperdicia. Las
+    // que no entran van al final: se ofrecen solo si no hay ninguna que sirva.
+    .sort((a, b) => {
+      if (a.entra !== b.entra) return a.entra ? -1 : 1;
+      if (a.entra) return a.volumen - b.volumen || b.stock - a.stock;
+      return a.diferencia_mm - b.diferencia_mm || b.stock - a.stock;
+    })
+    .slice(0, cuantas)
+    .map(({ volumen: _volumen, ...a }) => a);
+}
+
 export function calcularCotizacion(
   boxes: BoxInput[],
   config: PricingConfig,
@@ -456,9 +559,56 @@ export function calcularCotizacion(
       ? Math.ceil(m2Objetivo / m2PorCajaPrimera)
       : null;
 
+  const hayCatalogo = medidasEnStock.length > 0;
+
+  // Si la medida pedida es una del catalogo. Las de catalogo se producen en
+  // tirada larga sin arte: alcanzan volumen y aun asi no llevan impresion.
+  const medidaDeCatalogo = hayCatalogo && boxResults.some((b) =>
+    medidasEnStock.some((m) =>
+      m.length_mm === b.length_mm && m.width_mm === b.width_mm && m.height_mm === b.height_mm,
+    ),
+  );
+
   let impedimento: Impedimento | null = null;
 
-  if (totalM2 < config.min_m2_pedido) {
+  // UN PEDIDO PUEDE CHOCAR CON LOS DOS PISOS A LA VEZ, y hay que decir el que
+  // manda, no el primero que se evalue.
+  //
+  // Si la medida no esta en catalogo, el piso que aplica es el de produccion a
+  // medida —1.000 m²—, aunque el pedido tambien este por debajo del piso de
+  // venta de 500. Antes se evaluaba primero el de 500 y la conversacion salia
+  // en dos viajes: "te faltan 883 cajas", y cuando el cliente pedia esas 883,
+  // "en realidad son 1.766". Le hacemos pedir dos veces para decirle que no
+  // dos veces.
+  //
+  // Y decir que no sin decir que si termina en una derivacion a un humano: por
+  // eso este impedimento viaja con las medidas de catalogo mas parecidas, ya
+  // cotizadas.
+  if (!medidaDeCatalogo && hayCatalogo && totalM2 < config.wholesale_min_m2) {
+    const cajasParaAMedida = cajasPara(config.wholesale_min_m2);
+    const alternativas = buscarAlternativas(boxes[0], config, medidasEnStock);
+    impedimento = {
+      tipo: 'medida_propia_sin_volumen',
+      motivo:
+        `Esta medida no está en el catálogo, así que hay que fabricarla, y la producción a ` +
+        `medida arranca en ${config.wholesale_min_m2.toLocaleString('es-AR')} m². Este pedido son ` +
+        `${totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m².` +
+        (cajasParaAMedida
+          ? ` Serían ${cajasParaAMedida.toLocaleString('es-AR')} cajas de esta medida.`
+          : '') +
+        (alternativas.length
+          ? ` Por debajo de ese volumen trabajamos con medidas estándar de catálogo, sin impresión. ` +
+            (alternativas[0].entra
+              ? `La más chica en la que entra lo tuyo es `
+              : `La más parecida es `) +
+            `${alternativas[0].length_mm}x${alternativas[0].width_mm}x${alternativas[0].height_mm} mm, ` +
+            `y el mínimo en esa medida son ${alternativas[0].cantidad.toLocaleString('es-AR')} cajas.`
+          : ` Por debajo de ese volumen trabajamos con medidas estándar de catálogo, sin impresión.`),
+      cajas_necesarias: cajasParaAMedida,
+      m2_faltantes: Math.round((config.wholesale_min_m2 - totalM2) * 10) / 10,
+      alternativas,
+    };
+  } else if (totalM2 < config.min_m2_pedido) {
     const faltan = config.min_m2_pedido - totalM2;
     const cajas = cajasPara(config.min_m2_pedido);
     impedimento = {
@@ -469,6 +619,7 @@ export function calcularCotizacion(
         (cajas ? ` Con esta medida, son ${cajas.toLocaleString('es-AR')} cajas.` : ''),
       cajas_necesarias: cajas,
       m2_faltantes: Math.round(faltan * 10) / 10,
+      alternativas: [],
     };
   }
 
@@ -489,7 +640,6 @@ export function calcularCotizacion(
   // o a buscar una medida que no existe.
   const llegaAlMinimo = totalM2 >= RETAIL_CONFIG.MIN_M2_PEDIDO;
 
-  const hayCatalogo = medidasEnStock.length > 0;
   const todasEnStock = hayCatalogo && boxResults.every((b) =>
     medidasEnStock.some((m) =>
       m.length_mm === b.length_mm && m.width_mm === b.width_mm &&
@@ -539,36 +689,7 @@ export function calcularCotizacion(
   // estandar: esas se producen en tirada larga sin arte y no se imprimen. Un
   // pedido de 2.000 m² de una medida de catalogo alcanza el volumen y aun asi
   // no lleva impresion.
-  const medidaDeCatalogo = hayCatalogo && boxResults.some((b) =>
-    medidasEnStock.some((m) =>
-      m.length_mm === b.length_mm && m.width_mm === b.width_mm && m.height_mm === b.height_mm,
-    ),
-  );
   const impresionDisponible = totalM2 >= config.printing_min_m2 && !medidaDeCatalogo;
-
-  // Segundo impedimento: pide una medida propia con un volumen que solo alcanza
-  // para catalogo.
-  //
-  // Es distinto del piso de venta y no se arregla comprando un poco mas: o
-  // elige una medida estandar, o sube hasta el umbral de produccion a medida.
-  // Es exactamente la consulta que llegaba por WhatsApp —cajas troqueladas por
-  // 50 unidades— y que el sitio dejaba pasar.
-  if (!impedimento && !medidaDeCatalogo && hayCatalogo && totalM2 < config.wholesale_min_m2) {
-    const cajasParaAMedida = cajasPara(config.wholesale_min_m2);
-    impedimento = {
-      tipo: 'medida_propia_sin_volumen',
-      motivo:
-        `Esta medida no está en el catálogo, así que hay que fabricarla, y la producción a ` +
-        `medida arranca en ${config.wholesale_min_m2.toLocaleString('es-AR')} m². Este pedido son ` +
-        `${totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m².` +
-        (cajasParaAMedida
-          ? ` Serían ${cajasParaAMedida.toLocaleString('es-AR')} cajas de esta medida.`
-          : '') +
-        ` Por debajo de ese volumen trabajamos con medidas estándar de catálogo, sin impresión.`,
-      cajas_necesarias: cajasParaAMedida,
-      m2_faltantes: Math.round((config.wholesale_min_m2 - totalM2) * 10) / 10,
-    };
-  }
 
   // A partir de aca ya estan los dos impedimentos calculados, asi que recien
   // ahora se puede decidir si este pedido tiene precio.

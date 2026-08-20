@@ -665,9 +665,21 @@ Total m2: ${cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits:
 ${imp.motivo}
 
 No cotizamos por debajo de ese volumen.${
-      imp.cajas_necesarias
-        ? `\n\nSi te sirven ${imp.cajas_necesarias.toLocaleString('es-AR')} cajas, escribi esa cantidad y te paso el precio.`
-        : ''
+      // Si hay una medida de catalogo parecida va con precio: decir que no sin
+      // decir que si termina en que alguien tenga que buscarla a mano.
+      imp.alternativas.length
+        ? '\n\nMedidas de catalogo parecidas:\n' +
+          imp.alternativas
+            .map(
+              (a) =>
+                `- ${a.length_mm}x${a.width_mm}x${a.height_mm} mm: ${a.cantidad.toLocaleString('es-AR')} cajas ` +
+                `a ${ars(a.precio_por_caja)} c/u, ${ars(a.subtotal)} + IVA`,
+            )
+            .join('\n') +
+          '\n\nEscribi la medida que te sirve y avanzamos.'
+        : imp.cajas_necesarias
+          ? `\n\nSi te sirven ${imp.cajas_necesarias.toLocaleString('es-AR')} cajas, escribi esa cantidad y te paso el precio.`
+          : ''
     }`;
   }
 

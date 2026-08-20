@@ -478,6 +478,19 @@ async function tryQuoteFromConversation(
   // negociar la cantidad.
   if (!cotizacion.cotizable) {
     const imp = cotizacion.impedimento;
+    const alt = imp.alternativas[0];
+    // Si hay una medida de catalogo parecida se la ofrecemos ya cotizada. Decir
+    // que no sin decir que si termina en "escribinos por WhatsApp", que es
+    // mandar a una persona a hacer una busqueda que ya esta hecha.
+    if (alt) {
+      return (
+        `${imp.motivo}\n\n` +
+        `La más parecida que tenemos es ${alt.length_mm}x${alt.width_mm}x${alt.height_mm} mm: ` +
+        `${alt.cantidad.toLocaleString('es-AR')} cajas a ${precioUnitarioARS(alt.precio_por_caja)} ` +
+        `cada una, subtotal $${Math.round(alt.subtotal).toLocaleString('es-AR')} sin IVA ` +
+        `(${Math.round(alt.total_con_iva).toLocaleString('es-AR')} con IVA). ¿Te sirve?`
+      );
+    }
     return (
       `${imp.motivo} No cotizamos por debajo de ese volumen.` +
       (imp.cajas_necesarias

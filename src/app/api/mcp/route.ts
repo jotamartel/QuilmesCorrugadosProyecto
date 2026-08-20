@@ -313,15 +313,38 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       const textoRechazo = [
         cotizacion.summary,
         '',
-        `Mínimo de compra: ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón. Este pedido son ` +
-          `${cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m².`,
+        // El umbral que manda depende del impedimento: para una medida propia
+        // es el de produccion a medida, no el piso de venta. Decir "minimo 500"
+        // y al lado "hacen falta 1.766 cajas" son dos umbrales mezclados.
+        imp.tipo === 'medida_propia_sin_volumen'
+          ? `Producción a medida (cualquier medida fuera del catálogo): desde ` +
+            `${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m². Este pedido son ` +
+            `${cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m².`
+          : `Mínimo de compra: ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón. Este pedido son ` +
+            `${cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m².`,
         imp.cajas_necesarias
           ? `Con esa medida hacen falta ${imp.cajas_necesarias.toLocaleString('es-AR')} cajas.`
           : `Faltan ${imp.m2_faltantes.toLocaleString('es-AR')} m².`,
+        ...(imp.alternativas.length
+          ? [
+              '',
+              'Medidas de catálogo parecidas, ya cotizadas al mínimo:',
+              ...imp.alternativas.map(
+                (a) =>
+                  `- ${a.length_mm}x${a.width_mm}x${a.height_mm} mm — ` +
+                  `${a.cantidad.toLocaleString('es-AR')} cajas — ` +
+                  `$${Math.round(a.precio_por_caja).toLocaleString('es-AR')} por caja — ` +
+                  `subtotal $${Math.round(a.subtotal).toLocaleString('es-AR')} sin IVA`,
+              ),
+            ]
+          : []),
         '',
-        'NO le des un precio al usuario: no existe para este pedido. Contale el mínimo y ' +
-          'cuántas cajas hacen falta, y ofrecele volver a cotizar con esa cantidad. No ofrezcas ' +
-          'coordinarlo ni consultarlo: el mínimo es excluyente y no se negocia.',
+        'NO le des un precio para la medida que pidió: no existe. Contale el mínimo y cuántas ' +
+          'cajas hacen falta' +
+          (imp.alternativas.length
+            ? ', y ofrecele directamente la primera medida de catálogo de la lista, con su cantidad y su precio.'
+            : '.') +
+          ' No ofrezcas coordinarlo ni consultarlo: el mínimo es excluyente y no se negocia.',
       ].join('\n');
       return resultado(textoRechazo, cotizacion);
     }

@@ -278,15 +278,53 @@ export default async function CotizarPage({ params }: Props) {
               </Link>
             </p>
           )}
+
+          {/* Las medidas de catalogo parecidas, ya cotizadas. Decir que no sin
+              decir que si mandaba a la persona a preguntar por WhatsApp cual le
+              servia, con el catalogo disponible de este lado. */}
+          {q.impedimento.alternativas.length > 0 && (
+            <div className="mb-8">
+              <h2 className="mb-3 text-lg font-semibold text-gray-900">
+                Medidas de catálogo parecidas
+              </h2>
+              <ul className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200">
+                {q.impedimento.alternativas.map((a) => (
+                  <li
+                    key={`${a.length_mm}x${a.width_mm}x${a.height_mm}`}
+                    className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3"
+                  >
+                    <div>
+                      <Link
+                        href={`/cotizar/${a.length_mm}x${a.width_mm}x${a.height_mm}/${a.cantidad}`}
+                        className="font-semibold text-[#002E55] underline underline-offset-2 tabular-nums"
+                      >
+                        {a.length_mm}×{a.width_mm}×{a.height_mm} mm
+                      </Link>
+                      <span className="ml-2 text-sm text-gray-600 tabular-nums">
+                        {a.cantidad.toLocaleString('es-AR')} cajas · {a.m2.toLocaleString('es-AR')} m²
+                      </span>
+                    </div>
+                    <div className="text-right tabular-nums">
+                      <div className="font-semibold text-gray-900">
+                        {ars(a.precio_por_caja)} <span className="text-sm font-normal text-gray-600">por caja</span>
+                      </div>
+                      <div className="text-sm text-gray-600">{ars(a.subtotal)} sin IVA</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <p className="text-gray-700">
-            Si necesitás menos volumen del que podemos producir, escribinos por{' '}
+            ¿Ninguna te sirve? Escribinos por{' '}
             <a
               href={CONTACTO.whatsapp}
               className="text-[#002E55] underline underline-offset-2"
             >
               WhatsApp
             </a>{' '}
-            y te decimos qué medida de catálogo se ajusta mejor a lo que buscás.
+            y lo vemos.
           </p>
         </main>
         <LandingFooter />

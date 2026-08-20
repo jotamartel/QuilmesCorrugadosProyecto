@@ -302,7 +302,7 @@ export default async function CotizarPage({ params }: Props) {
                 <th scope="row" className="px-4 py-3 font-medium text-gray-600">Impresión</th>
                 <td className="px-4 py-3">
                   {caja.printing_colors
-                    ? `${caja.printing_colors} color${caja.printing_colors > 1 ? 'es' : ''} (+15% por color)`
+                    ? `${caja.printing_colors} color${caja.printing_colors > 1 ? 'es' : ''}, incluida en el precio por m². Aparte solo el polímero`
                     : `Sin impresión. Hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores disponibles.`}
                 </td>
               </tr>

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { RegistrarLeadParams, RegistrarLeadResponse } from '@/types/retell';
 import { precioUnitarioARS } from '@/lib/cotizacion/motor';
+import { CONTACTO } from '@/lib/contacto';
 
 export async function POST(request: NextRequest) {
   try {
@@ -225,8 +226,8 @@ async function enviarCotizacionPorEmail(
 
           <p style="color: #666; font-size: 0.9em; margin-top: 30px;">
             Quilmes Corrugados<br/>
-            Tel: (011) XXXX-XXXX<br/>
-            WhatsApp: +54 9 11 XXXX-XXXX
+            Tel: ${CONTACTO.telefonoLocal}<br/>
+            WhatsApp: <a href="${CONTACTO.whatsapp}">${CONTACTO.telefonoVisible}</a>
           </p>
         </div>
       `,

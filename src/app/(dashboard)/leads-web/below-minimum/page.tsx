@@ -55,9 +55,11 @@ export default function BelowMinimumLeadsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pedidos Menores al Mínimo</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Pedidos recotizados con menos volumen</h1>
           <p className="text-gray-600 mt-1">
-            Cotizaciones entre 1000 y 3000 m² con precio con recargo
+            Clientes que pidieron rehacer la cotización por debajo de los 3.000 m². Ya no es un
+            pedido &quot;bajo mínimo&quot;: de 1.000 a 3.000 m² es una venta normal, solo cambia el
+            tramo de precio.
           </p>
         </div>
         <Link

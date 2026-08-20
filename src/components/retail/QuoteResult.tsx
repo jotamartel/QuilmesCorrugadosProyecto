@@ -50,18 +50,29 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
   const [allBoxes, setAllBoxes] = useState<StandardSuggestion[]>([]);
   const [showAllForIndex, setShowAllForIndex] = useState<number | null>(null);
   const [loadingAll, setLoadingAll] = useState(false);
-  const showSuggestions = totalM2 < 1000 && onSelectStandard;
+  // Debajo del tope no se fabrica una medida propia: solo se venden medidas
+  // estandar de catalogo. El 1.000 estaba escrito a mano aca.
+  const showSuggestions = totalM2 < topeM2 && onSelectStandard;
 
-  // Boxes that still need a standard selection
-  const boxesNeedingStandard = useMemo(() => {
+  // Cajas que todavia son una medida propia y por lo tanto no se pueden producir
+  // a este volumen. Esto BLOQUEA el pedido, exista o no una sugerencia cargada:
+  // antes se derivaba de la lista de sugerencias, asi que si la lista volvia
+  // vacia el boton de continuar aparecia y se podia pedir una medida que la
+  // fabrica no puede hacer.
+  const cajasQueNecesitanEstandar = useMemo(() => {
     if (!showSuggestions) return [];
     return boxes
       .map((box, index) => ({ box, index }))
-      .filter(({ box }) => box.standardBoxId == null)
-      .filter(({ index }) => (suggestionsMap[index]?.length ?? 0) > 0);
-  }, [showSuggestions, boxes, suggestionsMap]);
+      .filter(({ box }) => box.standardBoxId == null);
+  }, [showSuggestions, boxes]);
 
-  const mustSelectStandard = boxesNeedingStandard.length > 0;
+  const mustSelectStandard = cajasQueNecesitanEstandar.length > 0;
+
+  // Las que ademas ya tienen sugerencias para mostrar.
+  const boxesNeedingStandard = useMemo(
+    () => cajasQueNecesitanEstandar.filter(({ index }) => (suggestionsMap[index]?.length ?? 0) > 0),
+    [cajasQueNecesitanEstandar, suggestionsMap]
+  );
 
   // Stable key for dimension dependencies — only re-fetch when non-standard box dimensions change
   const nonStandardDimsKey = useMemo(() => {
@@ -102,7 +113,14 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
       fetch(`/api/public/standard-suggestions?l=${box.largo}&w=${box.ancho}&h=${box.alto}&qty=${box.cantidad}`)
         .then((res) => res.json())
         .then((data) => {
-          if (!cancelled && data.suggestions) {
+          if (cancelled) return;
+          // La medida tipeada ya es de catalogo: se marca sola y no se le pide
+          // que elija otra. onSelectStandard mantiene la cantidad.
+          if (data.exacta && onSelectStandard) {
+            onSelectStandard(data.exacta, index);
+            return;
+          }
+          if (data.suggestions) {
             setSuggestionsMap(prev => ({ ...prev, [index]: data.suggestions }));
           }
         })
@@ -144,11 +162,22 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
   const renderBoxCard = (sug: StandardSuggestion, boxIndex: number, isDashed: boolean) => {
     const targetBox = boxes[boxIndex];
     if (!targetBox) return null;
+
+    // La cantidad que va a quedar si elige esta medida. Tiene que coincidir con lo
+    // que hace selectStandardBox en BoxGame: una medida mas chica necesita mas
+    // cajas para el mismo piso de m², y eso hay que mostrarlo ANTES de elegir.
+    const m2Otras = boxes.reduce((suma, b, i) => (i === boxIndex ? suma : suma + b.totalM2), 0);
+    const minParaElPiso = Math.ceil(Math.max(0, minM2Pedido - m2Otras) / sug.m2_per_box);
+    const cantidadFinal = Math.max(targetBox.cantidad, minParaElPiso);
+    const subeLaCantidad = cantidadFinal > targetBox.cantidad;
+
     const price = calcularPrecioMinorista(
-      sug.length_mm, sug.width_mm, sug.height_mm, targetBox.cantidad, retailConfig
+      sug.length_mm, sug.width_mm, sug.height_mm, cantidadFinal, retailConfig
     );
-    const hasStock = sug.stock > 0;
-    const hasEnoughStock = sug.stock >= targetBox.cantidad;
+    // El stock define el plazo, no si se puede comprar: lo que hay sale en 24/48 hs
+    // y el resto se fabrica. Antes esto estaba al reves y una medida con stock 0
+    // decia "Entrega inmediata".
+    const cubreTodo = sug.stock >= cantidadFinal;
     return (
       <div
         key={sug.id}
@@ -157,7 +186,7 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
           background: 'var(--retail-surface)',
           boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
           border: isDashed
-            ? `1px dashed ${hasStock ? 'var(--retail-primary)' : 'var(--retail-border, #d0d0d0)'}`
+            ? `1px dashed ${cubreTodo ? 'var(--retail-primary)' : 'var(--retail-border, #d0d0d0)'}`
             : `1px solid var(--retail-border, #e0e0e0)`,
         }}
       >
@@ -185,23 +214,37 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
               className="text-xs"
               style={{
                 fontFamily: 'var(--font-retail-sans), sans-serif',
-                color: hasStock ? '#16a34a' : 'var(--retail-text-muted)',
+                color: cubreTodo ? '#16a34a' : 'var(--retail-text-muted)',
               }}
             >
-              {hasStock
-                ? `${sug.stock} en stock`
-                : 'Entrega inmediata'}
+              {cubreTodo
+                ? 'Entrega inmediata'
+                : sug.stock > 0
+                  ? `${sug.stock.toLocaleString('es-AR')} en stock, el resto se fabrica`
+                  : 'A fabricar'}
             </span>
           </div>
+          {subeLaCantidad && (
+            <div
+              className="text-xs mt-1"
+              style={{
+                fontFamily: 'var(--font-retail-sans), sans-serif',
+                color: 'var(--retail-text-muted)',
+              }}
+            >
+              {cantidadFinal.toLocaleString('es-AR')} cajas, que es el minimo de{' '}
+              {minM2Pedido} m² en esta medida
+            </div>
+          )}
         </div>
         <button
           onClick={() => onSelectStandard!(sug, boxIndex)}
           className="rounded-xl px-4 py-2 text-xs font-semibold tracking-wide whitespace-nowrap active:scale-95"
           style={{
             fontFamily: 'var(--font-retail-sans), sans-serif',
-            background: hasEnoughStock ? 'var(--retail-primary)' : 'transparent',
-            color: hasEnoughStock ? '#fff' : 'var(--retail-primary)',
-            border: hasEnoughStock ? 'none' : '2px solid var(--retail-primary)',
+            background: cubreTodo ? 'var(--retail-primary)' : 'transparent',
+            color: cubreTodo ? '#fff' : 'var(--retail-primary)',
+            border: cubreTodo ? 'none' : '2px solid var(--retail-primary)',
             transition: 'transform 150ms',
           }}
         >
@@ -396,8 +439,25 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
           )}
         </div>
 
+        {/* No hay ninguna sugerencia cargada pero igual hace falta una medida
+            estandar: no dejar al comprador sin salida. */}
+        {mustSelectStandard && boxesNeedingStandard.length === 0 && (
+          <div
+            className="max-w-sm mx-auto mt-6 rounded-xl p-4 text-center"
+            style={{ background: '#FBF2E0', border: '1px solid #E8C98A' }}
+          >
+            <p
+              className="text-sm leading-relaxed"
+              style={{ fontFamily: 'var(--font-retail-sans), sans-serif', color: '#7A4E00' }}
+            >
+              A este volumen fabricamos solo medidas de catalogo, y no pudimos cargarlas.
+              Escribinos por WhatsApp y te decimos cual se ajusta a lo que necesitas.
+            </p>
+          </div>
+        )}
+
         {/* Standard box suggestions — per box that needs it */}
-        {mustSelectStandard && (
+        {mustSelectStandard && boxesNeedingStandard.length > 0 && (
           <div
             className="max-w-sm mx-auto mt-6 space-y-6"
             style={{

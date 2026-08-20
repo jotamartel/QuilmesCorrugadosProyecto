@@ -21,6 +21,8 @@ interface BelowMinimumModalProps {
   originalTotalSqm: number;
   pricePerM2BelowMinimum: number;
   minM2PerModel: number;
+  /** Piso de produccion a medida. Sale de pricing_config.wholesale_min_m2. */
+  minM2AMedida: number;
   onSuccess: () => void;
 }
 
@@ -33,6 +35,7 @@ export function BelowMinimumModal({
   originalTotalSqm,
   pricePerM2BelowMinimum,
   minM2PerModel,
+  minM2AMedida,
   onSuccess,
 }: BelowMinimumModalProps) {
   const [quantity, setQuantity] = useState<number>(originalQuantity);
@@ -58,11 +61,12 @@ export function BelowMinimumModal({
   const unfolded = calculateUnfolded(boxDimensions.length_mm, boxDimensions.width_mm, boxDimensions.height_mm);
   const sqmPerBox = unfolded.m2;
   const totalSqm = calculateTotalM2(sqmPerBox, quantity);
-  const minQuantityFor1000m2 = Math.ceil(1000 / sqmPerBox);
+  // El piso de produccion a medida sale de la config, no escrito aca: cuando el
+  // umbral bajo de 3.000 a 1.000 este numero quedo desincronizado del resto.
+  const minQuantityAMedida = Math.ceil(minM2AMedida / sqmPerBox);
 
-  // Validar cantidad mínima (1000m2)
-  const isValid = totalSqm >= 1000 && totalSqm < minM2PerModel;
-  const isBelow1000m2 = totalSqm < 1000;
+  const isValid = totalSqm >= minM2AMedida && totalSqm < minM2PerModel;
+  const isBelowAMedida = totalSqm < minM2AMedida;
   
   // Validar datos de entrega requeridos
   const isDeliveryDataValid = province && city.trim() && address.trim();
@@ -125,10 +129,16 @@ export function BelowMinimumModal({
     setError(null);
 
     if (!isValid) {
-      if (isBelow1000m2) {
-        setError(`La cantidad mínima es ${minQuantityFor1000m2} cajas para alcanzar 1000m²`);
+      if (isBelowAMedida) {
+        setError(
+          `La producción a medida arranca en ${minM2AMedida.toLocaleString('es-AR')} m²: ` +
+          `${minQuantityAMedida.toLocaleString('es-AR')} cajas de esta medida`
+        );
       } else {
-        setError(`El pedido debe ser menor a ${minM2PerModel}m² para usar esta opción`);
+        setError(
+          `Desde ${minM2PerModel.toLocaleString('es-AR')} m² el precio por m² es más bajo: ` +
+          `volvé a la cotización original`
+        );
       }
       return;
     }
@@ -198,8 +208,8 @@ export function BelowMinimumModal({
                 <AlertCircle className="w-5 h-5 text-yellow-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">¿Necesitas menos m²?</h3>
-                <p className="text-sm text-gray-500">Cotización para pedidos menores al mínimo</p>
+                <h3 className="text-lg font-semibold text-gray-900">¿Necesitás menos m²?</h3>
+                <p className="text-sm text-gray-500">Recalculá el precio con menos volumen</p>
               </div>
             </div>
             <button
@@ -224,7 +234,7 @@ export function BelowMinimumModal({
                     ¡Solicitud enviada con éxito!
                   </h3>
                   <p className="text-sm text-gray-600 max-w-md">
-                    Hemos recibido tu solicitud. Estaremos teniendo en cuenta tu pedido al momento de programar las producciones de las próximas semanas y te contactaremos para coordinar el pago de la seña y ultimar detalles.
+                    Recibimos tu pedido con el volumen nuevo. Te escribimos para coordinar la entrega y la forma de pago.
                   </p>
                 </div>
               </div>
@@ -252,18 +262,20 @@ export function BelowMinimumModal({
                   type="number"
                   value={quantity}
                   onChange={(e) => setQuantity(Number(e.target.value))}
-                  min={minQuantityFor1000m2}
+                  min={minQuantityAMedida}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   required
                 />
-                {isBelow1000m2 && (
+                {isBelowAMedida && (
                   <p className="mt-1 text-sm text-red-600">
-                    Mínimo: {minQuantityFor1000m2} cajas para alcanzar 1000m²
+                    La producción a medida arranca en {minM2AMedida.toLocaleString('es-AR')} m²:{' '}
+                    {minQuantityAMedida.toLocaleString('es-AR')} cajas de esta medida
                   </p>
                 )}
                 {totalSqm >= minM2PerModel && (
                   <p className="mt-1 text-sm text-red-600">
-                    El pedido debe ser menor a {minM2PerModel}m² para usar esta opción
+                    Desde {minM2PerModel.toLocaleString('es-AR')} m² el precio por m² es más bajo:
+                    volvé a la cotización original
                   </p>
                 )}
               </div>

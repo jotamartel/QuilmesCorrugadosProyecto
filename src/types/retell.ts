@@ -234,12 +234,11 @@ export const RETELL_CONSTANTS = {
     FIN: HORARIO.hasta,
     DIAS: [...HORARIO.dias] as number[],
   },
-  DESCUENTOS: [
-    { minM2: 5000, descuento: 0.20, nombre: '20% mayorista' },
-    { minM2: 3000, descuento: 0.15, nombre: '15% por volumen' },
-    { minM2: 1000, descuento: 0.10, nombre: '10% por volumen' },
-    { minM2: 500, descuento: 0.05, nombre: '5% por volumen' },
-  ],
+  // DESCUENTOS se borro el 20/08/2026. No lo leia nadie y describia el precio
+  // como un porcentaje de descuento sobre una base que no existe: la escalera
+  // real son cuatro precios por m² en pricing_config, no descuentos. Tenerlo
+  // escrito acá era una segunda version de los precios esperando divergir.
+  
   TIEMPOS_PRODUCCION: [
     { maxM2: 1000, tiempo: '2 a 3 días hábiles' },
     { maxM2: 3000, tiempo: '3 a 5 días hábiles' },

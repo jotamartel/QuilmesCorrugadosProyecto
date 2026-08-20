@@ -584,7 +584,7 @@ export async function GET(request: NextRequest) {
         width_mm: 'Ancho en mm (100-2000). Alias: ancho_cm, w',
         height_mm: 'Alto en mm (50-1500). Alias: alto_cm, h',
         quantity: 'Cantidad de cajas (entero ≥ 1). Alias: cantidad, qty',
-        printing_colors: `Colores de impresión (0-${RETAIL_CONFIG.MAX_PRINTING_COLORS}, opcional). Cada color suma 15%`,
+        printing_colors: `Colores de impresión (0-${RETAIL_CONFIG.MAX_PRINTING_COLORS}, opcional). La impresión está incluida en el precio por m²; aparte solo se cobra el polímero`,
       },
       batch: {
         method: 'POST',

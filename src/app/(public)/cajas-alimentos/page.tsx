@@ -14,7 +14,6 @@ import { Pizza, Truck, UtensilsCrossed, ArrowRight } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
 import { RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
 
-const MIN = RETAIL_CONFIG.MIN_CANTIDAD;
 
 const PREGUNTAS = [
   {
@@ -43,9 +42,10 @@ const PREGUNTAS = [
   {
     pregunta: '¿Cuál es el mínimo para un restaurante chico?',
     respuesta:
-      `Desde ${MIN} cajas si la medida está en catálogo. Si querés una medida propia con ` +
-      'impresión, el mínimo de fabricación es 3.000 m² por modelo, que en cajas de delivery ' +
-      'son varios miles de unidades: conviene cuando ya tenés rotación estable.',
+      `${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón si la medida está en catálogo — el mínimo se mide ` +
+      `en superficie, no en cantidad de cajas. Si querés una medida propia con impresión, ` +
+      `el mínimo es ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m², que en cajas de delivery ` +
+      `son unas dos mil unidades: conviene cuando ya tenés rotación estable.`,
   },
   {
     pregunta: '¿Entregan en CABA y zona sur?',
@@ -92,7 +92,10 @@ export default function CajasAlimentosPage() {
 
           <ResumenClave
             puntos={[
-              { rotulo: 'Mínimo', valor: `${MIN} cajas de stock, o 3.000 m² por modelo a medida` },
+              {
+                rotulo: 'Mínimo',
+                valor: `${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón en medidas de catálogo, o ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m² a medida`,
+              },
               {
                 rotulo: 'Precio',
                 valor: `De $${RETAIL_CONFIG.VOLUME_PRICE_PER_M2} a $${RETAIL_CONFIG.RETAIL_PRICE_PER_M2} por m² de cartón, según volumen`,
@@ -163,7 +166,7 @@ export default function CajasAlimentosPage() {
             <li><Link href="/cajas-mudanza" className="text-[#002E55] hover:underline">Cajas para mudanza</Link></li>
             <li><Link href="/mayorista" className="text-[#002E55] hover:underline">Compra por mayor</Link></li>
             <li><Link href="/precios" className="text-[#002E55] hover:underline">Precios por volumen</Link></li>
-            <li><Link href="/cajas" className="text-[#002E55] hover:underline">Comprar desde {MIN} cajas</Link></li>
+            <li><Link href="/cajas" className="text-[#002E55] hover:underline">Comprar desde {RETAIL_CONFIG.MIN_M2_PEDIDO} m²</Link></li>
             <li><Link href="/faq" className="text-[#002E55] hover:underline">Todas las preguntas</Link></li>
           </ul>
         </div>

@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useMemo, useCallback } from 'react';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
+import type { RetailConfig } from '@/lib/retail/config';
 import { calculateUnfolded } from '@/lib/utils/box-calculations';
 
 const WHEEL_STEP = 5; // unidades por tick de scroll
@@ -13,9 +14,22 @@ interface QuantityInputProps {
   largo: number;
   ancho: number;
   alto: number;
+  /** m² de las medidas que ya estan en el pedido. El minimo es del pedido entero. */
+  m2Acumulados?: number;
+  retailConfig?: RetailConfig;
 }
 
-export default function QuantityInput({ value, onChange, visible, largo, ancho, alto }: QuantityInputProps) {
+export default function QuantityInput({
+  value,
+  onChange,
+  visible,
+  largo,
+  ancho,
+  alto,
+  m2Acumulados = 0,
+  retailConfig,
+}: QuantityInputProps) {
+  const cfg = retailConfig ?? RETAIL_CONFIG;
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -53,20 +67,27 @@ export default function QuantityInput({ value, onChange, visible, largo, ancho, 
     onChange(Math.min(num, 99999)); // sanity cap
   };
 
-  // Calculate m² info for dynamic feedback
-  const { m2PerBox, totalM2, qtyForWholesale } = useMemo(() => {
+  // El minimo es de superficie y es del PEDIDO ENTERO, no de esta linea: dos
+  // medidas de 300 m² son un pedido valido de 600. Por eso entra m2Acumulados.
+  const { m2Pedido, cajasMinimo, cajasFaltantes, qtyForWholesale } = useMemo(() => {
     const { m2 } = calculateUnfolded(largo, ancho, alto);
+    const pedido = m2Acumulados + m2 * value;
+    const faltanM2 = Math.max(0, cfg.MIN_M2_PEDIDO - pedido);
     return {
-      m2PerBox: m2,
-      totalM2: m2 * value,
-      qtyForWholesale: Math.ceil(RETAIL_CONFIG.WHOLESALE_THRESHOLD_M2 / m2),
+      m2Pedido: pedido,
+      // Cuantas cajas de ESTA medida hacen falta para llegar al piso, contando
+      // lo que ya esta cargado.
+      cajasMinimo: Math.ceil(Math.max(0, cfg.MIN_M2_PEDIDO - m2Acumulados) / m2),
+      cajasFaltantes: Math.ceil(faltanM2 / m2),
+      qtyForWholesale: Math.ceil(Math.max(0, cfg.WHOLESALE_THRESHOLD_M2 - m2Acumulados) / m2),
     };
-  }, [largo, ancho, alto, value]);
+  }, [largo, ancho, alto, value, m2Acumulados, cfg]);
 
-  const isMayorista = totalM2 >= RETAIL_CONFIG.WHOLESALE_THRESHOLD_M2;
-  // Entre 1 y MIN_CANTIDAD-1 el boton de confirmar no aparece (BoxGame lo oculta),
-  // asi que hay que decir explicitamente por que: si no, el usuario queda trabado.
-  const belowMinimum = value > 0 && value < RETAIL_CONFIG.MIN_CANTIDAD;
+  const isMayorista = m2Pedido >= cfg.WHOLESALE_THRESHOLD_M2;
+  // Debajo del piso el boton de confirmar no aparece (BoxGame lo oculta), asi que
+  // hay que decir aca por que y cuanto falta. Antes esto se enteraba recien en la
+  // pantalla de cotizacion, con el pedido entero ya cargado.
+  const belowMinimum = value > 0 && m2Pedido < cfg.MIN_M2_PEDIDO;
 
   return (
     <div
@@ -123,19 +144,25 @@ export default function QuantityInput({ value, onChange, visible, largo, ancho, 
       >
         {belowMinimum ? (
           <>
-            Minimo {RETAIL_CONFIG.MIN_CANTIDAD.toLocaleString('es-AR')} unidades — te faltan{' '}
-            {(RETAIL_CONFIG.MIN_CANTIDAD - value).toLocaleString('es-AR')}
+            {m2Pedido.toFixed(0)} m² — el minimo es {cfg.MIN_M2_PEDIDO} m², te faltan{' '}
+            {cajasFaltantes.toLocaleString('es-AR')} cajas
           </>
         ) : value > 0 ? (
           isMayorista ? (
             // Paso el tope de stock: a este volumen se produce a medida y lo
             // cotiza el mayorista, no este canal.
-            <>{totalM2.toFixed(0)} m² — supera el stock, se fabrica a medida</>
+            <>{m2Pedido.toFixed(0)} m² — supera el stock, se fabrica a medida</>
           ) : (
-            <>Desde {qtyForWholesale.toLocaleString('es-AR')} uds. se fabrica a medida y el m² baja</>
+            <>
+              {m2Pedido.toFixed(0)} m² — desde {qtyForWholesale.toLocaleString('es-AR')} uds. se
+              fabrica a medida y el m² baja
+            </>
           )
         ) : (
-          <>Minimo {RETAIL_CONFIG.MIN_CANTIDAD.toLocaleString('es-AR')} unidades</>
+          <>
+            Minimo {cajasMinimo.toLocaleString('es-AR')} cajas de esta medida ({cfg.MIN_M2_PEDIDO} m²
+            de carton)
+          </>
         )}
       </div>
     </div>

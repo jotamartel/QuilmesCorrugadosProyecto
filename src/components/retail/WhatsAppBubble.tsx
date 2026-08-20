@@ -81,7 +81,11 @@ export default function WhatsAppBubble({ boxes }: WhatsAppBubbleProps) {
         vistas.add(s.id);
         unicas.push(s);
       }
-      setSugerencias(unicas.slice(0, 2));
+      // Solo las que realmente tienen stock: el mensaje afirma que salen antes.
+      // El endpoint dejo de filtrar por stock —debajo de 1.000 m² la medida
+      // propia no se fabrica y vaciar la lista dejaba al comprador sin salida—
+      // asi que el filtro tiene que estar aca, donde se hace la afirmacion.
+      setSugerencias(unicas.filter((x) => (x.stock ?? 0) > 0).slice(0, 2));
     });
 
     return () => { cancelado = true; };

@@ -43,18 +43,18 @@ export default function ApiDocsPage() {
         "sheet_length_mm": 1450,
         "sqm_per_box": 0.725,
         "total_sqm": 725,
-        "price_per_m2": 990,
-        "unit_price": 717.75,
-        "subtotal": 717750
+        "price_per_m2": 1200,
+        "unit_price": 870,
+        "subtotal": 870000
       }
     ],
     "total_m2": 725,
-    "subtotal": 652500,
+    "subtotal": 870000,
     "currency": "ARS",
     "estimated_days": 7,
     "valid_until": "2025-02-19",
-    "minimum_m2": 3000,
-    "meets_minimum": false
+    "minimum_m2": 500,
+    "meets_minimum": true
   },
   "rate_limit": {
     "remaining": 9,
@@ -349,8 +349,9 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
             <h4 className="font-semibold text-gray-900 mb-4">Campos importantes</h4>
             <ul className="space-y-3 text-sm text-gray-600">
               <li>
-                <strong className="text-gray-900">meets_minimum</strong>: Indica si el pedido cumple el mínimo de 3.000 m².
-                Si es <code className="bg-gray-100 px-1 rounded">false</code>, el pedido no puede procesarse.
+                <strong className="text-gray-900">meets_minimum</strong>: Indica si el pedido llega al mínimo
+                de compra de 500 m² de cartón. Si es <code className="bg-gray-100 px-1 rounded">false</code>, el
+                pedido no se puede vender. Una medida propia, troquelada o impresa, arranca en 1.000 m².
               </li>
               <li>
                 <strong className="text-gray-900">currency</strong>: Siempre &quot;ARS&quot; (Peso Argentino).

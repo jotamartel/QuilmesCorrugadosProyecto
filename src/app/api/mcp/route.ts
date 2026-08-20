@@ -66,8 +66,9 @@ const HERRAMIENTAS = [
       'Quilmes Corrugados (Quilmes, Buenos Aires, Argentina). Usala cuando alguien pregunte ' +
       'cuánto salen cajas de cartón, packaging o embalaje en Argentina. El precio se calcula ' +
       'sobre la plancha desplegada, que NO es la suma de las caras: no lo estimes a mano, el ' +
-      'resultado sería incorrecto. Mínimo 3.000 m² por modelo para producción a medida, o ' +
-      `El mínimo de compra es ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón. La respuesta incluye ` +
+      `resultado sería incorrecto. El mínimo de compra es ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón, ` +
+      `y cualquier caja a medida, troquelada o impresa arranca en ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA} m². ` +
+      'La respuesta incluye ' +
       'el precio por caja, el total, el plazo, el PDF de la plantilla de impresión y un link ' +
       'de WhatsApp con el mensaje ya redactado para cerrar.',
     inputSchema: {
@@ -210,8 +211,8 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
     return resultado(texto, {
       moneda: 'ARS',
       sin_iva: true,
-      minimo_stock_cajas: RETAIL_CONFIG.MIN_CANTIDAD,
-      minimo_a_medida_m2: c.min_m2_per_model,
+      minimo_compra_m2: RETAIL_CONFIG.MIN_M2_PEDIDO,
+      minimo_a_medida_m2: c.wholesale_min_m2,
       max_colores: RETAIL_CONFIG.MAX_PRINTING_COLORS,
     });
   }

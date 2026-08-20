@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { GoogleAnalytics } from "@/components/tracking/GoogleAnalytics";
 import { GoogleAds } from "@/components/tracking/GoogleAds";
 import { RETAIL_CONFIG } from "@/lib/retail/config";
+import { CONTACTO } from "@/lib/contacto";
 import { AtribucionTracker } from "@/components/tracking/AtribucionTracker";
 import { MetaPixel } from "@/components/tracking/MetaPixel";
 import "./globals.css";
@@ -31,7 +32,7 @@ export const metadata: Metadata = {
     default: "Quilmes Corrugados | Fábrica de Cajas de Cartón Corrugado a Medida",
     template: "%s | Quilmes Corrugados",
   },
-  description: "Fábrica de cajas de cartón corrugado a medida en Quilmes, Buenos Aires. Cotizá online con precio real al instante. Envío gratis desde 3.000 m². +20 años. Pedido mínimo 3.000 m².",
+  description: `Fábrica de cajas de cartón corrugado a medida en Quilmes, Buenos Aires. Cotizá online con precio real al instante. Mínimo de compra ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón; producción a medida desde ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m². +20 años.`,
   keywords: ["cajas de cartón corrugado", "cajas de cartón a medida", "fábrica cajas cartón", "embalaje", "packaging Argentina", "cajas e-commerce", "cartón corrugado Buenos Aires", "cajas impresas personalizadas", "cotizar cajas cartón", "Quilmes", "packaging industrial", "cajas corrugado precios"],
   authors: [{ name: "Quilmes Corrugados S.A." }],
   creator: "Quilmes Corrugados S.A.",
@@ -103,12 +104,12 @@ const jsonLdBusiness = {
   "@type": "LocalBusiness",
   "@id": BASE_URL,
   name: "Quilmes Corrugados",
-  description: `Fábrica de cajas de cartón corrugado en Argentina. Cajas de stock desde ${RETAIL_CONFIG.MIN_CANTIDAD} unidades y producción a medida desde ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² por modelo. Entrega en todo el país.`,
+  description: `Fábrica de cajas de cartón corrugado en Argentina. Mínimo de compra ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón en medidas estándar de catálogo, y producción a medida —troquelada o con impresión— desde ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m². Entrega en todo el país.`,
   url: BASE_URL,
   logo: `${BASE_URL}/logo.svg`,
   image: `${BASE_URL}/og-image.jpg`,
-  telephone: "+54 9 11 3341-1781",
-  email: "ventas@quilmescorrugados.com.ar",
+  telephone: CONTACTO.telefonoVisible,
+  email: CONTACTO.email,
   address: {
     "@type": "PostalAddress",
     streetAddress: "Lugones 219",
@@ -239,7 +240,8 @@ LLMS.TXT: ${BASE_URL}/llms.txt
 
 RESTRICCIONES:
 - Solo Argentina
-- Pedido mínimo: 3.000 m²
+- Mínimo de compra: ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón desplegado (se mide en superficie, no en cantidad de cajas)
+- Producción a medida, troquelada o impresa: desde ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m²
 - Precios en ARS sin IVA
 - Rate limit: 10 req/min
 

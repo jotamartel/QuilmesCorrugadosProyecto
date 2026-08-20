@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import type { GameState, BoxQuoteLine, OrderFormData, ShippingData } from '@/lib/retail/types';
 import type { StandardSuggestion } from './QuoteResult';
 import { RETAIL_CONFIG, type RetailConfig } from '@/lib/retail/config';
 import { calcularPrecioMinorista } from '@/lib/retail/pricing';
+import { calculateUnfolded } from '@/lib/utils/box-calculations';
 import { getAtribucion } from '@/lib/utils/atribucion';
 import { trackEvent } from '@/lib/retail/tracking';
 
@@ -109,10 +110,26 @@ function useBoxGame() {
     }
   }, [state, transition]);
 
+  // m² que ya estan en el pedido, sin contar la linea que se esta editando: esa
+  // se reemplaza, no se suma dos veces. El minimo es del pedido entero.
+  const m2Acumulados = useMemo(
+    () => boxes.reduce((suma, b, i) => (i === editingIndex ? suma : suma + b.totalM2), 0),
+    [boxes, editingIndex]
+  );
+
+  // Alcanza el piso de venta contando lo ya cargado. Es lo que habilita avanzar:
+  // antes se gateaba en 100 unidades y un pedido de 42 m² pasaba entero para
+  // enterarse recien en la pantalla de cotizacion.
+  const llegaAlMinimo = useMemo(() => {
+    if (cantidad <= 0) return false;
+    const m2Linea = calculateUnfolded(largo, ancho, alto).m2 * cantidad;
+    return m2Acumulados + m2Linea >= retailConfig.MIN_M2_PEDIDO;
+  }, [cantidad, largo, ancho, alto, m2Acumulados, retailConfig.MIN_M2_PEDIDO]);
+
   const confirmQuantity = useCallback(() => {
-    if (cantidad < RETAIL_CONFIG.MIN_CANTIDAD) return;
+    if (!llegaAlMinimo) return;
     transition('ADD_MORE');
-  }, [cantidad, transition]);
+  }, [llegaAlMinimo, transition]);
 
   const addMore = useCallback(() => {
     // Save current box (replace if editing, append if new)
@@ -243,7 +260,18 @@ function useBoxGame() {
   // Select a standard box from suggestions (replaces the box at given index)
   const selectStandardBox = useCallback((sug: StandardSuggestion, boxIndex: number) => {
     if (boxIndex < 0 || boxIndex >= boxes.length) return;
-    const qty = boxes[boxIndex].cantidad;
+
+    // Cambiar de medida cambia los m², no solo el nombre. Manteniendo la cantidad
+    // tal cual, pasar de 575 cajas de 400x300x300 (500 m²) a la misma cantidad de
+    // 200x200x200 daba 195 m² y el pedido caia abajo del minimo sin decir nada.
+    // Se sube la cantidad lo justo para que el pedido siga siendo vendible.
+    const m2Otras = boxes.reduce((suma, b, i) => (i === boxIndex ? suma : suma + b.totalM2), 0);
+    const m2Sugerida = calculateUnfolded(sug.length_mm, sug.width_mm, sug.height_mm).m2;
+    const minParaElPiso = Math.ceil(
+      Math.max(0, retailConfig.MIN_M2_PEDIDO - m2Otras) / m2Sugerida
+    );
+    const qty = Math.max(boxes[boxIndex].cantidad, minParaElPiso);
+
     const result = calcularPrecioMinorista(sug.length_mm, sug.width_mm, sug.height_mm, qty, retailConfig);
     const newBox: BoxQuoteLine = {
       largo: sug.length_mm,
@@ -357,7 +385,7 @@ function useBoxGame() {
 
   return {
     state, largo, ancho, alto, cantidad, boxes, formData, shippingData, editingIndex, isTransitioning, showHint,
-    retailConfig,
+    retailConfig, m2Acumulados, llegaAlMinimo,
     setLargo, setAncho, setAlto, setCantidad,
     start, confirmDimension, confirmQuantity, addMore, finishQuote, reset,
     startEdit, revealQuote, backToForm, goToShipping, backToQuote, selectStandardBox, submitOrder,
@@ -589,6 +617,8 @@ export default function BoxGame() {
             largo={game.largo}
             ancho={game.ancho}
             alto={game.alto}
+            m2Acumulados={game.m2Acumulados}
+            retailConfig={game.retailConfig}
           />
         )}
 
@@ -610,7 +640,7 @@ export default function BoxGame() {
         <ConfirmButton
           label={isAltoState ? 'CANTIDAD' : isDimensionState ? 'SIGUIENTE CARA' : 'LISTO'}
           onClick={isDimensionState ? game.confirmDimension : game.confirmQuantity}
-          visible={(isDimensionState || (isQuantityState && game.cantidad >= RETAIL_CONFIG.MIN_CANTIDAD)) && !game.isTransitioning}
+          visible={(isDimensionState || (isQuantityState && game.llegaAlMinimo)) && !game.isTransitioning}
         />
       </div>
     </div>

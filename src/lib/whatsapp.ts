@@ -4,6 +4,7 @@ import { CONTACTO } from '@/lib/contacto';
 import { HORARIO, RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
 import { SITE_URL } from '@/lib/site';
 import { precioUnitarioARS, type QuoteResult } from '@/lib/cotizacion/motor';
+import { calculateUnfolded } from '@/lib/utils/box-calculations';
 
 // Cliente Twilio - solo se inicializa si hay credenciales configuradas
 const client = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
@@ -617,7 +618,7 @@ export function getQuantityMessage(length: number, width: number, height: number
 
 Cuantas unidades necesitas?
 
-Minimo recomendado: cantidad que sume 3.000 m2`;
+Minimo de compra: ${RETAIL_CONFIG.MIN_M2_PEDIDO} m2 de carton, que con esta medida son ${Math.ceil(RETAIL_CONFIG.MIN_M2_PEDIDO / calculateUnfolded(length, width, height).m2).toLocaleString('es-AR')} cajas`;
 }
 
 /**
@@ -669,12 +670,16 @@ Cotizacion valida hasta el ${new Date(cotizacion.valid_until + 'T12:00:00').toLo
 
 Ver online: ${SITE_URL}/cotizar/${dimensions.length}x${dimensions.width}x${dimensions.height}/${quantity}`;
 
-  // El aviso de minimo tiene que ser el del canal que le toca a este pedido.
-  // Antes decia siempre "menor al minimo de 3.000 m2", asi que a un minorista
-  // de 260 cajas —que esta perfectamente dentro de lo que le vendemos— el bot
-  // le avisaba que su pedido no llegaba a un minimo que no es el suyo.
-  if (quantity < RETAIL_CONFIG.MIN_CANTIDAD) {
-    message += `\n\n(El minimo de compra es ${RETAIL_CONFIG.MIN_CANTIDAD} unidades)`;
+  // El minimo se mide en m² de carton, no en cajas: 100 chicas son 34 m² y 100
+  // grandes pasan los 100 m². Avisar "el minimo es 100 unidades" rechazaba un
+  // pedido grande de pocas cajas y dejaba pasar uno chico de muchas.
+  if (cotizacion.total_m2 < RETAIL_CONFIG.MIN_M2_PEDIDO) {
+    const m2PorCaja = cotizacion.total_m2 / quantity;
+    const faltan = Math.ceil((RETAIL_CONFIG.MIN_M2_PEDIDO - cotizacion.total_m2) / m2PorCaja);
+    message +=
+      `\n\n(El minimo de compra es ${RETAIL_CONFIG.MIN_M2_PEDIDO} m2 de carton y este pedido ` +
+      `son ${cotizacion.total_m2.toFixed(1)} m2. Con esta medida te faltan ` +
+      `${faltan.toLocaleString('es-AR')} cajas.)`;
   }
 
   if (colores > 0) {

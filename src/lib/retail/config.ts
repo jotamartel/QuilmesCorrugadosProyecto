@@ -90,9 +90,12 @@ export const RETAIL_CONFIG: RetailConfig = {
   MIN_M2_PEDIDO: 500,
   MIN_M2_A_MEDIDA_PROPIA: 1000,
 
-  // Minimo de una tirada a medida. Espeja pricing_config.min_m2_per_model.
-  // Existe como constante porque los metadatos y el JSON-LD son estaticos y no
-  // pueden leer la base.
+  // Escalon donde BAJA EL PRECIO. Espeja pricing_config.min_m2_per_model.
+  // OJO: no es un minimo de nada. El minimo para fabricar una medida propia es
+  // MIN_M2_A_MEDIDA_PROPIA (1.000). El nombre de esta constante confundio las
+  // dos cosas y por eso media docena de textos decian que a medida arrancaba en
+  // 3.000. Existe como constante porque los metadatos y el JSON-LD son
+  // estaticos y no pueden leer la base.
   MIN_M2_A_MEDIDA: 3000,
 
   // Condiciones del envio gratis. Espejan pricing_config.free_shipping_min_m2

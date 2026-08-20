@@ -14,7 +14,6 @@ import { Package, Truck, Shield, ArrowRight } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
 import { RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
 
-const MIN = RETAIL_CONFIG.MIN_CANTIDAD;
 
 /**
  * El H1 dice algo distinto del title a proposito. El title compite por
@@ -26,9 +25,10 @@ const PREGUNTAS = [
   {
     pregunta: '¿Cuál es la cantidad mínima para pedir cajas de e-commerce?',
     respuesta:
-      `Desde ${MIN} cajas si la medida está en catálogo y sale de stock. ` +
-      `Para una medida propia fabricada a pedido el mínimo es de 3.000 m² por modelo, ` +
-      `que en una caja chica de envíos equivale a varios miles de unidades.`,
+      `El mínimo se mide en cartón, no en cajas: ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² si la medida ` +
+      `está en catálogo, que en una caja chica de envíos son unas 1.500 unidades y en una ` +
+      `mediana unas 600. Para una medida propia, troquelada o impresa, el mínimo es ` +
+      `${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m².`,
   },
   {
     pregunta: '¿Cuánto sale una caja para envíos?',
@@ -99,7 +99,10 @@ export default function CajasEcommercePage() {
 
           <ResumenClave
             puntos={[
-              { rotulo: 'Mínimo', valor: `${MIN} cajas de stock, o 3.000 m² por modelo a medida` },
+              {
+                rotulo: 'Mínimo',
+                valor: `${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón en medidas de catálogo, o ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m² a medida`,
+              },
               {
                 rotulo: 'Precio',
                 valor: `De $${RETAIL_CONFIG.VOLUME_PRICE_PER_M2} a $${RETAIL_CONFIG.RETAIL_PRICE_PER_M2} por m² de cartón, según volumen`,
@@ -203,7 +206,7 @@ export default function CajasEcommercePage() {
             </li>
             <li>
               <Link href="/cajas" className="text-[#002E55] hover:underline">
-                Comprar desde {MIN} cajas
+                Comprar desde {RETAIL_CONFIG.MIN_M2_PEDIDO} m²
               </Link>
             </li>
             <li>

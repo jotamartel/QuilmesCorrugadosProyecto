@@ -149,28 +149,8 @@ export function validateBoxDimensions(
   return errors;
 }
 
-/**
- * Genera warnings para una caja según sus características
- */
-export function generateBoxWarnings(
-  dimensions: BoxDimensions,
-  totalM2: number,
-  minimumM2: number = 3000
-): string[] {
-  const warnings: string[] = [];
-  const { length_mm, width_mm, height_mm } = dimensions;
-
-  if (isOversized(length_mm, width_mm, height_mm)) {
-    warnings.push('La caja excede el tamaño máximo estándar (600x400x400 mm). Requiere precio especial a cotizar.');
-  }
-
-  if (!meetsMinimum(totalM2, minimumM2)) {
-    const { m2 } = calculateUnfolded(length_mm, width_mm, height_mm);
-    const minQty = calculateMinimumQuantity(m2, minimumM2);
-    warnings.push(
-      `El modelo no alcanza el mínimo recomendado de ${minimumM2.toLocaleString('es-AR')} m². Cantidad sugerida: ${minQty.toLocaleString('es-AR')} unidades.`
-    );
-  }
-
-  return warnings;
-}
+// generateBoxWarnings se borro el 20/08/2026. No la llamaba nadie y traia
+// cableado un "minimo recomendado" de 3.000 m² que ya no es un minimo de nada:
+// el piso de venta son 500 m² y la produccion a medida arranca en 1.000. Si
+// vuelve a hacer falta un texto de advertencia, sale de motor.ts, que es donde
+// vive la regla, no de un default de parametro.

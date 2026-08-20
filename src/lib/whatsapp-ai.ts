@@ -192,18 +192,41 @@ export interface AIContext {
   /** Segmento inferido de la landing (ecommerce, alimentos, mayorista, mudanza) */
   segmentHint?: string;
   /** Config de precios activa (para dar precios exactos) */
-  pricingConfig?: {
-    price_per_m2_standard: number;
-    price_per_m2_volume: number;
-    price_per_m2_below_minimum?: number;
-    price_per_m2_retail: number;
-    wholesale_min_m2: number;
-    min_m2_pedido: number;
-    min_m2_per_model: number;
-    volume_threshold_m2: number;
-    free_shipping_min_m2: number;
-    free_shipping_max_km: number;
-  };
+  pricingConfig?: ContextoDePrecios;
+}
+
+/** Lo que hace falta de pricing_config para armar el bloque de precios. */
+export interface ContextoDePrecios {
+  price_per_m2_standard: number;
+  price_per_m2_volume: number;
+  price_per_m2_below_minimum?: number | null;
+  price_per_m2_retail: number;
+  wholesale_min_m2: number;
+  min_m2_pedido: number;
+  min_m2_per_model: number;
+  volume_threshold_m2: number;
+  free_shipping_min_m2: number;
+  free_shipping_max_km: number;
+}
+
+/**
+ * El bloque de precios que se le inyecta al modelo. Existia dos veces —una para
+ * WhatsApp y otra para el chat del sitio— y las dos derivaban el precio del
+ * tramo intermedio a mano, con un `* 1.2` que da $1.080 donde la escalera real
+ * cobra $1.000. Ahora los cuatro precios salen de getPricePerM2, que es la misma
+ * funcion que factura: si el modelo dice un precio, es el que se cobra.
+ */
+function bloqueDePrecios(pricing: ContextoDePrecios | PricingConfig): string {
+  const ars = (m2: number) => '$' + getPricePerM2(m2, pricing as PricingConfig);
+  const n = (v: number) => v.toLocaleString('es-AR');
+  return [
+    'PRECIOS ACTUALES (usar SOLO estos si preguntan — no inventar ni negociar otros):',
+    `- De catálogo, ${n(pricing.min_m2_pedido)} a ${n(pricing.wholesale_min_m2)} m²: ${ars(pricing.min_m2_pedido)}/m² (medidas estándar, sin impresión, se cotiza en /cajas)`,
+    `- A medida, ${n(pricing.wholesale_min_m2)} a ${n(pricing.min_m2_per_model)} m²: ${ars(pricing.wholesale_min_m2)}/m²`,
+    `- A medida, ${n(pricing.min_m2_per_model)} a ${n(pricing.volume_threshold_m2)} m²: ${ars(pricing.min_m2_per_model)}/m²`,
+    `- A medida, más de ${n(pricing.volume_threshold_m2)} m²: ${ars(pricing.volume_threshold_m2)}/m²`,
+    `- Envío gratis: ≥${n(pricing.free_shipping_min_m2)} m² y ≤${pricing.free_shipping_max_km} km`,
+  ].join(String.fromCharCode(10));
 }
 
 /**
@@ -281,14 +304,7 @@ CONTEXTO ACTUAL:
 ${ctx.clientName ? `- Nombre del contacto: ${ctx.clientName}` : ''}
 ${ctx.companyName ? `- Empresa: ${ctx.companyName}` : ''}
 ${ctx.lastQuoteTotal ? `- Última cotización: $${ctx.lastQuoteTotal.toLocaleString('es-AR')} (${ctx.lastQuoteM2?.toLocaleString('es-AR')} m²)` : ''}
-${pricing ? `
-PRECIOS ACTUALES (usar SOLO estos si preguntan — no inventar ni negociar otros):
-- De stock, ${pricing.min_m2_pedido} a ${pricing.wholesale_min_m2} m²: $${pricing.price_per_m2_retail}/m² (medidas estándar de catálogo, sin impresión, se cotiza en /cajas)
-- A medida, ${pricing.wholesale_min_m2} a ${pricing.min_m2_per_model} m²: $${pricing.price_per_m2_below_minimum ?? pricing.price_per_m2_standard * 1.2}/m²
-- A medida, ${pricing.min_m2_per_model} a ${pricing.volume_threshold_m2} m²: $${pricing.price_per_m2_standard}/m²
-- A medida, más de ${pricing.volume_threshold_m2} m²: $${pricing.price_per_m2_volume}/m²
-- Envío gratis: ≥${pricing.free_shipping_min_m2} m² y ≤${pricing.free_shipping_max_km} km
-` : ''}`;
+${pricing ? bloqueDePrecios(pricing) : ''}`;
 
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: KNOWLEDGE_PROMPT + contextBlock },
@@ -411,8 +427,21 @@ async function tryQuoteFromConversation(
 
   const configToUse = config || getFallbackPricingConfig();
 
-  if (parsed.quantity < RETAIL_CONFIG.MIN_CANTIDAD) {
-    return `La cantidad mínima es ${RETAIL_CONFIG.MIN_CANTIDAD} unidades. Indicaste ${parsed.quantity.toLocaleString('es-AR')}. ¿Querés cotizar con la cantidad mínima o más?`;
+  // El piso se mide en m² de carton desplegado, no en cajas. Cortar por cantidad
+  // rechazaba a quien pedia 90 cajas grandes —que pasan los 500 m² de sobra— y
+  // dejaba pasar 100 cajas chicas, que no llegan ni a 40 m².
+  {
+    const m2Caja = calculateUnfolded(parsed.length, parsed.width, parsed.height).m2;
+    const m2Pedido = calculateTotalM2(m2Caja, parsed.quantity);
+    if (m2Pedido < RETAIL_CONFIG.MIN_M2_PEDIDO) {
+      const cajasMinimo = Math.ceil(RETAIL_CONFIG.MIN_M2_PEDIDO / m2Caja);
+      return (
+        `El mínimo de compra es ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón y ` +
+        `${parsed.quantity.toLocaleString('es-AR')} cajas de ${parsed.length}x${parsed.width}x${parsed.height} ` +
+        `son ${m2Pedido.toFixed(1)} m². Con esa medida el mínimo son ` +
+        `${cajasMinimo.toLocaleString('es-AR')} cajas. ¿Te sirve esa cantidad?`
+      );
+    }
   }
 
   const validation = validateDimensions(parsed.length, parsed.width, parsed.height);
@@ -541,14 +570,7 @@ export async function generateChatResponse(
 CONTEXTO: Usuario en la web de Quilmes Corrugados. No tiene historial de WhatsApp.
 - Estado: ${ctx.conversationState || 'inicial'}
 - Página actual: ${ctx.landingPage || 'desconocida'}${segmentLine}${askSegmentLine}
-${pricing ? `
-PRECIOS ACTUALES (usar SOLO estos — no inventar ni negociar otros):
-- De stock, ${pricing.min_m2_pedido} a ${pricing.wholesale_min_m2} m²: $${pricing.price_per_m2_retail}/m² (medidas estándar de catálogo, sin impresión)
-- A medida, ${pricing.wholesale_min_m2} a ${pricing.min_m2_per_model} m²: $${pricing.price_per_m2_below_minimum ?? pricing.price_per_m2_standard * 1.2}/m²
-- A medida, ${pricing.min_m2_per_model} a ${pricing.volume_threshold_m2} m²: $${pricing.price_per_m2_standard}/m²
-- A medida, más de ${pricing.volume_threshold_m2} m²: $${pricing.price_per_m2_volume}/m²
-- Envío gratis: ≥${pricing.free_shipping_min_m2} m² y ≤${pricing.free_shipping_max_km} km
-` : ''}`;
+${pricing ? bloqueDePrecios(pricing) : ''}`;
 
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: KNOWLEDGE_PROMPT.replace('WhatsApp', 'sitio web').replace(/Escribí "cotizar"/g, 'Usá el cotizador') + contextBlock },

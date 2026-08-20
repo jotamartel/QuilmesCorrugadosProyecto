@@ -29,7 +29,7 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: 'Precios de cajas de cartón corrugado',
   description:
-    'Precio por m² de cajas de cartón corrugado a medida, actualizado. Desde $700/m² por volumen. Fábrica en Quilmes, Buenos Aires. Cotización online al instante.',
+    'Precio por m² de cajas de cartón corrugado a medida, actualizado, con los cuatro tramos por volumen. Fábrica en Quilmes, Buenos Aires. Cotización online al instante.',
   alternates: { canonical: '/precios' },
 };
 

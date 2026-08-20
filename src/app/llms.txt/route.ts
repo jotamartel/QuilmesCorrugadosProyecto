@@ -191,7 +191,8 @@ ${BASE_URL}/api/v1/quote?length_mm=400&width_mm=600&height_mm=600&quantity=3000
 ${BASE_URL}/api/v1/quote?length_cm=40&width_cm=60&height_cm=60&quantity=3000
 
 Parámetros: length_mm (100-2000), width_mm (100-2000), height_mm (50-1500),
-quantity (entero ≥ 1), printing_colors (0-${RETAIL_CONFIG.MAX_PRINTING_COLORS}, opcional, +15% por color).
+quantity (entero ≥ 1), printing_colors (0-${RETAIL_CONFIG.MAX_PRINTING_COLORS}, opcional; la
+impresión está incluida en el precio por m², aparte solo se cobra el polímero).
 Alias aceptados: largo_cm / ancho_cm / alto_cm / cantidad.
 Límite: 10 consultas por minuto sin API key.
 
@@ -227,8 +228,8 @@ mismo precio y el mismo motor de calculo.
 
 | Volumen del pedido | Precio | Qué es |
 |---|---|---|
-| hasta ${m2(c.wholesale_min_m2)} | ${ars(c.price_per_m2_retail)}/m² | medidas estándar de stock, entrega rápida |
-| ${m2(c.wholesale_min_m2)} a ${m2(c.min_m2_per_model)} | ${ars(c.price_per_m2_below_minimum ?? RESPALDO.price_per_m2_below_minimum)}/m² | a medida, con recargo por bajo volumen |
+| ${m2(c.min_m2_pedido)} a ${m2(c.wholesale_min_m2)} | ${ars(c.price_per_m2_retail)}/m² | medidas estándar de catálogo, sin impresión, entrega más rápida |
+| ${m2(c.wholesale_min_m2)} a ${m2(c.min_m2_per_model)} | ${ars(c.price_per_m2_below_minimum ?? RESPALDO.price_per_m2_below_minimum)}/m² | a medida, troquelada o impresa |
 | ${m2(c.min_m2_per_model)} a ${m2(c.volume_threshold_m2)} | ${ars(c.price_per_m2_standard)}/m² | a medida, precio estándar |
 | más de ${m2(c.volume_threshold_m2)} | ${ars(c.price_per_m2_volume)}/m² | a medida, precio por volumen |
 
@@ -269,13 +270,15 @@ genera a la persona.
 
 ## Los dos canales
 
-**Stock — hasta ${m2(c.wholesale_min_m2)}**
-Medidas estándar ya fabricadas. Entrega más rápida porque no
-hay producción de por medio. Se compra online: ${BASE_URL}/cajas
+**Catálogo — de ${m2(c.min_m2_pedido)} a ${m2(c.wholesale_min_m2)}**
+Medidas estándar. Lo que hay en stock sale en 24/48 hs y el resto se
+fabrica. No llevan impresión. Se cotiza en ${BASE_URL}/cajas y el pedido
+se cierra por WhatsApp.
 
 **A medida — desde ${m2(c.wholesale_min_m2)}**
-Cualquier medida dentro de los rangos. Producción ${c.production_days_standard} días hábiles
-(${c.production_days_printing} con impresión). Se cotiza en ${BASE_URL}/#cotizador
+Cualquier medida dentro de los rangos, con troquelado o impresión.
+Producción ${c.production_days_standard} días hábiles (${c.production_days_printing} con impresión).
+Se cotiza en ${BASE_URL}/#cotizador
 
 ## Restricciones
 

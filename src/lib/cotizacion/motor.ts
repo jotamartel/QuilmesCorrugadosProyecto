@@ -450,7 +450,7 @@ export function calcularCotizacion(
   // Sin este chequeo mandabamos al cliente a /cajas a chocarse con el minimo,
   // o a buscar una medida que no existe.
   const cantidadTotal = boxResults.reduce((s, b) => s + b.quantity, 0);
-  const llegaAlMinimo = cantidadTotal >= RETAIL_CONFIG.MIN_CANTIDAD;
+  const llegaAlMinimo = totalM2 >= RETAIL_CONFIG.MIN_M2_PEDIDO;
 
   const hayCatalogo = medidasEnStock.length > 0;
   const todasEnStock = hayCatalogo && boxResults.every((b) =>
@@ -465,7 +465,7 @@ export function calcularCotizacion(
 
   const motivoNoOnline = !volumenDeStock ? null
     : !llegaAlMinimo
-      ? `Son ${cantidadTotal} cajas y el autoservicio arranca en ${RETAIL_CONFIG.MIN_CANTIDAD}. Para esta cantidad lo coordinamos por WhatsApp.`
+      ? `Son ${totalM2.toFixed(1)} m² y el mínimo de compra es ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón. Para este volumen lo coordinamos por WhatsApp.`
       : !hayCatalogo
         ? null
         : `Esta medida no está entre las estándar que tenemos en stock, así que se fabrica a pedido. Escribinos y lo vemos.`;

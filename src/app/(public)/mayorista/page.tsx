@@ -14,15 +14,15 @@ import { Package, TrendingDown, Factory, ArrowRight } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
 import { RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
 
-const MIN = RETAIL_CONFIG.MIN_CANTIDAD;
 
 const PREGUNTAS = [
   {
     pregunta: '¿Cuál es el mínimo para comprar por mayor?',
     respuesta:
-      '3.000 m² de cartón por modelo de caja. Ese es el punto donde arranca una tirada de ' +
-      'producción a medida. Por debajo de 1.000 m² el pedido sale del canal de stock, con ' +
-      `mínimo de ${MIN} cajas y precio minorista.`,
+      `${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m² de cartón. Ese es el punto donde ` +
+      `arranca una tirada a medida: recién ahí se puede troquelar o imprimir. Por debajo, el ` +
+      `pedido sale del catálogo de medidas estándar, con mínimo de ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² ` +
+      `y precio minorista. Los 3.000 m² son otra cosa: el tramo donde el precio por m² baja.`,
   },
   {
     pregunta: '¿Cuánto baja el precio por volumen?',
@@ -70,13 +70,14 @@ export default function MayoristaPage() {
             Comprá cajas de cartón{' '}
             <span className="text-[#002E55]">directo de fábrica</span>
           </h1>
-          {/* Decia "Desde 100 unidades por modelo", que es el minimo del canal
-              MINORISTA. En la pagina del canal mayorista contradecia la
-              escalera de precios entera y prometia algo que este canal no
-              vende. El minimo real de una tirada a medida es 3.000 m². */}
+          {/* Decia "Desde 100 unidades por modelo", que es un minimo que ya no
+              existe en ningun canal, y despues "desde 3.000 m²", que es el
+              escalon donde BAJA EL PRECIO, no donde arranca la produccion. Una
+              tirada a medida arranca en MIN_M2_A_MEDIDA_PROPIA. */}
           <p className="text-xl text-gray-600 mb-6 max-w-2xl mx-auto">
-            Producción propia en Quilmes, sin intermediarios. Tiradas a medida desde 3.000 m²
-            por modelo, con precio por m² que baja según el volumen.
+            Producción propia en Quilmes, sin intermediarios. Tiradas a medida desde{' '}
+            {RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m² de cartón, con precio
+            por m² que baja según el volumen.
           </p>
           <div className="mb-8 flex flex-wrap items-center justify-center gap-3">
             <a
@@ -95,7 +96,10 @@ export default function MayoristaPage() {
 
           <ResumenClave
             puntos={[
-              { rotulo: 'Mínimo', valor: '3.000 m² por modelo para producción a medida' },
+              {
+                rotulo: 'Mínimo',
+                valor: `${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m² de cartón para producción a medida`,
+              },
               {
                 rotulo: 'Precio',
                 valor: `De $${RETAIL_CONFIG.VOLUME_PRICE_PER_M2} a $${RETAIL_CONFIG.RETAIL_PRICE_PER_M2} por m², según el tramo de volumen`,
@@ -126,7 +130,7 @@ export default function MayoristaPage() {
                 <TrendingDown className="w-6 h-6 text-[#002E55]" />
               </div>
               <h3 className="font-semibold text-gray-900 mb-2">Precios por volumen</h3>
-              <p className="text-gray-600 text-sm">Desde 3.000 m² precio estándar. Más de 5.000 m² descuento mayorista.</p>
+              <p className="text-gray-600 text-sm">El precio por m² baja por tramos: a los 1.000, a los 3.000 y a los 5.000 m².</p>
             </div>
             <div className="text-center p-6">
               <div className="inline-flex justify-center w-12 h-12 bg-blue-100 rounded-full mb-4">
@@ -134,7 +138,8 @@ export default function MayoristaPage() {
               </div>
               <h3 className="font-semibold text-gray-900 mb-2">Pedidos chicos, otro canal</h3>
               <p className="text-gray-600 text-sm">
-                ¿No llegás a 3.000 m²? Desde {MIN} cajas se compra de stock en{' '}
+                ¿No llegás a {RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m²? Desde{' '}
+                {RETAIL_CONFIG.MIN_M2_PEDIDO} m² se compra de catálogo en{' '}
                 <Link href="/cajas" className="text-[#002E55] underline underline-offset-2">
                   la tienda minorista
                 </Link>

@@ -60,7 +60,7 @@ export default function QuoteConfirmationPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showBelowMinimumModal, setShowBelowMinimumModal] = useState(false);
-  const [pricingConfig, setPricingConfig] = useState<{ price_per_m2_below_minimum: number; min_m2_per_model: number } | null>(null);
+  const [pricingConfig, setPricingConfig] = useState<{ price_per_m2_below_minimum: number; min_m2_per_model: number; wholesale_min_m2: number } | null>(null);
 
   useEffect(() => {
     async function fetchQuote() {
@@ -79,10 +79,11 @@ export default function QuoteConfirmationPage() {
         if (pricingRes.ok) {
           const pricingData = await pricingRes.json();
           // Usar valores directamente de la configuración activa (sin fallbacks hardcodeados)
-          if (pricingData.price_per_m2_below_minimum && pricingData.min_m2_per_model) {
+          if (pricingData.price_per_m2_below_minimum && pricingData.min_m2_per_model && pricingData.wholesale_min_m2) {
             setPricingConfig({
               price_per_m2_below_minimum: pricingData.price_per_m2_below_minimum,
               min_m2_per_model: pricingData.min_m2_per_model,
+              wholesale_min_m2: pricingData.wholesale_min_m2,
             });
           }
         }
@@ -289,7 +290,7 @@ export default function QuoteConfirmationPage() {
               </a>
 
               {/* Botón para pedidos menores al mínimo */}
-              {quote.total_sqm >= 3000 && pricingConfig && (
+              {pricingConfig && quote.total_sqm > pricingConfig.wholesale_min_m2 && (
                 <button
                   onClick={() => setShowBelowMinimumModal(true)}
                   className="w-full px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"
@@ -329,6 +330,7 @@ export default function QuoteConfirmationPage() {
           originalTotalSqm={quote.total_sqm}
           pricePerM2BelowMinimum={pricingConfig.price_per_m2_below_minimum}
           minM2PerModel={pricingConfig.min_m2_per_model}
+          minM2AMedida={pricingConfig.wholesale_min_m2}
           onSuccess={() => {
             // Recargar la cotización para ver el estado actualizado
             window.location.reload();

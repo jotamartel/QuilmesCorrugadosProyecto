@@ -10,6 +10,7 @@ import type { CotizarParams, CotizarResponse } from '@/types/retell';
 import type { PricingConfig } from '@/lib/types/database';
 import { RETELL_CONSTANTS } from '@/types/retell';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 
 const {
   ANCHO_LAMINA_MAX_MM,
@@ -248,11 +249,21 @@ function validateParams(params: CotizarParams): { valid: boolean; message?: stri
     };
   }
 
-  if (cantidad < 100) {
+  // El piso se mide en m² de carton desplegado, no en cajas. Cortar en 100
+  // unidades rechazaba a quien pedia 50 cajas grandes —que pasan los 500 m² de
+  // sobra— y aceptaba 100 chicas, que no llegan ni a 40 m². Ademas el mensaje
+  // ya hablaba en m²: bloqueaba con un criterio y explicaba con otro.
+  const m2Caja = calculateUnfolded(largo_cm * 10, ancho_cm * 10, alto_cm * 10).m2;
+  const m2Pedido = calculateTotalM2(m2Caja, cantidad);
+
+  if (m2Pedido < RETAIL_CONFIG.MIN_M2_PEDIDO) {
+    const cajasMinimo = Math.ceil(RETAIL_CONFIG.MIN_M2_PEDIDO / m2Caja);
     return {
       valid: false,
-      message: `Para ${cantidad} cajas el pedido es muy chico para producir. ` +
-        `El mínimo de compra es de ${RETAIL_CONFIG.MIN_M2_PEDIDO} metros cuadrados de cartón. ¿Querés que calcule cuántas cajas de esa medida son?`,
+      message:
+        `El mínimo de compra es de ${RETAIL_CONFIG.MIN_M2_PEDIDO} metros cuadrados de cartón, ` +
+        `y ${cantidad} cajas de esa medida son ${m2Pedido.toFixed(0)} metros cuadrados. ` +
+        `Con esa medida el mínimo son ${cajasMinimo} cajas. ¿Te sirve esa cantidad?`,
     };
   }
 

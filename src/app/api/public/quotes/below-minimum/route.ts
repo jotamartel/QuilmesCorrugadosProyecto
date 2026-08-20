@@ -84,11 +84,17 @@ export async function POST(request: NextRequest) {
     const sqmPerBox = unfolded.m2;
     const totalSqm = calculateTotalM2(sqmPerBox, body.requested_quantity);
 
-    // Validar que esté entre 1000 y min_m2_per_model
-    if (totalSqm < 1000) {
-      const minQuantity = Math.ceil(1000 / sqmPerBox);
+    // El piso de produccion a medida sale de la config, no escrito aca: cuando
+    // el umbral se movio, esta copia quedo atras.
+    const minM2AMedida = config.wholesale_min_m2;
+    if (totalSqm < minM2AMedida) {
+      const minQuantity = Math.ceil(minM2AMedida / sqmPerBox);
       return NextResponse.json(
-        { error: `La cantidad mínima es ${minQuantity} cajas para alcanzar 1000m²` },
+        {
+          error:
+            `La producción a medida arranca en ${minM2AMedida.toLocaleString('es-AR')} m²: ` +
+            `${minQuantity.toLocaleString('es-AR')} cajas de esta medida`,
+        },
         { status: 400 }
       );
     }

@@ -77,7 +77,8 @@ export default function LandingPage() {
             </Link>
           </div>
           <p className="mt-4 text-sm text-gray-500">
-            Mayorista: mín {RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² · Minorista: desde{' '}
+            Mayorista: a medida desde{' '}
+            {RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m² · Minorista: desde{' '}
             {RETAIL_CONFIG.MIN_M2_PEDIDO} m²
           </p>
           {/* El precio en el texto visible del home.
@@ -208,7 +209,9 @@ export default function LandingPage() {
             respuesta:
               `Depende del canal. Si la medida está en catálogo y sale de stock, desde ` +
               `${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón. Si querés una medida propia fabricada ` +
-              `a pedido, el mínimo es ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² de cartón por modelo de caja.`,
+              `a pedido —troquelada o con impresión—, el mínimo es ` +
+              `${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m² de cartón. De ahí en adelante ` +
+              `el precio por m² baja por tramos.`,
           },
           {
             pregunta: '¿Puedo cotizar sin hablar con un vendedor?',

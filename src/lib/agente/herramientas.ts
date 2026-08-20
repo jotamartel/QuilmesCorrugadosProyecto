@@ -196,8 +196,9 @@ export function crearHerramientas(ctx: ContextoAgente) {
     const c = await getActivePricingConfig();
     return JSON.stringify({
       minimos: {
-        minorista_cajas: RETAIL_CONFIG.MIN_CANTIDAD,
-        mayorista_m2_por_modelo: RETAIL_CONFIG.MIN_M2_A_MEDIDA,
+        // Se miden en m² de carton desplegado, nunca en cantidad de cajas.
+        compra_m2: RETAIL_CONFIG.MIN_M2_PEDIDO,
+        medida_propia_m2: RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA,
         explicacion: MINIMOS.largo,
       },
       precios_por_m2_sin_iva: c

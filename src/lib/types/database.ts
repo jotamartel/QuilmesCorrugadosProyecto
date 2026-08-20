@@ -45,6 +45,11 @@ export interface PricingConfig {
   price_per_m2_retail: number; // Precio por m2 para ventas de stock (< wholesale_min_m2)
   wholesale_min_m2: number; // Limite entre stock (/cajas) y produccion a medida (mayorista)
 
+  // Piso absoluto de venta, en m² de carton. Debajo de esto no se cotiza.
+  // El minimo dejo de medirse en cantidad de cajas: lo que limita es cuanto
+  // carton entra en una tirada, y eso no depende de en cuantas cajas se corte.
+  min_m2_pedido: number;
+
   // Impresion. Los tres son configurables desde el panel porque la franja
   // intermedia todavia no esta definida comercialmente.
   printing_min_m2: number;              // Desde que m2 se ofrece impresion

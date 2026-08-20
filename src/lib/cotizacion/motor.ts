@@ -71,6 +71,23 @@ export interface BoxResult {
   template_pdf: string;
 }
 
+/**
+ * Por qué un pedido no se puede tomar, cuando no se puede.
+ *
+ * Son dos motivos distintos y conviene no mezclarlos: uno es de volumen —no
+ * llega al piso de venta— y el otro es de canal —quiere una medida propia con
+ * un volumen que solo alcanza para catálogo—. El segundo no se resuelve
+ * comprando más de lo mismo: hay que elegir una medida estándar o subir bastante
+ * más.
+ */
+export interface Impedimento {
+  tipo: 'bajo_minimo' | 'medida_propia_sin_volumen';
+  motivo: string;
+  /** Cuántas cajas de ESTA medida hacen falta para poder avanzar. */
+  cajas_necesarias: number | null;
+  m2_faltantes: number;
+}
+
 export interface QuoteResult {
   boxes: BoxResult[];
   total_m2: number;
@@ -90,6 +107,14 @@ export interface QuoteResult {
   meets_minimum: boolean;
   /** Por qué canal corresponde este volumen */
   channel: 'stock' | 'made_to_order';
+  /**
+   * Si el pedido se puede tomar. Null cuando sí.
+   *
+   * El precio se devuelve igual, para que quien consume pueda mostrar el orden
+   * de magnitud, pero con esto presente NO es una oferta: es la referencia que
+   * acompaña a la explicación de qué falta.
+   */
+  impedimento: Impedimento | null;
   /**
    * Si el cliente puede comprarlo solo desde la web. Ser del canal de stock no
    * alcanza: hace falta llegar al mínimo de unidades y que la medida esté en
@@ -381,6 +406,37 @@ export function calcularCotizacion(
   totalM2 = Math.round(totalM2 * 100) / 100;
   totalSubtotal = Math.round(totalSubtotal * 100) / 100;
 
+  // ¿Se puede tomar este pedido?
+  //
+  // Dos umbrales distintos. El piso de venta es de superficie y no de unidades:
+  // lo que limita es cuánto cartón entra en una tirada. Y la personalización
+  // —medida propia, troquelado, impresión— arranca más arriba, porque implica
+  // preparar la máquina para un desarrollo que no está en catálogo.
+  const m2PorCajaPrimera = boxResults[0]?.sqm_per_box || 0;
+  const cajasPara = (m2Objetivo: number) =>
+    m2PorCajaPrimera > 0 && boxes.length === 1
+      ? Math.ceil(m2Objetivo / m2PorCajaPrimera)
+      : null;
+
+  let impedimento: Impedimento | null = null;
+
+  if (totalM2 < config.min_m2_pedido) {
+    const faltan = config.min_m2_pedido - totalM2;
+    const cajas = cajasPara(config.min_m2_pedido);
+    impedimento = {
+      tipo: 'bajo_minimo',
+      motivo:
+        `El mínimo de compra es ${config.min_m2_pedido.toLocaleString('es-AR')} m² de cartón y ` +
+        `este pedido son ${totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m².` +
+        (cajas ? ` Con esta medida, son ${cajas.toLocaleString('es-AR')} cajas.` : ''),
+      cajas_necesarias: cajas,
+      m2_faltantes: Math.round(faltan * 10) / 10,
+    };
+  }
+
+  // El otro impedimento: quiere una medida que no esta en catalogo, con un
+  // volumen que solo alcanza para catalogo. No se arregla comprando un poco
+  // mas: o elige una medida estandar, o sube hasta el umbral de a medida.
   const validUntil = new Date();
   validUntil.setDate(validUntil.getDate() + config.quote_validity_days);
 
@@ -450,6 +506,30 @@ export function calcularCotizacion(
     ),
   );
   const impresionDisponible = totalM2 >= config.printing_min_m2 && !medidaDeCatalogo;
+
+  // Segundo impedimento: pide una medida propia con un volumen que solo alcanza
+  // para catalogo.
+  //
+  // Es distinto del piso de venta y no se arregla comprando un poco mas: o
+  // elige una medida estandar, o sube hasta el umbral de produccion a medida.
+  // Es exactamente la consulta que llegaba por WhatsApp —cajas troqueladas por
+  // 50 unidades— y que el sitio dejaba pasar.
+  if (!impedimento && !medidaDeCatalogo && hayCatalogo && totalM2 < config.wholesale_min_m2) {
+    const cajasParaAMedida = cajasPara(config.wholesale_min_m2);
+    impedimento = {
+      tipo: 'medida_propia_sin_volumen',
+      motivo:
+        `Esta medida no está en el catálogo, así que hay que fabricarla, y la producción a ` +
+        `medida arranca en ${config.wholesale_min_m2.toLocaleString('es-AR')} m². Este pedido son ` +
+        `${totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m².` +
+        (cajasParaAMedida
+          ? ` Serían ${cajasParaAMedida.toLocaleString('es-AR')} cajas de esta medida.`
+          : '') +
+        ` Por debajo de ese volumen trabajamos con medidas estándar de catálogo, sin impresión.`,
+      cajas_necesarias: cajasParaAMedida,
+      m2_faltantes: Math.round((config.wholesale_min_m2 - totalM2) * 10) / 10,
+    };
+  }
 
   // Si a este pedido, por su volumen, la impresión ya le viene incluida.
   const impresionIncluidaEnElPedido = totalM2 >= config.printing_included_min_m2;
@@ -582,6 +662,7 @@ export function calcularCotizacion(
     valid_until: validUntil.toISOString().split('T')[0],
     minimum_m2: config.wholesale_min_m2,
     meets_minimum: !esDeStock,
+    impedimento,
     channel: esDeStock ? 'stock' : 'made_to_order',
     can_buy_online: sePuedeComprarOnline,
     channel_note: !esDeStock

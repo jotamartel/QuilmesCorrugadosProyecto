@@ -56,6 +56,7 @@ function getFallbackPricingConfig(): PricingConfig {
     volume_threshold_m2: 5000,
     min_m2_per_model: 3000,
     wholesale_min_m2: 1000,
+    min_m2_pedido: 500,
     price_per_m2_below_minimum: 1000,
     price_per_m2_retail: 1200,
     printing_min_m2: 1000,

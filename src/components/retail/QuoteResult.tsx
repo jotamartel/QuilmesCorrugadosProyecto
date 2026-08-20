@@ -15,6 +15,16 @@ export interface StandardSuggestion {
   height_mm: number;
   m2_per_box: number;
   stock: number;
+  /**
+   * Si lo que iba a entrar en la medida que tipeo entra en esta. Lo calcula el
+   * endpoint: el alto contra el alto —la apertura va arriba, rotarla la deja
+   * abierta de costado— y el largo con el ancho intercambiables entre si.
+   *
+   * No filtra: se ofrecen las mas parecidas y el cliente elige. Pero si es mas
+   * chica hay que decirlo, porque el que compra sabe que va adentro y nosotros
+   * no.
+   */
+  entra?: boolean;
 }
 
 interface QuoteResultProps {
@@ -224,6 +234,14 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
                   : 'A fabricar'}
             </span>
           </div>
+          {sug.entra === false && (
+            <div
+              className="text-xs mt-1"
+              style={{ fontFamily: 'var(--font-retail-sans), sans-serif', color: '#b45309' }}
+            >
+              Mas chica que la que armaste
+            </div>
+          )}
           {subeLaCantidad && (
             <div
               className="text-xs mt-1"

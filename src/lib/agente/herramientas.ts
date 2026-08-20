@@ -170,15 +170,21 @@ export function crearHerramientas(ctx: ContextoAgente) {
           subtotal_sin_iva: Math.round(a.subtotal),
           total_con_iva: Math.round(a.total_con_iva),
           en_stock: a.stock,
+          // Si lo que iba a embalar entra en esta caja. No filtra nada: se
+          // ofrecen las mas parecidas y el cliente decide, pero si es mas
+          // chica hay que decirlo.
+          entra_lo_que_iba_en_la_pedida: a.entra,
           link_para_compartir: `${SITE_URL}/cotizar/${a.length_mm}x${a.width_mm}x${a.height_mm}/${a.cantidad}`,
         })),
         instruccion:
           'NO des ningun precio para la medida que pidió: no lo tenés y no existe. Decí el ' +
           'mínimo, cuántos m² son y cuántas cajas hacen falta. ' +
           (imp.alternativas.length
-            ? 'Y OFRECELE DIRECTAMENTE la primera de alternativas_de_catalogo, con su medida, ' +
-              'su cantidad y su precio, que ya están calculados acá. No preguntes si querés ' +
-              'que la busque: buscala y decila. '
+            ? 'Y OFRECELE DIRECTAMENTE las de alternativas_de_catalogo, con su medida, su ' +
+              'cantidad y su precio, que ya están calculados acá. No preguntes si querés que ' +
+              'las busque: son estas. Si alguna tiene entra_lo_que_iba_en_la_pedida en false, ' +
+              'avisá que es más chica que la medida que pidió, pero ofrecela igual: el cliente ' +
+              'sabe qué va adentro. '
             : '') +
           'NO ofrezcas coordinarlo por WhatsApp, ni consultarlo, ni pasarlo a un asesor para ' +
           'que la busque una persona: el mínimo es excluyente y la alternativa ya la tenés.',

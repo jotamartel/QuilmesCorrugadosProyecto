@@ -127,11 +127,14 @@ export interface AlternativaDeCatalogo {
   /**
    * Si lo que iba a entrar en la caja pedida entra en esta.
    *
-   * Se compara dimensión por dimensión, ordenadas de mayor a menor, porque una
-   * caja se puede rotar. Importa más que el parecido: la primera version de
-   * esto ordenaba por distancia y a alguien que pidió 214x263x301 le ofrecía
-   * una de 200x200x200, que es la mas "parecida" en milímetros y no le entra
-   * nada de lo que queria embalar.
+   * El alto tiene que cubrir al alto —es una RSC y la apertura va arriba, así
+   * que rotarla la dejaría abierta de costado—; el largo y el ancho sí se
+   * intercambian entre sí.
+   *
+   * NO filtra ni reordena: las alternativas se eligen por parecido y esto viaja
+   * como dato, para que quien conteste pueda decir "esta es un poco más chica"
+   * en vez de que nosotros decidamos por el cliente qué le sirve. Él sabe qué
+   * va adentro; nosotros no.
    */
   entra: boolean;
 }
@@ -419,19 +422,25 @@ function buscarAlternativas(
   pedida: BoxInput,
   config: PricingConfig,
   medidasEnStock: Array<{ length_mm: number; width_mm: number; height_mm: number; stock: number }>,
-  cuantas = 2,
+  cuantas = 3,
 ): AlternativaDeCatalogo[] {
   return medidasEnStock
     .filter((m) =>
       !(m.length_mm === pedida.length_mm && m.width_mm === pedida.width_mm && m.height_mm === pedida.height_mm),
     )
     .map((m) => {
-      // Ordenadas de mayor a menor: una caja se puede rotar, asi que lo que
-      // importa es que cada dimension del candidato cubra a la que le toca.
-      const pedidas = [pedida.length_mm, pedida.width_mm, pedida.height_mm].sort((a, b) => b - a);
-      const candidatas = [m.length_mm, m.width_mm, m.height_mm].sort((a, b) => b - a);
-      const entra = candidatas.every((c, i) => c >= pedidas[i]);
-      const volumen = m.length_mm * m.width_mm * m.height_mm;
+      // EL ALTO NO ROTA. Es una RSC: la apertura esta arriba, asi que el alto
+      // tiene que cubrir al alto. Intercambiarlo con el largo o el ancho da una
+      // caja que "entra" en la cuenta y que en la practica abre de costado.
+      //
+      // El largo y el ancho si se intercambian entre si: apoyar la caja girada
+      // noventa grados no cambia por donde se llena.
+      const basePedida = [pedida.length_mm, pedida.width_mm].sort((a, b) => b - a);
+      const baseCandidata = [m.length_mm, m.width_mm].sort((a, b) => b - a);
+      const entra =
+        m.height_mm >= pedida.height_mm &&
+        baseCandidata[0] >= basePedida[0] &&
+        baseCandidata[1] >= basePedida[1];
 
       const { m2 } = calculateUnfolded(m.length_mm, m.width_mm, m.height_mm);
       // La cantidad que hace falta para que ESTA medida llegue al piso de venta.
@@ -452,24 +461,22 @@ function buscarAlternativas(
         subtotal,
         total_con_iva: Math.round(subtotal * (1 + IVA) * 100) / 100,
         stock: m.stock ?? 0,
+        // Distancia con la misma regla de rotacion: alto contra alto, y la base
+        // comparada ordenada. Sumar |largo-largo| a secas castiga a una caja
+        // identica apoyada al reves.
         diferencia_mm:
-          Math.abs(m.length_mm - pedida.length_mm) +
-          Math.abs(m.width_mm - pedida.width_mm) +
-          Math.abs(m.height_mm - pedida.height_mm),
+          Math.abs(m.height_mm - pedida.height_mm) +
+          Math.abs(baseCandidata[0] - basePedida[0]) +
+          Math.abs(baseCandidata[1] - basePedida[1]),
         entra,
-        volumen,
       };
     })
-    // Primero las que sirven de verdad —donde entra lo que iba a embalar—, y
-    // entre esas la mas ajustada, que es la que menos cartón desperdicia. Las
-    // que no entran van al final: se ofrecen solo si no hay ninguna que sirva.
-    .sort((a, b) => {
-      if (a.entra !== b.entra) return a.entra ? -1 : 1;
-      if (a.entra) return a.volumen - b.volumen || b.stock - a.stock;
-      return a.diferencia_mm - b.diferencia_mm || b.stock - a.stock;
-    })
-    .slice(0, cuantas)
-    .map(({ volumen: _volumen, ...a }) => a);
+    // Las mas parecidas, y nada mas. Una version anterior mandaba al fondo a
+    // las que no entraban, y terminaba ofreciendo una caja del doble de volumen
+    // porque era la unica que "servia". Quien pregunta sabe que va adentro:
+    // nosotros damos las opciones y decimos cual es mas chica, no elegimos.
+    .sort((a, b) => a.diferencia_mm - b.diferencia_mm || b.stock - a.stock)
+    .slice(0, cuantas);
 }
 
 export function calcularCotizacion(
@@ -598,11 +605,34 @@ export function calcularCotizacion(
           : '') +
         (alternativas.length
           ? ` Por debajo de ese volumen trabajamos con medidas estándar de catálogo, sin impresión. ` +
-            (alternativas[0].entra
-              ? `La más chica en la que entra lo tuyo es `
-              : `La más parecida es `) +
-            `${alternativas[0].length_mm}x${alternativas[0].width_mm}x${alternativas[0].height_mm} mm, ` +
-            `y el mínimo en esa medida son ${alternativas[0].cantidad.toLocaleString('es-AR')} cajas.`
+            `Las más parecidas: ` +
+            alternativas
+              .map(
+                (a) =>
+                  `${a.length_mm}x${a.width_mm}x${a.height_mm} mm desde ` +
+                  `${a.cantidad.toLocaleString('es-AR')} cajas`,
+              )
+              .join(', ') +
+            `.` +
+            // Se dice una vez, no una por medida. Y se dice: son mas chicas y
+            // eso lo tiene que saber quien va a meter algo adentro.
+            (() => {
+              // Se dice en castellano y una sola vez. Antes decia 'el campo
+              // "entra" de cada una lo indica', que es el nombre de un campo
+              // filtrandose a un texto que lee un cliente.
+              const chicas = alternativas.filter((a) => !a.entra);
+              if (chicas.length === 0) return '';
+              if (chicas.length === alternativas.length) {
+                return ` Ojo que todas son más chicas que la medida que pediste.`;
+              }
+              return (
+                ` Ojo que ` +
+                chicas
+                  .map((a) => `${a.length_mm}x${a.width_mm}x${a.height_mm}`)
+                  .join(' y ') +
+                ` ${chicas.length > 1 ? 'son más chicas' : 'es más chica'} que la medida que pediste.`
+              );
+            })()
           : ` Por debajo de ese volumen trabajamos con medidas estándar de catálogo, sin impresión.`),
       cajas_necesarias: cajasParaAMedida,
       m2_faltantes: Math.round((config.wholesale_min_m2 - totalM2) * 10) / 10,

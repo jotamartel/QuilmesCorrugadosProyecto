@@ -59,17 +59,34 @@ export async function GET(request: NextRequest) {
 
     const candidates = boxes.filter((box) => box !== exacta);
 
-    // Ordena por distancia Manhattan (|L1-L2| + |W1-W2| + |H1-H2|); a igual
-    // distancia, primero la que tiene stock, que entrega antes.
+    // Las medidas mas parecidas. El alto se compara contra el alto: es una RSC
+    // y la apertura va arriba, asi que rotarla la dejaria abierta de costado.
+    // El largo y el ancho si se intercambian entre si, y por eso la base se
+    // compara ordenada: sumar |largo-largo| a secas castiga a una caja igual
+    // apoyada al reves.
+    //
+    // El campo `entra` viaja como dato, no filtra: quien pregunta sabe que va
+    // adentro de la caja y puede preferir una mas chica. Nosotros damos las
+    // opciones y decimos cual es mas chica.
+    const basePedida = [l, w].sort((a, b) => b - a);
+
     const sorted = candidates
-      .map((box) => ({
-        ...box,
-        distance: Math.abs(box.length_mm - l) + Math.abs(box.width_mm - w) + Math.abs(box.height_mm - h),
-      }))
+      .map((box) => {
+        const baseCaja = [box.length_mm, box.width_mm].sort((a, b) => b - a);
+        return {
+          ...box,
+          entra:
+            box.height_mm >= h && baseCaja[0] >= basePedida[0] && baseCaja[1] >= basePedida[1],
+          distance:
+            Math.abs(box.height_mm - h) +
+            Math.abs(baseCaja[0] - basePedida[0]) +
+            Math.abs(baseCaja[1] - basePedida[1]),
+        };
+      })
       .sort((a, b) => a.distance - b.distance || (b.stock ?? 0) - (a.stock ?? 0));
 
     // Return top 2
-    const suggestions = sorted.slice(0, 2).map(({ distance: _distance, ...box }) => box);
+    const suggestions = sorted.slice(0, 3).map(({ distance: _distance, ...box }) => box);
 
     return NextResponse.json({ suggestions, exacta });
   } catch (error) {

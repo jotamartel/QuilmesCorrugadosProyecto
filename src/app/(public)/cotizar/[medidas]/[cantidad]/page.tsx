@@ -303,6 +303,11 @@ export default async function CotizarPage({ params }: Props) {
                       <span className="ml-2 text-sm text-gray-600 tabular-nums">
                         {a.cantidad.toLocaleString('es-AR')} cajas · {a.m2.toLocaleString('es-AR')} m²
                       </span>
+                      {!a.entra && (
+                        <div className="text-xs text-amber-700">
+                          Más chica que la que pediste
+                        </div>
+                      )}
                     </div>
                     <div className="text-right tabular-nums">
                       <div className="font-semibold text-gray-900">

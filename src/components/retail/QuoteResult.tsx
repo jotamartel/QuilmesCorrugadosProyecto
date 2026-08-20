@@ -34,7 +34,16 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
   // y lo cotiza el mayorista, con su propia escalera de precios.
   const superaTope = boxes.some(b => b.isMayorista);
   const topeM2 = (retailConfig ?? RETAIL_CONFIG).WHOLESALE_THRESHOLD_M2;
-  const belowMinimum = precioTotal < RETAIL_CONFIG.PRECIO_MINIMO_PEDIDO;
+  // El piso de venta se mide en carton, no en plata: un minimo en pesos deja
+  // pasar 4 m² y ese pedido no se puede producir. Sale de la config para que
+  // moverlo no requiera deploy.
+  const minM2Pedido = (retailConfig ?? RETAIL_CONFIG).MIN_M2_PEDIDO;
+  const belowMinimum = totalM2 > 0 && totalM2 < minM2Pedido;
+  const m2Faltantes = Math.max(0, minM2Pedido - totalM2);
+  // Cuantas cajas mas de la ultima medida cargada cubren lo que falta: decir
+  // solo "te faltan 380 m²" no le sirve a nadie que piensa en cajas.
+  const m2UltimaCaja = boxes.length > 0 ? boxes[boxes.length - 1].m2PerBox : 0;
+  const cajasFaltantes = m2UltimaCaja > 0 ? Math.ceil(m2Faltantes / m2UltimaCaja) : 0;
 
   // Standard box suggestions per box index (only for < 1000 m²)
   const [suggestionsMap, setSuggestionsMap] = useState<Record<number, StandardSuggestion[]>>({});
@@ -366,16 +375,24 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
             </div>
           )}
 
+          {/* Debajo del piso no se vende. Se dice el minimo y cuanto falta,
+              en cajas, que es como lo piensa quien esta comprando. */}
           {belowMinimum && (
-            <p
-              className="text-xs mt-1 text-center"
-              style={{
-                fontFamily: 'var(--font-retail-sans), sans-serif',
-                color: 'var(--retail-text-muted)',
-              }}
+            <div
+              className="max-w-sm mx-auto mt-4 rounded-xl p-4 text-center"
+              style={{ background: '#FBF2E0', border: '1px solid #E8C98A' }}
             >
-              Pedido minimo: {formatPrecio(RETAIL_CONFIG.PRECIO_MINIMO_PEDIDO)}
-            </p>
+              <p
+                className="text-sm leading-relaxed"
+                style={{ fontFamily: 'var(--font-retail-sans), sans-serif', color: '#7A4E00' }}
+              >
+                El minimo de compra es <strong>{minM2Pedido.toLocaleString('es-AR')} m²</strong> de
+                carton y este pedido son {totalM2.toFixed(1)} m².
+                {cajasFaltantes > 0 && (
+                  <> Con esta medida te faltan <strong>{cajasFaltantes.toLocaleString('es-AR')}</strong> cajas.</>
+                )}
+              </p>
+            </div>
           )}
         </div>
 
@@ -497,9 +514,10 @@ export default function QuoteResult({ boxes, visible, onReset, onOrder, onSelect
           transition: `all 400ms cubic-bezier(0.4, 0, 0.2, 1) ${300 + boxes.length * 100}ms`,
         }}
       >
-        {/* Solo si no tiene que elegir estandar y no supera el tope de stock:
-            arriba del tope el servidor rechaza el pedido y hay que derivar. */}
-        {!mustSelectStandard && !superaTope && (
+        {/* Solo si no tiene que elegir estandar, no supera el tope de stock y
+            llega al piso de venta: arriba del tope el servidor rechaza el
+            pedido y hay que derivar; abajo del piso no se vende. */}
+        {!mustSelectStandard && !superaTope && !belowMinimum && (
           <button
             onClick={onOrder}
             className="w-full rounded-2xl py-4 text-base font-semibold tracking-wide active:scale-95"

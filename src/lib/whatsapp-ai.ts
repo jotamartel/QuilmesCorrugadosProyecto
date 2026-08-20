@@ -90,14 +90,18 @@ const KNOWLEDGE_PROMPT = `Sos el asistente de WhatsApp de Quilmes Corrugados, un
 
 ### Producto
 - Cajas de cartón corrugado a medida (tipo RSC - Regular Slotted Container)
-- Dos canales: mayorista a medida (desde 3.000 m² por modelo) y minorista de
-  stock desde 100 cajas, que se compra online en /cajas
+- Dos canales: mayorista a medida (desde ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m², con
+  troquelado e impresión) y minorista de medidas estándar de stock, desde
+  ${RETAIL_CONFIG.MIN_M2_PEDIDO} m², que se cotiza en /cajas y se cierra por WhatsApp
 - Solo Argentina: no exportamos
 
 ### Medidas y límites
 - Mínimo por caja: 200 x 200 x 100 mm
 - Máximo: ancho + alto no puede superar 1200 mm (limitación de plancha)
-- Cantidad mínima: 100 unidades de stock, o 3.000 m² por modelo a medida
+- El mínimo se mide en m² de cartón, NO en cantidad de cajas: ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² para
+  comprar, y ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m² para cualquier caja a medida,
+  troquelada o impresa. Si piden 50 o 100 cajas personalizadas, decir el mínimo y
+  cuántas cajas de esa medida hacen falta
 
 ### Precios
 Los precios y los cortes de tramo NO van escritos acá: llegan en el bloque
@@ -194,6 +198,7 @@ export interface AIContext {
     price_per_m2_below_minimum?: number;
     price_per_m2_retail: number;
     wholesale_min_m2: number;
+    min_m2_pedido: number;
     min_m2_per_model: number;
     volume_threshold_m2: number;
     free_shipping_min_m2: number;
@@ -278,7 +283,7 @@ ${ctx.companyName ? `- Empresa: ${ctx.companyName}` : ''}
 ${ctx.lastQuoteTotal ? `- Última cotización: $${ctx.lastQuoteTotal.toLocaleString('es-AR')} (${ctx.lastQuoteM2?.toLocaleString('es-AR')} m²)` : ''}
 ${pricing ? `
 PRECIOS ACTUALES (usar SOLO estos si preguntan — no inventar ni negociar otros):
-- De stock, hasta ${pricing.wholesale_min_m2} m²: $${pricing.price_per_m2_retail}/m² (medidas estándar, desde 100 cajas, se compra en /cajas)
+- De stock, ${pricing.min_m2_pedido} a ${pricing.wholesale_min_m2} m²: $${pricing.price_per_m2_retail}/m² (medidas estándar de catálogo, sin impresión, se cotiza en /cajas)
 - A medida, ${pricing.wholesale_min_m2} a ${pricing.min_m2_per_model} m²: $${pricing.price_per_m2_below_minimum ?? pricing.price_per_m2_standard * 1.2}/m²
 - A medida, ${pricing.min_m2_per_model} a ${pricing.volume_threshold_m2} m²: $${pricing.price_per_m2_standard}/m²
 - A medida, más de ${pricing.volume_threshold_m2} m²: $${pricing.price_per_m2_volume}/m²
@@ -537,10 +542,11 @@ CONTEXTO: Usuario en la web de Quilmes Corrugados. No tiene historial de WhatsAp
 - Estado: ${ctx.conversationState || 'inicial'}
 - Página actual: ${ctx.landingPage || 'desconocida'}${segmentLine}${askSegmentLine}
 ${pricing ? `
-PRECIOS ACTUALES:
-- Estándar: $${pricing.price_per_m2_standard}/m² (≥${pricing.min_m2_per_model} m²)
-- Mayorista: $${pricing.price_per_m2_volume}/m² (≥${pricing.volume_threshold_m2} m²)
-- Pedidos chicos: $${pricing.price_per_m2_below_minimum ?? pricing.price_per_m2_standard * 1.2}/m² (coordinar: $850)
+PRECIOS ACTUALES (usar SOLO estos — no inventar ni negociar otros):
+- De stock, ${pricing.min_m2_pedido} a ${pricing.wholesale_min_m2} m²: $${pricing.price_per_m2_retail}/m² (medidas estándar de catálogo, sin impresión)
+- A medida, ${pricing.wholesale_min_m2} a ${pricing.min_m2_per_model} m²: $${pricing.price_per_m2_below_minimum ?? pricing.price_per_m2_standard * 1.2}/m²
+- A medida, ${pricing.min_m2_per_model} a ${pricing.volume_threshold_m2} m²: $${pricing.price_per_m2_standard}/m²
+- A medida, más de ${pricing.volume_threshold_m2} m²: $${pricing.price_per_m2_volume}/m²
 - Envío gratis: ≥${pricing.free_shipping_min_m2} m² y ≤${pricing.free_shipping_max_km} km
 ` : ''}`;
 

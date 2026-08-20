@@ -28,8 +28,13 @@ export interface BoxCalculations {
   pricePerM2: number;
   unitPrice: number;
   subtotal: number;
-  minQuantityFor3000m2: number;
-  meetsMinimum: boolean;
+  /** Cuántas cajas de esta medida hacen falta para poder fabricarla a medida. */
+  minCajasAMedida: number;
+  /** Cuántas hacen falta para llegar al piso de venta. */
+  minCajasPiso: number;
+  /** Los dos umbrales en m², para poder nombrarlos sin pasar la config al componente. */
+  minM2AMedida: number;
+  minM2Piso: number;
   /** Por debajo del limite no se produce a medida: se vende de stock desde /cajas */
   esDeStock: boolean;
 }
@@ -82,7 +87,12 @@ export function calculateBoxItem(box: BoxItemData, pricingConfig?: PricingConfig
   
   const subtotal = Math.round(totalSqm * pricePerM2 * 100) / 100;
   const unitPrice = quantity > 0 ? Math.round((subtotal / quantity) * 100) / 100 : 0;
-  const minQuantityFor3000m2 = Math.ceil(pricingConfig.min_m2_per_model / unfolded.m2);
+  // El umbral que importa acá es el de producción a medida, no el escalón de
+  // precio: este cotizador fabrica la medida que le pidan, y eso arranca en
+  // wholesale_min_m2. Antes sugería el de 3.000, que es donde baja el precio, y
+  // eso pedía el triple de lo necesario para poder comprar.
+  const minCajasAMedida = Math.ceil(pricingConfig.wholesale_min_m2 / unfolded.m2);
+  const minCajasPiso = Math.ceil(pricingConfig.min_m2_pedido / unfolded.m2);
 
   return {
     sheetWidth: unfolded.unfoldedWidth,
@@ -92,9 +102,11 @@ export function calculateBoxItem(box: BoxItemData, pricingConfig?: PricingConfig
     pricePerM2,
     unitPrice,
     subtotal,
-    minQuantityFor3000m2,
-    meetsMinimum: totalSqm >= pricingConfig.min_m2_per_model,
-    esDeStock: totalSqm < (pricingConfig.wholesale_min_m2 ?? 1000),
+    minCajasAMedida,
+    minCajasPiso,
+    minM2AMedida: pricingConfig.wholesale_min_m2,
+    minM2Piso: pricingConfig.min_m2_pedido,
+    esDeStock: totalSqm < pricingConfig.wholesale_min_m2,
   };
 }
 
@@ -277,21 +289,20 @@ export function BoxItemForm({
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
-              min={calculations?.minQuantityFor3000m2 || 100}
+              min={calculations?.minCajasAMedida || 1}
               value={box.quantity || ''}
               onChange={(e) => {
                 const value = e.target.value.replace(/\D/g, '');
                 handleFieldUpdate('quantity', value ? parseInt(value) : 0);
               }}
-              placeholder={calculations ? `Mín. ${calculations.minQuantityFor3000m2.toLocaleString('es-AR')}` : ''}
+              placeholder={calculations ? `Mín. ${calculations.minCajasAMedida.toLocaleString('es-AR')}` : ''}
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#4F6D87] focus:border-transparent text-base ${
-                calculations && !calculations.meetsMinimum && calculations.totalSqm < 1000 ? 'border-red-400 bg-red-50' : calculations && !calculations.meetsMinimum ? 'border-yellow-400 bg-yellow-50' : 'border-gray-300'
+                calculations?.esDeStock ? 'border-yellow-400 bg-yellow-50' : 'border-gray-300'
               }`}
             />
             {calculations && (
-              <p className={`text-xs mt-1 ${calculations.meetsMinimum ? 'text-gray-400' : 'text-yellow-600'}`}>
-                Recomendado: {calculations.minQuantityFor3000m2.toLocaleString('es-AR')} uds para 3.000 m²
-                {!calculations.meetsMinimum && calculations.totalSqm >= 1000 && ' (mínimo 1.000 m² con recargo)'}
+              <p className={`text-xs mt-1 ${calculations.esDeStock ? 'text-yellow-600' : 'text-gray-400'}`}>
+                Mínimo para fabricar a medida: {calculations.minCajasAMedida.toLocaleString('es-AR')} uds
               </p>
             )}
           </div>
@@ -372,17 +383,16 @@ export function BoxItemForm({
             </div>
           )}
 
-          {/* Mínimo recomendado para producción a medida. No aplica a los
-              pedidos de stock: esos los cubre el aviso de derivación a /cajas,
-              y mostrar los dos a la vez decía cosas contradictorias. */}
-          {calculations && !calculations.meetsMinimum && !calculations.esDeStock && (
+          {/* Debajo del mínimo para fabricar a medida. Entre ese mínimo y el
+              escalón de precio no va ningún aviso: ese pedido se vende normal. */}
+          {calculations && calculations.esDeStock && (
             <div className="p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
               <p className="text-xs text-yellow-800">
-                <strong>Pedido menor al mínimo recomendado:</strong> Para alcanzar los 3.000 m² recomendados necesitás{' '}
-                <strong>{calculations.minQuantityFor3000m2.toLocaleString('es-AR')}</strong> unidades.
-              </p>
-              <p className="text-xs text-yellow-700 mt-1">
-                Podés cotizar igual, la producción estará sujeta a disponibilidad.
+                Con esta medida, <strong>{calculations.minCajasAMedida.toLocaleString('es-AR')}</strong>{' '}
+                cajas son los {calculations.minM2AMedida.toLocaleString('es-AR')} m² desde los que
+                fabricamos a medida, y{' '}
+                <strong>{calculations.minCajasPiso.toLocaleString('es-AR')}</strong> son el mínimo de
+                compra de {calculations.minM2Piso.toLocaleString('es-AR')} m².
               </p>
             </div>
           )}

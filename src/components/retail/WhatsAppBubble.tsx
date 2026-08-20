@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import type { BoxQuoteLine } from '@/lib/retail/types';
 import type { StandardSuggestion } from './QuoteResult';
 import { trackEvent } from '@/lib/utils/tracking';
+import { CONTACTO } from '@/lib/contacto';
 
-// Mismo numero que src/components/public/WhatsAppButton.tsx.
-export const WHATSAPP_NUMBER = '5491133411781';
+// El numero sale de CONTACTO: esta era la copia 33 del telefono escrita a mano.
+export const WHATSAPP_NUMBER = CONTACTO.telefonoE164;
 
 const APERTURA_MS = 900;    // deja respirar la revelacion del precio antes de aparecer
 const AUTOCIERRE_MS = 7000; // en mobile el globo tapa el CTA: se repliega solo
@@ -106,7 +107,7 @@ export default function WhatsAppBubble({ boxes }: WhatsAppBubbleProps) {
     return partes.join(' ');
   }, [resumen, sugerencias]);
 
-  const href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(mensaje)}`;
+  const href = CONTACTO.whatsappCon(mensaje);
 
   const handleClick = () => {
     trackEvent('whatsapp_click', {

@@ -2,6 +2,8 @@
 
 import type { BoxQuoteLine, ShippingData } from '@/lib/retail/types';
 import { formatPrecio } from '@/lib/retail/pricing';
+import { CONTACTO } from '@/lib/contacto';
+import { trackEvent } from '@/lib/utils/tracking';
 
 interface OrderConfirmationProps {
   boxes: BoxQuoteLine[];
@@ -14,6 +16,17 @@ export default function OrderConfirmation({ boxes, visible, onReset, shippingDat
   const precioProductos = boxes.reduce((sum, b) => sum + b.subtotal, 0);
   const shippingCost = shippingData?.costConfirmed ? shippingData.cost : 0;
   const precioTotal = precioProductos + shippingCost;
+
+  // El pedido se cierra por WhatsApp: no emitimos link de pago hasta tener el
+  // proceso ajustado. Sin esto la pantalla terminaba en "te contactaremos" y la
+  // pelota quedaba del lado de la fabrica, que es donde se enfrian los pedidos.
+  const detalle = boxes
+    .map((b) => `${b.cantidad.toLocaleString('es-AR')} x ${b.largo}x${b.ancho}x${b.alto}mm`)
+    .join(', ');
+  const mensaje =
+    `Hola! Acabo de cerrar una cotizacion en la web: ${detalle}. ` +
+    `Total ${formatPrecio(precioProductos)}${shippingData && !shippingData.costConfirmed ? ' + envio' : ''}. ` +
+    `Quiero confirmar el pedido.`;
 
   return (
     <div
@@ -61,7 +74,7 @@ export default function OrderConfirmation({ boxes, visible, onReset, shippingDat
               color: 'var(--retail-text-muted)',
             }}
           >
-            Te contactaremos pronto para coordinar tu pedido.
+            Confirmala por WhatsApp y coordinamos entrega y pago.
           </p>
         </div>
 
@@ -153,6 +166,28 @@ export default function OrderConfirmation({ boxes, visible, onReset, shippingDat
             </span>
           </div>
         </div>
+
+        {/* Cierre del pedido. Es la accion principal de esta pantalla. */}
+        <a
+          href={CONTACTO.whatsappCon(mensaje)}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => trackEvent('whatsapp_click', { section: 'retail_confirmacion', totalSqm: boxes.reduce((s, b) => s + b.totalM2, 0) })}
+          className="w-full rounded-2xl py-4 text-base font-semibold tracking-wide active:scale-95 flex items-center justify-center gap-2"
+          style={{
+            fontFamily: 'var(--font-retail-sans), sans-serif',
+            background: '#25D366',
+            color: '#fff',
+            border: 'none',
+            textDecoration: 'none',
+            transition: 'transform 150ms',
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M17.5 14.4c-.3-.2-1.7-.9-2-1-.3-.1-.5-.2-.7.1-.2.3-.7 1-.9 1.2-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5 0-.2 0-.4 0-.5 0-.2-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.2.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.2-.3-.2-.6-.4zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z" />
+          </svg>
+          Confirmar por WhatsApp
+        </a>
 
         {/* Reset button */}
         <button

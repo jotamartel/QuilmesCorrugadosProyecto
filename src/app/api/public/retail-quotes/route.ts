@@ -110,10 +110,24 @@ export async function POST(request: NextRequest) {
         if (Number.isFinite(b.alto) && Number.isFinite(b.ancho) && b.alto + b.ancho > c.MAX_SHEET_WIDTH) {
           errors.push(`Caja ${n}: alto + ancho no puede superar ${c.MAX_SHEET_WIDTH} mm`);
         }
-        if (!Number.isInteger(b.cantidad) || b.cantidad < c.MIN_CANTIDAD) {
-          errors.push(`Caja ${n}: el minimo es ${c.MIN_CANTIDAD} unidades`);
+        if (!Number.isInteger(b.cantidad) || b.cantidad < 1) {
+          errors.push(`Caja ${n}: la cantidad debe ser al menos 1 unidad`);
         }
       });
+
+      // El piso de venta se mide sobre el pedido entero, no caja por caja: dos
+      // medidas de 300 m² cada una son un pedido valido de 600 m². Se valida
+      // aca ademas de en el cotizador porque esta ruta es publica.
+      const m2Pedido = body.boxes.reduce((suma, b) => {
+        if (!Number.isFinite(b.largo) || !Number.isFinite(b.ancho) || !Number.isFinite(b.alto)) return suma;
+        return suma + calculateUnfolded(b.largo, b.ancho, b.alto).m2 * (b.cantidad || 0);
+      }, 0);
+
+      if (errors.length === 0 && m2Pedido < c.MIN_M2_PEDIDO) {
+        errors.push(
+          `El minimo de compra es ${c.MIN_M2_PEDIDO} m² de carton y este pedido son ${m2Pedido.toFixed(1)} m²`
+        );
+      }
     }
 
     if (errors.length > 0) {

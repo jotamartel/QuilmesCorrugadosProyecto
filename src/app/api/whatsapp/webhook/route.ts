@@ -557,8 +557,22 @@ Por favor usa el formato:
         if (qtyMatch) {
           const quantity = Number(qtyMatch[1].replace(/\./g, ''));
 
-          if (quantity < RETAIL_CONFIG.MIN_CANTIDAD) {
-            responseMessage = `La cantidad minima es ${RETAIL_CONFIG.MIN_CANTIDAD} unidades. Cuantas necesitas?`;
+          // El minimo se mide en m² de carton, no en cajas: 100 cajas chicas
+          // son 34 m² y 100 grandes pasan los 100. Con las medidas ya
+          // capturadas se puede decir exactamente cuantas cajas faltan, que es
+          // lo que la persona necesita para decidir.
+          const d = state.dimensions!;
+          const m2PorCaja = calculateUnfolded(d.length, d.width, d.height).m2;
+          const m2Pedido = calculateTotalM2(m2PorCaja, quantity);
+
+          if (m2Pedido < RETAIL_CONFIG.MIN_M2_PEDIDO) {
+            const cajasMinimo = Math.ceil(RETAIL_CONFIG.MIN_M2_PEDIDO / m2PorCaja);
+            responseMessage =
+              `El minimo de compra es ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de carton y ` +
+              `${quantity.toLocaleString('es-AR')} cajas de ${d.length}x${d.width}x${d.height} son ` +
+              `${m2Pedido.toFixed(1)} m².\n\n` +
+              `Con esta medida el minimo son ${cajasMinimo.toLocaleString('es-AR')} cajas. ` +
+              `Te sirve esa cantidad?`;
           } else {
             await updateConversationState(phoneNumber, {
               step: 'waiting_printing',

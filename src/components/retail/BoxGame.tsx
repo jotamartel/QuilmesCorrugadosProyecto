@@ -52,6 +52,7 @@ function useBoxGame() {
             WHOLESALE_PRICE_PER_M2: data.price_per_m2_wholesale || prev.WHOLESALE_PRICE_PER_M2,
             // El tope del canal tambien sale de la base: moverlo no requiere deploy.
             WHOLESALE_THRESHOLD_M2: data.wholesale_min_m2 || prev.WHOLESALE_THRESHOLD_M2,
+            MIN_M2_PEDIDO: data.min_m2_pedido || prev.MIN_M2_PEDIDO,
           }));
         }
       })

@@ -45,8 +45,11 @@ export async function POST(request: NextRequest) {
     if (!body.height_mm || body.height_mm < 100 || body.height_mm > 600) {
       errors.push('El alto debe estar entre 100 y 600 mm');
     }
-    if (!body.quantity || body.quantity < 100) {
-      errors.push('La cantidad mínima es 100 unidades');
+    // El minimo no se mide en cajas sino en m² de carton, y eso depende de la
+    // medida: 100 cajas chicas son 34 m² y 100 grandes pasan los 100 m². El
+    // control por superficie lo hace el motor de cotizacion mas abajo.
+    if (!body.quantity || body.quantity < 1) {
+      errors.push('La cantidad debe ser al menos 1 unidad');
     }
 
     if (errors.length > 0) {

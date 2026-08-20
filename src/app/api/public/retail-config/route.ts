@@ -13,7 +13,7 @@ export async function GET() {
 
     const { data, error } = await supabase
       .from('pricing_config')
-      .select('price_per_m2_retail, price_per_m2_below_minimum, wholesale_min_m2')
+      .select('price_per_m2_retail, price_per_m2_below_minimum, wholesale_min_m2, min_m2_pedido')
       .eq('is_active', true)
       .order('valid_from', { ascending: false })
       .limit(1)
@@ -21,9 +21,10 @@ export async function GET() {
 
     // Respaldos alineados con la base, para no cotizar un precio viejo si falla.
     const DEFAULTS = {
-      price_per_m2_retail: 990,
-      price_per_m2_wholesale: 900,
+      price_per_m2_retail: 1200,
+      price_per_m2_wholesale: 1000,
       wholesale_min_m2: 1000,
+      min_m2_pedido: 500,
     };
 
     if (error) {
@@ -39,13 +40,16 @@ export async function GET() {
       price_per_m2_wholesale: Number(data.price_per_m2_below_minimum) || DEFAULTS.price_per_m2_wholesale,
       // Tope del canal de stock.
       wholesale_min_m2: Number(data.wholesale_min_m2) || DEFAULTS.wholesale_min_m2,
+      // Piso de venta: por debajo de esto no se cotiza en ningun canal.
+      min_m2_pedido: Number(data.min_m2_pedido) || DEFAULTS.min_m2_pedido,
     });
   } catch (error) {
     console.error('Error in GET /api/public/retail-config:', error);
     return NextResponse.json({
-      price_per_m2_retail: 990,
-      price_per_m2_wholesale: 900,
+      price_per_m2_retail: 1200,
+      price_per_m2_wholesale: 1000,
       wholesale_min_m2: 1000,
+      min_m2_pedido: 500,
     });
   }
 }

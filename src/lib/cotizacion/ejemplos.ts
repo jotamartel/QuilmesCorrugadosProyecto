@@ -98,13 +98,15 @@ export const EJEMPLOS: EjemploCotizacion[] = [
     colores: 0,
   },
   {
-    // El minimo del canal de stock. Existe para que se vea que no hace falta
-    // ser mayorista, que es justo lo que un asistente suele dar por sentado.
+    // El pedido mas chico que se puede comprar. Existe para que se vea que no
+    // hace falta ser mayorista, que es justo lo que un asistente suele dar por
+    // sentado. Son 1.200 cajas de esta medida porque el minimo se mide en m²
+    // de carton: 100 unidades de 300x200x200 son 42 m² y no se venden.
     medidas: '300x200x200',
-    cantidad: '100',
-    titulo: 'Pedido chico, el mínimo de 100 unidades',
+    cantidad: '1200',
+    titulo: 'El pedido mínimo: 500 m² de cartón',
     mm: { largo: 300, ancho: 200, alto: 200 },
-    unidades: 100,
+    unidades: 1200,
     colores: 0,
   },
 ];

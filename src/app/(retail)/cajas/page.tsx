@@ -17,12 +17,12 @@ import { SITE_URL } from '@/lib/site';
  */
 
 const DESCRIPCION =
-  `Compra minorista de cajas de carton corrugado a medida, desde ` +
+  `Compra minorista de cajas de carton corrugado en medidas estandar, desde ` +
   `${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón, con stock y entrega en AMBA. ` +
-  `Configura la medida, mira el precio al instante y pagas online.`;
+  `Configura la medida, mira el precio al instante y cerras el pedido por WhatsApp.`;
 
 export const metadata: Metadata = {
-  title: `Comprar cajas de cartón desde ${RETAIL_CONFIG.MIN_CANTIDAD} unidades`,
+  title: `Comprar cajas de cartón desde ${RETAIL_CONFIG.MIN_M2_PEDIDO} m²`,
   description: DESCRIPCION,
   alternates: { canonical: `${SITE_URL}/cajas` },
   openGraph: {

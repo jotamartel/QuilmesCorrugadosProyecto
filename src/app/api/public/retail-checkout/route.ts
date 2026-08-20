@@ -4,6 +4,16 @@
  * 1. Guarda la cotización en Supabase (igual que retail-quotes)
  * 2. Crea una preferencia de pago en MercadoPago
  * 3. Devuelve el init_point (URL de pago)
+ *
+ * DESACTIVADA. Hoy los pedidos se cierran por WhatsApp, no con un link de
+ * pago: el proceso —seña, plazos, confirmación de flete— todavía no está lo
+ * bastante ajustado como para cobrar de entrada. Cobrar antes de poder
+ * garantizar la entrega genera devoluciones, no ventas.
+ *
+ * La ruta se deja armada, no borrada: cuando el proceso esté cerrado se
+ * reactiva poniendo PAGO_ONLINE_HABILITADO en true. Ninguna pantalla la llama
+ * hoy, pero es pública y emite un link de pago real, así que el corte va acá
+ * y no solo en el frontend.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,8 +24,12 @@ import { calculateUnfolded } from '@/lib/utils/box-calculations';
 import { calcularPrecioMinorista } from '@/lib/retail/pricing';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import type { TaxCondition } from '@/lib/types/database';
+import { CONTACTO } from '@/lib/contacto';
 
 const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN || '';
+
+/** Interruptor del cobro online. Ver el comentario de arriba antes de tocarlo. */
+const PAGO_ONLINE_HABILITADO = false;
 
 interface RetailBox {
   largo: number;
@@ -55,6 +69,18 @@ interface CheckoutRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!PAGO_ONLINE_HABILITADO) {
+      return NextResponse.json(
+        {
+          error:
+            'El pago online esta desactivado. Los pedidos se cierran por WhatsApp: ' +
+            CONTACTO.telefonoVisible,
+          whatsapp: CONTACTO.whatsapp,
+        },
+        { status: 503 }
+      );
+    }
+
     if (!MP_ACCESS_TOKEN || MP_ACCESS_TOKEN.includes('0000000000')) {
       return NextResponse.json(
         { error: 'MercadoPago no está configurado. Configura MERCADOPAGO_ACCESS_TOKEN.' },
@@ -116,7 +142,7 @@ export async function POST(request: NextRequest) {
 
     const { data: pricing } = await supabase
       .from('pricing_config')
-      .select('price_per_m2_retail, price_per_m2_standard')
+      .select('price_per_m2_retail, price_per_m2_standard, min_m2_pedido, wholesale_min_m2')
       .eq('is_active', true)
       .order('valid_from', { ascending: false })
       .limit(1)
@@ -148,6 +174,22 @@ export async function POST(request: NextRequest) {
     const unfolded = calculateUnfolded(primaryBox.largo, primaryBox.ancho, primaryBox.alto);
     const totalSqm = cajas.reduce((sum, b) => sum + b.totalM2, 0);
     const totalSubtotal = cajas.reduce((sum, b) => sum + b.subtotal, 0);
+
+    // El piso de venta se valida tambien aca. El boton del cotizador se puede
+    // saltear posteando directo a esta ruta, y lo que devuelve es un link de
+    // pago de MercadoPago: si no se controla, se cobra un pedido que la
+    // fabrica no puede producir.
+    const minM2Pedido = Number(pricing?.min_m2_pedido) || RETAIL_CONFIG.MIN_M2_PEDIDO;
+    if (totalSqm < minM2Pedido) {
+      return NextResponse.json(
+        {
+          error:
+            `El minimo de compra es ${minM2Pedido.toLocaleString('es-AR')} m² de carton ` +
+            `y este pedido son ${totalSqm.toFixed(1)} m².`,
+        },
+        { status: 400 }
+      );
+    }
 
     // Shipping: el costo tampoco puede venir del cliente. Hoy no hay tarifa
     // calculada en el servidor, asi que se cobra 0 y se coordina aparte.

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package, Clock, Truck, Send, Loader2, AlertCircle } from 'lucide-react';
+import { Package, Clock, Truck, Send, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { BoxItemData, BoxCalculations } from './BoxItemForm';
 import { precioUnitarioARS } from '@/lib/cotizacion/motor';
@@ -14,9 +14,7 @@ interface PriceSummaryProps {
   distanceKm?: number | null;
   showPrice?: boolean; // Si es false, oculta los precios hasta completar datos
   onRequestContact?: () => void; // Callback para "Quiero que me contacten"
-  onBelowMinimum?: () => void; // Callback para "¿Necesitas menos m²?"
   submitting?: boolean; // Estado de envío
-  minM2PerModel?: number; // Mínimo m² por modelo para mostrar el botón
   stockMaxM2?: number; // Debajo de esto se vende de stock desde /cajas
   volumeThresholdM2?: number; // Desde acá aplica precio por volumen
 }
@@ -29,11 +27,9 @@ export function PriceSummary({
   distanceKm,
   showPrice = true,
   onRequestContact,
-  onBelowMinimum,
   stockMaxM2 = 1000,
   volumeThresholdM2 = 5000,
   submitting = false,
-  minM2PerModel = 3000,
 }: PriceSummaryProps) {
   // Calcular totales
   const validCalculations = boxCalculations.filter((c): c is BoxCalculations => c !== null);
@@ -42,7 +38,6 @@ export function PriceSummary({
   const totalQuantity = boxes.reduce((sum, b) => sum + b.quantity, 0);
 
   const hasValidBoxes = totalSqm > 0 && validCalculations.length > 0;
-  const isBelowMinimum = totalSqm > 0 && totalSqm < minM2PerModel;
   const hasVolumeDiscount = totalSqm >= volumeThresholdM2;
   // Volumen de stock: no se produce a medida, se compra hecho desde /cajas.
   const esPedidoDeStock = totalSqm > 0 && totalSqm < stockMaxM2;
@@ -127,19 +122,19 @@ export function PriceSummary({
 
       {/* Badges informativos */}
       <div className="flex flex-wrap gap-2">
-        {!isBelowMinimum && isFreeShipping === true && distanceKm !== null && distanceKm !== undefined && (
+        {!esPedidoDeStock && isFreeShipping === true && distanceKm !== null && distanceKm !== undefined && (
           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-700">
             <Truck className="w-3 h-3 mr-1" />
             Envío gratis ({distanceKm} km)
           </span>
         )}
-        {!isBelowMinimum && isFreeShipping === false && distanceKm !== null && distanceKm !== undefined && (
+        {!esPedidoDeStock && isFreeShipping === false && distanceKm !== null && distanceKm !== undefined && (
           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-[#001a33]">
             <Truck className="w-3 h-3 mr-1" />
             Envío con cargo ({distanceKm} km)
           </span>
         )}
-        {!isBelowMinimum && hasVolumeDiscount && (
+        {!esPedidoDeStock && hasVolumeDiscount && (
           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">
             Precio mayorista aplicado
           </span>
@@ -151,33 +146,6 @@ export function PriceSummary({
           Con el precio ya revelado se muestran los dos: precio y derivacion. */}
       {esPedidoDeStock && !showPrice ? (
         panelStock
-      ) : isBelowMinimum && !esPedidoDeStock ? (
-        <div className="space-y-3">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center text-sm">
-            <p className="text-yellow-800 font-medium">
-              Pedido menor al mínimo recomendado: 3.000 m²
-            </p>
-            <p className="text-sm text-yellow-700 mt-1">
-              Actualmente tenés {totalSqm.toLocaleString('es-AR', { minimumFractionDigits: 2 })} m².
-            </p>
-          </div>
-          {/* Botón para solicitar contacto si se puede fabricar en hueco de producción - solo en paso 2 (después de revelar precio) */}
-          {onBelowMinimum && showPrice && (
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={onBelowMinimum}
-                className="w-full px-4 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors shadow-md"
-              >
-                <AlertCircle className="w-4 h-4" />
-                Solicitar que me contacten cuando se pueda producir
-              </button>
-              <p className="text-xs text-gray-600 text-center px-2">
-                Estaremos teniendo en cuenta tu solicitud al momento de programar las producciones de las próximas semanas y te contactaremos para coordinar el pago de la seña y ultimar detalles
-              </p>
-            </div>
-          )}
-        </div>
       ) : !showPrice ? (
         /* Mensaje cuando el precio está oculto (paso 1) */
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
@@ -241,23 +209,6 @@ export function PriceSummary({
                 </>
               )}
             </button>
-          )}
-
-          {/* Botón para pedidos menores al mínimo */}
-          {onBelowMinimum && totalSqm < minM2PerModel && totalSqm >= 1000 && (
-            <div className="space-y-2 mt-3">
-              <button
-                type="button"
-                onClick={onBelowMinimum}
-                className="w-full px-4 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors shadow-md"
-              >
-                <AlertCircle className="w-4 h-4" />
-                Solicitar que me contacten cuando se pueda producir
-              </button>
-              <p className="text-xs text-gray-600 text-center px-2">
-                Estaremos teniendo en cuenta tu solicitud al momento de programar las producciones de las próximas semanas y te contactaremos para coordinar el pago de la seña y ultimar detalles
-              </p>
-            </div>
           )}
         </>
       )}

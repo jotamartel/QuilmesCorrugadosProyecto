@@ -6,8 +6,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { ArrowLeft, ArrowRight, Loader2, Plus, Eye } from 'lucide-react';
 import { PriceSummary } from './PriceSummary';
-import { BoxItemForm, BoxItemData, BoxCalculations, calculateBoxItem } from './BoxItemForm';
-import { BelowMinimumModal } from './BelowMinimumModal';
+import { BoxItemForm, BoxItemData, calculateBoxItem } from './BoxItemForm';
 import type { TaxCondition, BuenosAiresCity, PricingConfig } from '@/lib/types/database';
 import { ARGENTINE_PROVINCES, FREE_SHIPPING_MAX_KM } from '@/lib/types/database';
 import { trackEvent, identificar } from '@/lib/utils/tracking';
@@ -93,7 +92,6 @@ export function QuoterForm() {
   const [priceRevealed, setPriceRevealed] = useState(false);
   const [revealingPrice, setRevealingPrice] = useState(false);
   const [leadId, setLeadId] = useState<string | null>(null);
-  const [showBelowMinimumModal, setShowBelowMinimumModal] = useState(false);
   const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
   const quoteStartedTracked = useRef(false);
   const quoterViewedTracked = useRef(false);
@@ -223,16 +221,12 @@ export function QuoterForm() {
     let totalSqm = 0;
     let totalSubtotal = 0;
     let hasPrinting = false;
-    let allMeetMinimum = true;
 
     boxCalculations.forEach((calc, index) => {
       if (calc) {
         totalSqm += calc.totalSqm;
         totalSubtotal += calc.subtotal;
         if (boxes[index].has_printing) hasPrinting = true;
-        if (!calc.meetsMinimum) allMeetMinimum = false;
-      } else {
-        allMeetMinimum = false;
       }
     });
 
@@ -243,7 +237,6 @@ export function QuoterForm() {
       totalSubtotal,
       hasPrinting,
       estimatedDays,
-      allMeetMinimum,
       boxCount: boxes.length,
     };
   }, [boxCalculations, boxes]);
@@ -251,6 +244,8 @@ export function QuoterForm() {
   // Límite entre lo que se vende de stock y lo que se produce a medida.
   // Sale de la config: no debe quedar escrito acá.
   const wholesaleMinM2 = pricingConfig?.wholesale_min_m2 ?? 1000;
+  // Piso de venta del canal minorista, al que se deriva a quien pide menos.
+  const minM2Pedido = pricingConfig?.min_m2_pedido ?? 500;
 
   // Por debajo del límite no se produce a medida: se vende de stock desde
   // /cajas. Igual se lo deja avanzar para tomarle los datos — antes el botón
@@ -528,6 +523,27 @@ export function QuoterForm() {
           2
         </div>
       </div>
+
+      {/* Qué es este cotizador y dónde va el que necesita menos. Estaba
+          implícito: la persona cargaba 50 cajas, llegaba hasta el final y
+          recién ahí se enteraba de que ese volumen no se fabrica. */}
+      {step === 1 && (
+        <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 sm:flex sm:items-center sm:justify-between sm:gap-4">
+          <p className="text-sm text-gray-700">
+            <strong className="text-[#002E55]">Cotizador mayorista.</strong> Fabricamos la medida
+            que pidas —troquelada o con impresión— desde{' '}
+            <strong>{wholesaleMinM2.toLocaleString('es-AR')} m²</strong> de cartón.
+          </p>
+          <Link
+            href="/cajas"
+            onClick={() => trackEvent('quote_started', { section: 'header_a_minorista' })}
+            className="mt-2 sm:mt-0 inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-[#002E55] underline underline-offset-2 hover:text-[#001a33]"
+          >
+            ¿Menos de {wholesaleMinM2.toLocaleString('es-AR')} m²? Mínimo {minM2Pedido} m²
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:items-start">
         {/* Columna izquierda: Formulario */}
@@ -1046,46 +1062,13 @@ export function QuoterForm() {
           distanceKm={clientData.distance_km}
           showPrice={priceRevealed}
           onRequestContact={priceRevealed ? handleSubmit : undefined}
-          onBelowMinimum={totals.totalSqm < (pricingConfig?.min_m2_per_model || 3000) && totals.totalSqm >= 1000 ? async () => {
-            // Si el precio no está revelado, primero revelarlo
-            if (!priceRevealed && isStep2DataComplete) {
-              const newLeadId = await handleRevealPrice();
-              if (newLeadId) {
-                setShowBelowMinimumModal(true);
-              }
-            } else if (priceRevealed && leadId) {
-              setShowBelowMinimumModal(true);
-            }
-          } : undefined}
           submitting={submitting}
-          minM2PerModel={pricingConfig?.min_m2_per_model ?? 3000}
           stockMaxM2={wholesaleMinM2}
           volumeThresholdM2={pricingConfig?.volume_threshold_m2 ?? 5000}
         />
       </div>
       </div>
 
-      {/* Modal para pedidos menores al mínimo */}
-      {leadId && pricingConfig && pricingConfig.price_per_m2_below_minimum !== null && boxes.length > 0 && (
-        <BelowMinimumModal
-          isOpen={showBelowMinimumModal}
-          onClose={() => setShowBelowMinimumModal(false)}
-          quoteId={leadId}
-          boxDimensions={{
-            length_mm: boxes[0].length_mm,
-            width_mm: boxes[0].width_mm,
-            height_mm: boxes[0].height_mm,
-          }}
-          originalQuantity={boxes[0].quantity}
-          originalTotalSqm={totals.totalSqm}
-          pricePerM2BelowMinimum={pricingConfig.price_per_m2_below_minimum}
-          minM2PerModel={pricingConfig.min_m2_per_model}
-          onSuccess={() => {
-            // Recargar para mostrar la cotización actualizada
-            window.location.reload();
-          }}
-        />
-      )}
     </div>
   );
 }

@@ -24,7 +24,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { calcularCotizacion, validarCajas, urlPlantilla } from '@/lib/cotizacion/motor';
 import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
 import { SITE_URL } from '@/lib/site';
-import { RETAIL_CONFIG, MATERIAL } from '@/lib/retail/config';
+import { RETAIL_CONFIG, MATERIAL, HORARIO } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
 import type { PricingConfig } from '@/lib/types/database';
 import { notaImpresion } from '@/lib/cotizacion/motor';
@@ -193,10 +193,17 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       `Mínimos: ${RETAIL_CONFIG.MIN_CANTIDAD} cajas si la medida está en stock; ${n(c.min_m2_per_model)} m² por modelo para producción a medida.`,
       notaImpresion(c),
       `Material: ${MATERIAL.nota}`,
-      'Plazos: stock en 24 a 48 horas; producción a medida en 7 días hábiles.',
+      `Plazos: stock en 24 a 48 horas; producción a medida en ${c.production_days_standard} días ` +
+        `hábiles, ${c.production_days_printing} con impresión.`,
       `Envío: gratis en pedidos mayoristas desde ${c.free_shipping_min_m2.toLocaleString('es-AR')} m² y hasta ` +
         `${c.free_shipping_max_km} km de la fábrica en Quilmes. En pedidos minoristas, retiro en ` +
         'fábrica o envío a cargo del comprador. Al interior, flete aparte en ambos casos.',
+      `Validez de la cotización: ${c.quote_validity_days} días.`,
+      '',
+      // Faltaba: un asistente que preguntaba "en que horario atienden" no
+      // recibia nada por esta via, aunque el dato estuviera en el llms.txt.
+      `Atención: ${HORARIO.texto} (hora de Argentina). Solo Argentina, no exportamos.`,
+      `Contacto: WhatsApp ${CONTACTO.telefonoVisible} · ${CONTACTO.email} · ${CONTACTO.direccion}`,
       '',
       'Para un precio exacto hace falta la medida y la cantidad: usá cotizar_cajas_carton.',
     ].join('\n');

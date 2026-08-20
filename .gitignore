@@ -54,3 +54,6 @@ qa-transcriptos.json
 _qa/
 .env.qa.tmp
 .env.vercel.tmp
+
+# Descarga temporal del esquema de OpenAI, se baja con curl cuando hace falta
+esquema-tmp.json

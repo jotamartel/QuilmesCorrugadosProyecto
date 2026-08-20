@@ -231,6 +231,76 @@ export function crearHerramientas(ctx: ContextoAgente) {
   },
 });
 
+  /**
+   * El catalogo entero.
+   *
+   * Faltaba, y se notaba: cuando alguien pregunto "que otro tamano tenes de
+   * estandar" el agente lo mando a la pagina del catalogo, que es la respuesta
+   * de alguien que no tiene el dato. Lo tenemos en la base.
+   *
+   * Cada medida viene con la cantidad minima para llegar al piso de venta y el
+   * precio de esa cantidad, calculados con la misma escalera que factura. Sin
+   * eso el agente tendria que cotizar diez veces para poder listar el catalogo.
+   */
+  const medidasDeCatalogo = betaTool({
+    name: 'medidas_de_catalogo',
+    description:
+      'Devuelve TODAS las medidas estándar de catálogo, cada una con su cantidad mínima y su ' +
+      'precio ya calculados. Usala cuando pregunten qué medidas hay, qué otros tamaños tenés, ' +
+      'o cuando quieras ofrecer opciones además de las que ya diste. No mandes a nadie a mirar ' +
+      'el catálogo en la web: las medidas las tenés acá.',
+    inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
+    run: async () => {
+      const config = await getActivePricingConfig();
+      const catalogo = await leerCatalogoDeStock();
+      if (!config || catalogo.length === 0) {
+        return JSON.stringify({
+          medidas: [],
+          instruccion: 'No se pudo leer el catálogo. Ofrecé la página ' + SITE_URL + '/cajas.',
+        });
+      }
+
+      const medidas = catalogo
+        .map((m) => {
+          const q = calcularCotizacion(
+            [{ length_mm: m.length_mm, width_mm: m.width_mm, height_mm: m.height_mm, quantity: 1 }],
+            config,
+            catalogo,
+          );
+          const m2PorCaja = q.boxes[0].sqm_per_box;
+          const cantidad = Math.ceil(RETAIL_CONFIG.MIN_M2_PEDIDO / m2PorCaja);
+          const cotizada = calcularCotizacion(
+            [{ length_mm: m.length_mm, width_mm: m.width_mm, height_mm: m.height_mm, quantity: cantidad }],
+            config,
+            catalogo,
+          );
+          return {
+            medidas_mm: `${m.length_mm}x${m.width_mm}x${m.height_mm}`,
+            volumen_litros: Math.round((m.length_mm * m.width_mm * m.height_mm) / 1000),
+            cantidad_minima: cantidad,
+            precio_por_caja: cotizada.cotizable
+              ? precioUnitarioARS(cotizada.boxes[0].unit_price)
+              : null,
+            subtotal_sin_iva: cotizada.cotizable ? Math.round(cotizada.subtotal) : null,
+            total_con_iva: cotizada.cotizable ? Math.round(cotizada.total_with_tax) : null,
+            en_stock: m.stock ?? 0,
+            link_para_compartir: `${SITE_URL}/cotizar/${m.length_mm}x${m.width_mm}x${m.height_mm}/${cantidad}`,
+          };
+        })
+        // De la mas chica a la mas grande: es como las compara quien elige.
+        .sort((a, b) => a.volumen_litros - b.volumen_litros);
+
+      return JSON.stringify({
+        medidas,
+        nota: 'Las medidas estándar no llevan impresión: se producen en tirada larga sin arte.',
+        instruccion:
+          'Ofrecé las que se parezcan a lo que pidió, con su medida, su cantidad mínima y su ' +
+          'precio. Si no pidió ninguna medida en particular, mostrá tres o cuatro repartidas ' +
+          'entre chicas, medianas y grandes en vez de la lista entera.',
+      });
+    },
+  });
+
   const condicionesYPrecios = betaTool({
   name: 'condiciones_y_precios',
   description:
@@ -495,5 +565,12 @@ export function crearHerramientas(ctx: ContextoAgente) {
   },
 });
 
-  return [cotizarCajas, condicionesYPrecios, plantillaDeImpresion, guardarLead, derivarAHumano];
+  return [
+    cotizarCajas,
+    medidasDeCatalogo,
+    condicionesYPrecios,
+    plantillaDeImpresion,
+    guardarLead,
+    derivarAHumano,
+  ];
 }

@@ -82,6 +82,27 @@ function etiquetaDeEnlace(url: string): string {
   }
 }
 
+/**
+ * Las negritas del mensaje.
+ *
+ * Una cotizacion son seis o siete numeros seguidos —precio por caja, subtotal,
+ * IVA, total, cantidad, m²— y en un parrafo corrido se pierden todos. Con la
+ * medida y el total en negrita el ojo encuentra lo que busca sin leer entero.
+ *
+ * Se acepta la sintaxis de markdown porque es la que el modelo escribe solo.
+ */
+function conNegritas(texto: string, clave: string) {
+  return texto.split(/(\*\*[^*\n]+\*\*)/g).map((parte, i) =>
+    /^\*\*[^*\n]+\*\*$/.test(parte) ? (
+      <strong key={`${clave}-${i}`} className="font-semibold">
+        {parte.slice(2, -2)}
+      </strong>
+    ) : (
+      <span key={`${clave}-${i}`}>{parte}</span>
+    ),
+  );
+}
+
 function TextoConEnlaces({ texto, esDelUsuario }: { texto: string; esDelUsuario: boolean }) {
   const partes = texto.split(/(https?:\/\/[^\s]+)/g);
 
@@ -90,7 +111,7 @@ function TextoConEnlaces({ texto, esDelUsuario }: { texto: string; esDelUsuario:
     // ensanche la burbuja. break-words solo no alcanza para una URL.
     <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
       {partes.map((parte, i) => {
-        if (!/^https?:\/\//.test(parte)) return <span key={i}>{parte}</span>;
+        if (!/^https?:\/\//.test(parte)) return <span key={i}>{conNegritas(parte, String(i))}</span>;
 
         // La puntuacion que sigue al enlace no es parte del enlace.
         const m = parte.match(/^(.*?)([.,;:!?)\]]*)$/);

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { SITE_URL } from '@/lib/site';
-import { RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
+import { RETAIL_CONFIG, ENVIO, MINIMOS } from '@/lib/retail/config';
 import { TrafficTracker } from '@/components/tracking/TrafficTracker';
 import { LenisProvider } from '@/components/providers/LenisProvider';
 import { ChatWidget } from '@/components/public/ChatWidget';
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   // que se lee es lo unico que decide el clic.
   description:
     'Cajas de cartón corrugado a medida en Argentina. Cotizá online con precio real al ' +
-    `instante, desde ${RETAIL_CONFIG.MIN_CANTIDAD} cajas. Fábrica en Quilmes. Envío ${ENVIO.micro}.`,
+    `instante, ${MINIMOS.corto}. Fábrica en Quilmes. Envío ${ENVIO.micro}.`,
   alternates: {
     canonical: SITE_URL,
   },

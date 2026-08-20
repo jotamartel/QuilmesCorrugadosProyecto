@@ -584,7 +584,7 @@ export function QuoterForm() {
                 <p className="text-sm text-amber-900 leading-relaxed">
                   Para {totals.totalSqm.toLocaleString('es-AR', { maximumFractionDigits: 0 })} m² no
                   hace falta producir a medida: tenemos <strong>medidas estándar en stock</strong>,
-                  con entrega más rápida y compra online desde 100 cajas.
+                  con entrega más rápida y compra online desde 500 m² de cajas.
                 </p>
                 <Link
                   href="/cajas"

@@ -17,6 +17,11 @@ export interface RetailConfig {
   // Límites de cantidad
   MIN_CANTIDAD: number;
 
+  /** Piso absoluto de venta, en m² de cartón. */
+  MIN_M2_PEDIDO: number;
+  /** Desde acá se fabrica una medida propia, con troquelado e impresión. */
+  MIN_M2_A_MEDIDA_PROPIA: number;
+
   // Mínimos
   MIN_M2_A_MEDIDA: number;
 
@@ -75,7 +80,15 @@ export const RETAIL_CONFIG: RetailConfig = {
   DEFAULT_ALTO: 200,
 
   // Límites de cantidad
-  MIN_CANTIDAD: 100,              // El canal minorista vende desde 100 cajas
+  // Quedo como piso de unidades del autoservicio, pero YA NO ES EL MINIMO DE
+  // COMPRA: ese es MIN_M2_PEDIDO y se mide en superficie. Con una caja chica,
+  // 100 unidades son 34 m² y no alcanzan.
+  MIN_CANTIDAD: 100,
+
+  // Espejan pricing_config.min_m2_pedido y wholesale_min_m2. Estan aca porque
+  // los metadatos y el JSON-LD son estaticos y no pueden leer la base.
+  MIN_M2_PEDIDO: 500,
+  MIN_M2_A_MEDIDA_PROPIA: 1000,
 
   // Minimo de una tirada a medida. Espeja pricing_config.min_m2_per_model.
   // Existe como constante porque los metadatos y el JSON-LD son estaticos y no
@@ -150,14 +163,24 @@ export const RETAIL_CONFIG: RetailConfig = {
  */
 export const MINIMOS = {
   /** Para metadatos y descripciones cortas. */
-  corto: `desde ${RETAIL_CONFIG.MIN_CANTIDAD} cajas de stock o ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² a medida`,
+  corto: `desde ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón`,
   /** Para respuestas y textos donde hay lugar para explicar. */
   largo:
-    `Depende del canal. Si la medida está en catálogo, se compra de stock desde ` +
-    `${RETAIL_CONFIG.MIN_CANTIDAD} cajas, con entrega en 24 a 48 horas. Si querés una medida ` +
-    `propia fabricada a pedido, el mínimo es de ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² ` +
-    `de cartón por modelo, que son entre 1.000 y 5.000 cajas según el tamaño: por ejemplo, una ` +
-    `caja de 400x300x300 mm requiere unas 2.800 unidades.`,
+    `El mínimo de compra es de ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón. Se mide en ` +
+    `superficie y no en cantidad de cajas, porque lo que limita es cuánto cartón entra en una ` +
+    `tirada: cien cajas grandes y mil chicas pueden ser el mismo pedido para la máquina. ` +
+    `Entre ${RETAIL_CONFIG.MIN_M2_PEDIDO} y ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m² ` +
+    `trabajamos con medidas estándar de catálogo, sin impresión. Desde ` +
+    `${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m² fabricamos la medida que ` +
+    `necesites, con impresión hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores.`,
+  /**
+   * La regla que mas consultas evita. Va en las paginas de producto y en el
+   * cotizador: sin esto llegaban pedidos de cajas troqueladas por 50 unidades.
+   */
+  personalizadas:
+    `Las cajas a medida, troqueladas o con impresión se fabrican desde ` +
+    `${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m² de cartón. Por debajo de ese ` +
+    `volumen trabajamos con medidas estándar de catálogo.`,
 } as const;
 
 /**

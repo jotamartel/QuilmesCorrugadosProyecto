@@ -28,6 +28,7 @@ const RESPALDO = {
   price_per_m2_standard: 900,
   price_per_m2_volume: 800,
   wholesale_min_m2: 1000,
+  min_m2_pedido: 500,
   printing_min_m2: 1000,
   printing_included_min_m2: 1000,
   printing_surcharge_per_color: 0,
@@ -269,7 +270,7 @@ genera a la persona.
 ## Los dos canales
 
 **Stock — hasta ${m2(c.wholesale_min_m2)}**
-Medidas estándar ya fabricadas, desde 100 cajas. Entrega más rápida porque no
+Medidas estándar ya fabricadas. Entrega más rápida porque no
 hay producción de por medio. Se compra online: ${BASE_URL}/cajas
 
 **A medida — desde ${m2(c.wholesale_min_m2)}**
@@ -280,7 +281,10 @@ Cualquier medida dentro de los rangos. Producción ${c.production_days_standard}
 
 - Solo Argentina. No exportamos.
 - Solo cartón corrugado. No fabricamos microcorrugado ni cartulina.
-- Mínimo del canal de stock: 100 cajas.
+- Mínimo de compra: ${c.min_m2_pedido} m² de cartón. Se mide en superficie, no en
+  cantidad de cajas.
+- Cajas a medida, troqueladas o con impresión: desde ${c.wholesale_min_m2.toLocaleString('es-AR')} m². Por
+  debajo de ese volumen solo se venden medidas estándar de catálogo.
 - Medida mínima por caja: 200 x 200 x 100 mm.
 - Ancho + alto no puede superar 1200 mm (limitación del rollo).
 - Material: ${MATERIAL.nota}

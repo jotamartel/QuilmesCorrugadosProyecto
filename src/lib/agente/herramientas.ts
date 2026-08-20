@@ -94,10 +94,10 @@ export function crearHerramientas(ctx: ContextoAgente) {
     // Las validaciones van acá y no en el prompt: un limite de fabricacion que
     // el modelo tiene que recordar es un limite que alguna vez va a olvidar.
     const problemas: string[] = [];
-    if (cantidad < RETAIL_CONFIG.MIN_CANTIDAD) {
-      problemas.push(
-        `La cantidad mínima es ${RETAIL_CONFIG.MIN_CANTIDAD} cajas y pediste ${cantidad.toLocaleString('es-AR')}.`,
-      );
+    // El minimo se valida por m² en el motor, que es donde se conocen los
+    // metros del pedido. Aca solo se descartan las cantidades absurdas.
+    if (cantidad < 1) {
+      problemas.push('La cantidad tiene que ser al menos una caja.');
     }
     if (ancho_mm + alto_mm > RETAIL_CONFIG.MAX_SHEET_WIDTH) {
       problemas.push(

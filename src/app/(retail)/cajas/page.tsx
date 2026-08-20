@@ -18,7 +18,7 @@ import { SITE_URL } from '@/lib/site';
 
 const DESCRIPCION =
   `Compra minorista de cajas de carton corrugado a medida, desde ` +
-  `${RETAIL_CONFIG.MIN_CANTIDAD} cajas, con stock y entrega en AMBA. ` +
+  `${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón, con stock y entrega en AMBA. ` +
   `Configura la medida, mira el precio al instante y pagas online.`;
 
 export const metadata: Metadata = {
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   description: DESCRIPCION,
   alternates: { canonical: `${SITE_URL}/cajas` },
   openGraph: {
-    title: 'Comprar cajas de cartón corrugado a medida — desde 100 cajas',
+    title: `Comprar cajas de cartón corrugado — desde ${RETAIL_CONFIG.MIN_M2_PEDIDO} m²`,
     description: DESCRIPCION,
     url: `${SITE_URL}/cajas`,
     type: 'website',
@@ -40,7 +40,7 @@ export default function CajasPage() {
           quede en el primer tramo del HTML, que es lo que muchos extractores
           conservan cuando truncan. */}
       <h1 className="sr-only">
-        Comprar cajas de cartón corrugado a medida desde {RETAIL_CONFIG.MIN_CANTIDAD} cajas
+        Comprar cajas de cartón corrugado estándar desde {RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cajas
       </h1>
       <p className="sr-only">
         {DESCRIPCION} El precio minorista es de $

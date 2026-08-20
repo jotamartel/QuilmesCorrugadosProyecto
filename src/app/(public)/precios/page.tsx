@@ -48,6 +48,7 @@ const RESPALDO = {
   free_shipping_max_km: 60,
   production_days_standard: 7,
   production_days_printing: 14,
+  min_m2_pedido: 500,
   printing_min_m2: 1000,
   printing_included_min_m2: 1000,
   printing_surcharge_per_color: 0,
@@ -68,13 +69,14 @@ export default async function PreciosPage() {
     envioKm: Number(config.free_shipping_max_km),
     diasSinImpresion: Number(config.production_days_standard),
     diasConImpresion: Number(config.production_days_printing),
+    minPedido: Number(config.min_m2_pedido),
     printing_min_m2: Number(config.printing_min_m2),
     printing_included_min_m2: Number(config.printing_included_min_m2),
     printing_surcharge_per_color: Number(config.printing_surcharge_per_color),
   };
 
   const tramos = [
-    { rango: `Hasta ${m2(c.corteStock)}`, precio: c.stock, que: 'Medidas estándar de stock, desde 100 cajas. Entrega más rápida. Sin impresión.', canal: 'stock' as const },
+    { rango: `Hasta ${m2(c.corteStock)}`, precio: c.stock, que: 'Medidas estándar de catálogo. Entrega más rápida. Sin impresión.', canal: 'stock' as const },
     { rango: `${m2(c.corteStock)} a ${m2(c.corteMinimo)}`, precio: c.recargo, que: 'Producción a medida. Con impresión hasta 3 colores, incluida en el precio.', canal: 'medida' as const },
     { rango: `${m2(c.corteMinimo)} a ${m2(c.corteVolumen)}`, precio: c.estandar, que: 'Producción a medida, precio estándar. Impresión incluida.', canal: 'medida' as const },
     { rango: `Más de ${m2(c.corteVolumen)}`, precio: c.volumen, que: 'Producción a medida, precio por volumen. Impresión incluida.', canal: 'medida' as const },
@@ -150,7 +152,7 @@ export default async function PreciosPage() {
             name: '¿Cuál es el pedido mínimo?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: `Desde 100 cajas en medidas estándar de stock. Para producción a medida el mínimo es ${m2(c.corteStock)}, y desde ${m2(c.corteMinimo)} se accede al precio estándar sin recargo.`,
+              text: `Desde ${c.minPedido} m² en medidas estándar de catálogo. Para producción a medida el mínimo es ${m2(c.corteStock)}, y desde ${m2(c.corteMinimo)} se accede al precio estándar sin recargo.`,
             },
           },
           {
@@ -342,7 +344,7 @@ export default async function PreciosPage() {
           <div className="rounded-xl border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Medidas estándar, de stock</h3>
             <p className="text-gray-600 text-sm mb-4">
-              Desde 100 cajas, a {ars(c.stock)}/m². Ya están fabricadas, así que salen más
+              Desde {m2(c.minPedido)}, a {ars(c.stock)}/m². Ya están fabricadas, así que salen más
               rápido. Se compran online.
             </p>
             <Link

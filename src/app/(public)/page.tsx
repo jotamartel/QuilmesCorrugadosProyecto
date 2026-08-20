@@ -12,7 +12,7 @@ import { BotonCompartir } from '@/components/public/BotonCompartir';
 import Link from 'next/link';
 import { Factory, Truck, Ruler, Palette, ArrowDown, ShoppingBag } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
-import { RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
+import { RETAIL_CONFIG, ENVIO, MINIMOS } from '@/lib/retail/config';
 
 const benefits = [
   {
@@ -28,7 +28,7 @@ const benefits = [
   {
     icon: Ruler,
     title: 'Pedido mínimo',
-    description: `${RETAIL_CONFIG.MIN_CANTIDAD} cajas de stock o ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² a medida`,
+    description: `${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón; medidas propias desde ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m²`,
   },
   {
     icon: Palette,
@@ -78,7 +78,7 @@ export default function LandingPage() {
           </div>
           <p className="mt-4 text-sm text-gray-500">
             Mayorista: mín {RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² · Minorista: desde{' '}
-            {RETAIL_CONFIG.MIN_CANTIDAD} cajas
+            {RETAIL_CONFIG.MIN_M2_PEDIDO} m²
           </p>
           {/* El precio en el texto visible del home.
               Un asistente de IA que entra acá leía la página entera sin
@@ -113,7 +113,7 @@ export default function LandingPage() {
               },
               {
                 rotulo: 'Mínimos',
-                valor: `${RETAIL_CONFIG.MIN_CANTIDAD} cajas si sale de stock; ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² por modelo para producción a medida.`,
+                valor: MINIMOS.corto + `; medidas propias, troqueladas o con impresión desde ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m²`,
               },
               {
                 rotulo: 'Plazos',
@@ -207,7 +207,7 @@ export default function LandingPage() {
             pregunta: '¿Cuál es el pedido mínimo?',
             respuesta:
               `Depende del canal. Si la medida está en catálogo y sale de stock, desde ` +
-              `${RETAIL_CONFIG.MIN_CANTIDAD} cajas. Si querés una medida propia fabricada ` +
+              `${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón. Si querés una medida propia fabricada ` +
               `a pedido, el mínimo es ${RETAIL_CONFIG.MIN_M2_A_MEDIDA.toLocaleString('es-AR')} m² de cartón por modelo de caja.`,
           },
           {

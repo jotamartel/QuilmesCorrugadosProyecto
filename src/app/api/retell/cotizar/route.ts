@@ -9,6 +9,7 @@ import { getPricePerM2, getProductionDays, getActivePricingConfig } from '@/lib/
 import type { CotizarParams, CotizarResponse } from '@/types/retell';
 import type { PricingConfig } from '@/lib/types/database';
 import { RETELL_CONSTANTS } from '@/types/retell';
+import { RETAIL_CONFIG } from '@/lib/retail/config';
 
 const {
   ANCHO_LAMINA_MAX_MM,
@@ -251,7 +252,7 @@ function validateParams(params: CotizarParams): { valid: boolean; message?: stri
     return {
       valid: false,
       message: `Para ${cantidad} cajas el pedido es muy chico para producir. ` +
-        `El mínimo es de 100 unidades. ¿Querés que te cotice 100 cajas?`,
+        `El mínimo de compra es de ${RETAIL_CONFIG.MIN_M2_PEDIDO} metros cuadrados de cartón. ¿Querés que calcule cuántas cajas de esa medida son?`,
     };
   }
 

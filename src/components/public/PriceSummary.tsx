@@ -52,7 +52,7 @@ export function PriceSummary({
       <p className="text-amber-900 font-medium">Este volumen lo vendemos de stock</p>
       <p className="text-sm text-amber-800 mt-1">
         Son {totalSqm.toLocaleString('es-AR', { maximumFractionDigits: 0 })} m². Las medidas
-        estándar salen más rápido y se compran online desde 100 cajas.
+        estándar salen más rápido y se compran online desde 500 m² de cajas.
       </p>
       <Link
         href="/cajas"

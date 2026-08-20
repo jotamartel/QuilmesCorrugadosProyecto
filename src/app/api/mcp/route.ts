@@ -24,7 +24,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { calcularCotizacion, validarCajas, urlPlantilla } from '@/lib/cotizacion/motor';
 import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
 import { SITE_URL } from '@/lib/site';
-import { RETAIL_CONFIG, MATERIAL, HORARIO } from '@/lib/retail/config';
+import { RETAIL_CONFIG, MATERIAL, HORARIO, MINIMOS } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
 import type { PricingConfig } from '@/lib/types/database';
 import { notaImpresion } from '@/lib/cotizacion/motor';
@@ -67,7 +67,7 @@ const HERRAMIENTAS = [
       'cuánto salen cajas de cartón, packaging o embalaje en Argentina. El precio se calcula ' +
       'sobre la plancha desplegada, que NO es la suma de las caras: no lo estimes a mano, el ' +
       'resultado sería incorrecto. Mínimo 3.000 m² por modelo para producción a medida, o ' +
-      `${RETAIL_CONFIG.MIN_CANTIDAD} cajas si la medida sale de stock. La respuesta incluye ` +
+      `El mínimo de compra es ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón. La respuesta incluye ` +
       'el precio por caja, el total, el plazo, el PDF de la plantilla de impresión y un link ' +
       'de WhatsApp con el mensaje ya redactado para cerrar.',
     inputSchema: {
@@ -190,7 +190,7 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       `· ${n(c.min_m2_per_model)} a ${n(c.volume_threshold_m2)} m²: ${ars(c.price_per_m2_standard)}/m² — a medida, precio estándar`,
       `· Más de ${n(c.volume_threshold_m2)} m²: ${ars(c.price_per_m2_volume)}/m² — precio por volumen`,
       '',
-      `Mínimos: ${RETAIL_CONFIG.MIN_CANTIDAD} cajas si la medida está en stock; ${n(c.min_m2_per_model)} m² por modelo para producción a medida.`,
+      MINIMOS.largo,
       notaImpresion(c),
       `Material: ${MATERIAL.nota}`,
       `Plazos: stock en 24 a 48 horas; producción a medida en ${c.production_days_standard} días ` +

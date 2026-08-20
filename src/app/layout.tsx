@@ -92,7 +92,7 @@ export const metadata: Metadata = {
     "ai:capabilities": "cotizar_cajas_carton,calcular_precios,tiempo_produccion,envio_argentina",
     "ai:region": "Argentina",
     "ai:currency": "ARS",
-    "ai:minimum_order": `${RETAIL_CONFIG.MIN_CANTIDAD} cajas (stock) o ${RETAIL_CONFIG.MIN_M2_A_MEDIDA}m2 (a medida)`,
+        "ai:minimum_order": `${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón; medidas propias desde ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m²`,
     "ai:rate_limit": "10_requests_per_minute",
   },
 };

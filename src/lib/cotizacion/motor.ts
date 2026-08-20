@@ -712,15 +712,19 @@ export function calcularCotizacion(
         : `${motivoNoOnline ?? 'Se coordina directamente.'}`) +
     ` Fábrica en ${CONTACTO.direccion}. WhatsApp ${CONTACTO.telefonoVisible}.`;
 
-  // La impresión se produce a medida, así que arranca en el mismo volumen que
-  // el canal a medida. Por debajo se vende de stock, que va sin imprimir.
-  // La impresion pide dos cosas, no una.
+  // La impresion pide UNA sola cosa: llegar al volumen.
   //
-  // Llegar al volumen minimo, y que la medida NO sea una del catalogo
-  // estandar: esas se producen en tirada larga sin arte y no se imprimen. Un
-  // pedido de 2.000 m² de una medida de catalogo alcanza el volumen y aun asi
-  // no lleva impresion.
-  const impresionDisponible = totalM2 >= config.printing_min_m2 && !medidaDeCatalogo;
+  // Estuvo mal implementada. Habia una segunda condicion —que la medida no
+  // estuviera en el catalogo— que salio de leer "no se puede imprimir cajas
+  // estandar" como "ninguna medida del catalogo se imprime nunca". No es eso.
+  //
+  // Lo que no se imprime es lo que sale DE STOCK: una caja ya fabricada que
+  // esta en el deposito, que es lo que se vende por debajo de este umbral. Una
+  // medida del catalogo pedida por 3.000 m² no sale del deposito: se produce
+  // una tirada para ese pedido, y esa tirada se puede imprimir como cualquier
+  // otra. Con la condicion vieja, 2.000 cajas de 600x400x400 impresas —un
+  // pedido perfectamente normal— salian rechazadas.
+  const impresionDisponible = totalM2 >= config.printing_min_m2;
 
   // A partir de aca ya estan los dos impedimentos calculados, asi que recien
   // ahora se puede decidir si este pedido tiene precio.
@@ -856,9 +860,7 @@ export function calcularCotizacion(
        * sorpresa aparece recién en la factura.
        */
       price_note: !impresionDisponible
-        ? medidaDeCatalogo
-          ? 'Las medidas estándar de catálogo no se imprimen: se producen en tirada larga sin arte. Para llevar impresión hay que fabricar una medida propia.'
-          : `La impresión se hace desde ${config.printing_min_m2.toLocaleString('es-AR')} m². Este pedido no llega a ese volumen.`
+        ? `La impresión se hace desde ${config.printing_min_m2.toLocaleString('es-AR')} m². Este pedido son ${totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m² y no llega a ese volumen: por debajo se vende de stock, que va sin imprimir.`
         : impresionIncluidaEnElPedido
           ? `Desde ${config.printing_included_min_m2.toLocaleString('es-AR')} m² el costo de impresión ya está incluido en el precio por m², hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. ${NOTA_POLIMERO}`
           : `Cada color suma ${Math.round(config.printing_surcharge_per_color * 100)}% al precio por m², hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. Desde ${config.printing_included_min_m2.toLocaleString('es-AR')} m² el costo queda incluido y no se cobra recargo. ${NOTA_POLIMERO}`,

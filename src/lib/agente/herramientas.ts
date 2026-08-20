@@ -292,7 +292,7 @@ export function crearHerramientas(ctx: ContextoAgente) {
 
       return JSON.stringify({
         medidas,
-        nota: 'Las medidas estándar no llevan impresión: se producen en tirada larga sin arte.',
+        nota: `Estas medidas también se pueden imprimir, desde ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m². Por debajo salen de stock, y lo que sale de stock va sin imprimir.`,
         instruccion:
           'Ofrecé las que se parezcan a lo que pidió, con su medida, su cantidad mínima y su ' +
           'precio. Si no pidió ninguna medida en particular, mostrá tres o cuatro repartidas ' +

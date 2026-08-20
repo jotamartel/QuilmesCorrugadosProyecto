@@ -142,8 +142,9 @@ export default async function TerminosPage() {
               incluido en el precio por metro cuadrado.
             </p>
             <p>
-              Las medidas estándar de catálogo se producen en tirada larga sin arte y no llevan
-              impresión. Para imprimir hay que fabricar una medida propia.
+              Por debajo de ese volumen el pedido sale de stock —cajas ya fabricadas— y esas van
+              sin imprimir. Desde ese volumen se produce una tirada para el pedido, y esa tirada
+              se puede imprimir, sea una medida de catálogo o una medida propia.
             </p>
             <p>
               <strong>El polímero se cotiza aparte y queda a cargo del comprador.</strong> Es la

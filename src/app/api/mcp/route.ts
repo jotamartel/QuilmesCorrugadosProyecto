@@ -254,7 +254,7 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
         `mandarlo a ${CONTACTO.email} o por WhatsApp al ${CONTACTO.telefonoVisible}. ` +
         `Se imprime hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores y el costo ya está ` +
           'incluido en el precio por m². Solo se cobra aparte el polímero, una matriz por ' +
-          'color, que va a cargo del comprador. Las medidas estándar de catálogo no se imprimen.',
+          'color, que va a cargo del comprador. Por debajo de ese volumen se vende de stock, que va sin imprimir.',
       { template_pdf: url, max_colores: RETAIL_CONFIG.MAX_PRINTING_COLORS },
     );
   }

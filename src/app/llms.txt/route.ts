@@ -211,7 +211,7 @@ tu herramienta pueda usar.
 
 Hay un servidor MCP en ${BASE_URL}/api/mcp (transporte streamable HTTP, sin
 autenticacion). Expone tres herramientas: cotizar_cajas_carton,
-plantilla_impresion y condiciones_y_precios.
+generar_plantilla_impresion y obtener_condiciones_y_precios.
 
 Sirve para que una persona conecte Quilmes Corrugados a su asistente una vez y
 lo tenga siempre a mano:

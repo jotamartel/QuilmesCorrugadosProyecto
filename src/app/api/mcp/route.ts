@@ -23,6 +23,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calcularCotizacion, validarCajas, urlPlantilla } from '@/lib/cotizacion/motor';
 import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
+import { MEDIDA_MINIMA } from '@/lib/utils/box-calculations';
 import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG, MATERIAL, HORARIO, MINIMOS } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
@@ -90,14 +91,15 @@ const HERRAMIENTAS = [
     annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
   },
   {
-    name: 'plantilla_impresion',
+    name: 'generar_plantilla_impresion',
     title: 'Generar la plantilla de impresión (troquel)',
     description:
       'Devuelve el PDF con la caja desplegada: líneas de corte, líneas de plegado y las áreas ' +
       'donde puede ir el diseño, con las medidas exactas ya calculadas. Sirve para que el ' +
       'cliente le pase el archivo a su diseñador y arme el arte sobre la plantilla real, sin ' +
-      'pedirla por mail ni esperar. Usala cuando pregunten por impresión, branding o cómo ' +
-      'mandar el diseño. Mínimo 200x200x100 mm, y ancho + alto no puede superar 1200 mm.',
+      'pedirla por mail ni esperar. Usala cuando pregunten cómo imprimir sobre la caja o cómo ' +
+      `armar el arte para imprimirla. Mínimo ${MEDIDA_MINIMA.largo}x${MEDIDA_MINIMA.ancho}x${MEDIDA_MINIMA.alto} mm, ` +
+      `y ancho + alto no puede superar ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -110,7 +112,7 @@ const HERRAMIENTAS = [
     annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
   },
   {
-    name: 'condiciones_y_precios',
+    name: 'obtener_condiciones_y_precios',
     title: 'Precios vigentes y condiciones',
     description:
       'Devuelve la escalera de precios por metro cuadrado según volumen, los mínimos de cada ' +
@@ -176,7 +178,7 @@ function resultado(texto: string, structured?: unknown, esError = false) {
 }
 
 async function ejecutarTool(req: NextRequest, nombre: string, args: Record<string, unknown>) {
-  if (nombre === 'condiciones_y_precios') {
+  if (nombre === 'obtener_condiciones_y_precios') {
     const c = await leerPricing();
     if (!c) {
       registrar(req, nombre, 500, 'sin_configuracion_de_precios');
@@ -221,17 +223,24 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
   const ancho = Number(args.ancho_mm);
   const alto = Number(args.alto_mm);
 
-  if (nombre === 'plantilla_impresion') {
+  if (nombre === 'generar_plantilla_impresion') {
     if (![largo, ancho, alto].every(Number.isFinite)) {
       registrar(req, nombre, 400, 'faltan_parametros');
       return resultado('Faltan las tres medidas en milímetros: largo_mm, ancho_mm, alto_mm.', undefined, true);
     }
-    if (ancho + alto > RETAIL_CONFIG.MAX_SHEET_WIDTH) {
-      registrar(req, nombre, 400, 'medida_rechazada:ancho+alto supera la bobina');
+    // Se valida contra las MISMAS reglas que cotizar. Antes solo se miraba el
+    // ancho de bobina, asi que 100x100x50 —por debajo del minimo que la propia
+    // descripcion de esta tool anuncia— devolvia "plantilla lista", y un largo
+    // NEGATIVO tambien: -400x300x300 salia con un link a un PDF roto.
+    const errores = validarCajas([
+      { length_mm: largo, width_mm: ancho, height_mm: alto, quantity: 1 },
+    ]);
+    if (errores.length > 0) {
+      registrar(req, nombre, 400, 'medida_rechazada');
       return resultado(
-        `No se puede fabricar: ancho + alto suman ${ancho + alto} mm y el máximo es ` +
-          `${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho de la bobina. Probá con una ` +
-          `caja más baja o más angosta, o escribinos por WhatsApp al ${CONTACTO.telefonoVisible}.`,
+        errores.join(' ') +
+          ` Si necesitás algo fuera de esos límites, escribinos por WhatsApp al ` +
+          `${CONTACTO.telefonoVisible}.`,
         undefined,
         true,
       );

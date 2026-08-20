@@ -231,7 +231,7 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       return resultado(
         `No se puede fabricar: ancho + alto suman ${ancho + alto} mm y el máximo es ` +
           `${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho de la bobina. Probá con una ` +
-          'caja más baja o más angosta, o escribinos por WhatsApp al +54 9 11 3341-1781.',
+          `caja más baja o más angosta, o escribinos por WhatsApp al ${CONTACTO.telefonoVisible}.`,
         undefined,
         true,
       );
@@ -242,7 +242,7 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       `Plantilla lista para ${largo}x${ancho}x${alto} mm: ${url}\n\n` +
         'Es un PDF con la caja desplegada: trae las líneas de corte, las de plegado y las áreas ' +
         'donde puede ir el diseño. El flujo es bajarlo, ubicar el arte sobre esas áreas y ' +
-        'mandarlo a ventas@quilmescorrugados.com.ar o por WhatsApp al +54 9 11 3341-1781. ' +
+        `mandarlo a ${CONTACTO.email} o por WhatsApp al ${CONTACTO.telefonoVisible}. ` +
         `Se imprime hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores y el costo ya está ` +
           'incluido en el precio por m². Solo se cobra aparte el polímero, una matriz por ' +
           'color, que va a cargo del comprador. Las medidas estándar de catálogo no se imprimen.',

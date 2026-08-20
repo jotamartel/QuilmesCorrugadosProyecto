@@ -1,4 +1,5 @@
 import { SITE_URL } from '@/lib/site';
+import { CONTACTO } from '@/lib/contacto';
 /**
  * Componentes de Schema Markup (JSON-LD) para SEO
  * Usar en pages que necesiten datos estructurados específicos
@@ -123,7 +124,7 @@ export function OrganizationSchema() {
     },
     contactPoint: {
       "@type": "ContactPoint",
-      telephone: "+54 9 11 3341-1781",
+      telephone: CONTACTO.telefonoVisible,
       contactType: "sales",
       availableLanguage: "Spanish",
       areaServed: "AR",

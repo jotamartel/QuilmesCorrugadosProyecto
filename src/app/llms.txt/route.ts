@@ -15,6 +15,7 @@ import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
 import type { PricingConfig } from '@/lib/types/database';
 
 import { SITE_URL } from '@/lib/site';
+import { CONTACTO } from '@/lib/contacto';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import { HORARIO, MATERIAL } from '@/lib/retail/config';
 import { notaImpresion } from '@/lib/cotizacion/motor';
@@ -312,7 +313,7 @@ producción.
 
 ## Contacto
 
-- WhatsApp: +54 9 11 3341-1781 — https://wa.me/5491133411781
+- WhatsApp: ${CONTACTO.telefonoVisible} — ${CONTACTO.whatsapp}
 - Email: ventas@quilmescorrugados.com.ar
 - Dirección: Lugones 219, B1878 Quilmes, Buenos Aires, Argentina
 - Horario: ${HORARIO.texto.toLowerCase()} (hora de Argentina)

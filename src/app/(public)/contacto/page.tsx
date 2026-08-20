@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { SITE_URL } from '@/lib/site';
 import { ENVIO, HORARIO } from '@/lib/retail/config';
+import { CONTACTO } from '@/lib/contacto';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
@@ -68,7 +69,7 @@ export default function ContactoPage() {
                       onClick={() => trackEvent('phone_click')}
                       className="text-gray-600 hover:text-[#002E55]"
                     >
-                      +54 9 11 3341-1781
+                      {CONTACTO.telefonoVisible}
                     </a>
                   </div>
                 </div>

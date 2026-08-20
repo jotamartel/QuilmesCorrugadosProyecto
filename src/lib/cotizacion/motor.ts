@@ -15,6 +15,7 @@ import { calculateUnfolded, calculateTotalM2, MEDIDA_MINIMA } from '@/lib/utils/
 import { getPricePerM2, getProductionDays } from '@/lib/utils/pricing';
 import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { CONTACTO } from '@/lib/contacto';
 import type { PricingConfig } from '@/lib/types/database';
 
 const SITIO = SITE_URL;
@@ -709,7 +710,7 @@ export function calcularCotizacion(
       : sePuedeComprarOnline
         ? `Se vende de stock, entrega inmediata, se compra online en ${SITIO}/cajas.`
         : `${motivoNoOnline ?? 'Se coordina directamente.'}`) +
-    ` Fábrica en Lugones 219, Quilmes, Buenos Aires. WhatsApp +54 9 11 3341-1781.`;
+    ` Fábrica en ${CONTACTO.direccion}. WhatsApp ${CONTACTO.telefonoVisible}.`;
 
   // La impresión se produce a medida, así que arranca en el mismo volumen que
   // el canal a medida. Por debajo se vende de stock, que va sin imprimir.

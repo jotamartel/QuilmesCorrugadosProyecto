@@ -19,6 +19,7 @@ import { getPricePerM2, calculateSubtotal, getProductionDays } from '@/lib/utils
 import { sendNotification } from '@/lib/notifications';
 import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
 import { SITE_URL } from '@/lib/site';
+import { CONTACTO } from '@/lib/contacto';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import type { PricingConfig } from '@/lib/types/database';
 import {
@@ -599,7 +600,7 @@ export async function GET(request: NextRequest) {
         with_api_key: `${RATE_LIMIT_DEFAULT_WITH_KEY} requests/minute (configurable)`,
       },
       contact: {
-        whatsapp: '+54 9 11 3341-1781',
+        whatsapp: CONTACTO.telefonoVisible,
         email: 'ventas@quilmescorrugados.com.ar',
         address: 'Lugones 219, B1878 Quilmes, Buenos Aires, Argentina',
       },

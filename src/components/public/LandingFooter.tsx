@@ -1,4 +1,5 @@
 'use client';
+import { CONTACTO } from '@/lib/contacto';
 
 import Image from 'next/image';
 import Link from 'next/link';
@@ -34,7 +35,7 @@ export function LandingFooter() {
               <li className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-[#4F6D87]" />
                 <a href="tel:+5491133411781" onClick={() => trackEvent('phone_click', { source: 'footer' })} className="hover:text-white">
-                  +54 9 11 3341-1781
+                  {CONTACTO.telefonoVisible}
                 </a>
               </li>
               <li className="flex items-center gap-2">

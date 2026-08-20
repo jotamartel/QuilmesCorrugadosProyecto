@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { SITE_URL } from '@/lib/site';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
+import { CONTACTO } from '@/lib/contacto';
 
 export const metadata: Metadata = {
   // El layout raiz aplica el template "%s | Quilmes Corrugados": no repetirlo aca.
@@ -29,7 +30,7 @@ export default function PrivacidadPage() {
         </nav>
 
         <h1 className="text-3xl font-bold text-slate-900 mb-2">Política de Privacidad</h1>
-        <p className="text-slate-600 mb-10">Última actualización: Febrero 2025</p>
+        <p className="text-slate-600 mb-10">Última actualización: agosto de 2026</p>
 
         <div className="prose prose-slate max-w-none space-y-8 text-slate-700">
           <section>
@@ -66,23 +67,52 @@ export default function PrivacidadPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-slate-900 mb-3">4. Protección de los datos</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-3">
+              4. Asistentes automáticos, API pública y servidor MCP
+            </h2>
+            <p>
+              El chat del sitio y el de WhatsApp los atiende un asistente automático. Para
+              responder, el contenido de la conversación se procesa en servidores de proveedores
+              de modelos de lenguaje contratados por nosotros. No les enviamos datos que no estén
+              en la conversación, y esos proveedores actúan como encargados del tratamiento: no
+              usan el contenido para entrenar modelos.
+            </p>
+            <p>
+              La conversación queda registrada asociada a tu número de teléfono o a la sesión del
+              sitio, para poder darle continuidad al pedido y para que el equipo pueda retomarlo.
+            </p>
+            <p>
+              Nuestra API pública y el servidor MCP cotizan sin pedir datos personales: reciben
+              medidas y cantidades, y devuelven un precio. Registramos la consulta —medidas,
+              volumen, dirección IP y qué agente la hizo— para medir el uso y limitar el abuso.
+              Si además nos dejás un dato de contacto, se guarda como una consulta comercial.
+            </p>
+            <p>
+              Si consultás nuestros precios a través de un asistente de terceros —ChatGPT, Claude
+              u otro—, esa plataforma trata tus datos según su propia política, sobre la que no
+              tenemos control. Lo que llega a nuestros servidores es la consulta de cotización.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900 mb-3">5. Protección de los datos</h2>
             <p>
               Protegemos la información personal mediante: transmisión cifrada (HTTPS), almacenamiento en bases de datos con controles de acceso, restricción del acceso solo al personal autorizado, y no compartimos datos con terceros con fines comerciales sin tu consentimiento.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-slate-900 mb-3">5. Conservación</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-3">6. Conservación</h2>
             <p>
               Conservamos los datos el tiempo necesario para gestionar la relación comercial y cumplir obligaciones legales. Podés ejercer tus derechos de acceso, rectificación, supresión y oposición contactándonos por los medios indicados en nuestro sitio.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-slate-900 mb-3">6. Contacto</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-3">7. Contacto</h2>
             <p>
-              Para consultas sobre esta política o sobre tus datos personales: ventas@quilmescorrugados.com.ar o WhatsApp +54 11 3341-1781.
+              Para consultas sobre esta política o sobre tus datos personales:{' '}
+              {CONTACTO.email} o WhatsApp {CONTACTO.telefonoVisible}.
             </p>
           </section>
         </div>

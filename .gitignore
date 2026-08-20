@@ -57,3 +57,4 @@ _qa/
 
 # Descarga temporal del esquema de OpenAI, se baja con curl cuando hace falta
 esquema-tmp.json
+esquema-validacion-tmp.json

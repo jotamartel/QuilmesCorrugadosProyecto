@@ -15,8 +15,24 @@
  */
 import fs from 'node:fs';
 
+/**
+ * OJO: hay DOS URLs y no dan lo mismo.
+ *
+ * El esquema hospedado declara en su propio `const` la URL /plugins/, pero el
+ * portal RECHAZA el archivo si no dice /apps-sdk/:
+ *   "chatgpt-app-submission.json must use $schema
+ *    https://developers.openai.com/apps-sdk/schemas/chatgpt-app-submission.v1.json"
+ *
+ * O sea que el validador del portal y el esquema que el propio OpenAI publica
+ * se contradicen. La /apps-sdk/ redirige 301 a la /plugins/, asi que es la
+ * misma definicion; lo que difiere es cual de las dos exige cada lado. Manda el
+ * portal, que es quien tiene que aceptar el archivo.
+ *
+ * Por eso mas abajo la validacion local afloja ese unico `const`: valida todo
+ * el resto del esquema contra la URL que el portal pide.
+ */
 const ESQUEMA_URL =
-  'https://developers.openai.com/plugins/schemas/chatgpt-app-submission.v1.json';
+  'https://developers.openai.com/apps-sdk/schemas/chatgpt-app-submission.v1.json';
 
 const submission = {
   $schema: ESQUEMA_URL,
@@ -200,6 +216,24 @@ const submission = {
 };
 
 // ---------------------------------------------------------------------------
+
+// Validacion local contra el esquema oficial, con el unico `const` en disputa
+// relajado para aceptar las dos URLs. Todo lo demas —los minimos de casos, el
+// tope de 30 del subtitulo, el enum de categorias, las nueve justificaciones—
+// se valida tal cual lo publica OpenAI.
+//
+// Se baja con:
+//   curl -sL https://developers.openai.com/apps-sdk/schemas/chatgpt-app-submission.v1.json -o esquema-tmp.json
+if (fs.existsSync('esquema-tmp.json')) {
+  const esquema = JSON.parse(fs.readFileSync('esquema-tmp.json', 'utf8'));
+  esquema.properties.$schema = {
+    enum: [
+      'https://developers.openai.com/apps-sdk/schemas/chatgpt-app-submission.v1.json',
+      'https://developers.openai.com/plugins/schemas/chatgpt-app-submission.v1.json',
+    ],
+  };
+  fs.writeFileSync('esquema-validacion-tmp.json', JSON.stringify(esquema));
+}
 
 fs.writeFileSync('chatgpt-app-submission.json', JSON.stringify(submission, null, 2) + '\n');
 

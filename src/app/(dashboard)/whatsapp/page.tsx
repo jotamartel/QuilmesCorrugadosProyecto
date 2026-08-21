@@ -97,6 +97,7 @@ export default function WhatsAppPage() {
   const [respuesta, setRespuesta] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
+  const [reabriendo, setReabriendo] = useState(false);
 
   // Filtros
   const [filter, setFilter] = useState<FilterType>('all');
@@ -181,6 +182,38 @@ export default function WhatsAppPage() {
       setErrorEnvio('No se pudo enviar. Revisá la conexión.');
     } finally {
       setEnviando(false);
+    }
+  };
+
+  /**
+   * Golpear la puerta cuando la conversación se pasó de las 24 horas.
+   *
+   * Manda una plantilla aprobada por Meta —un texto fijo, ver
+   * src/lib/whatsapp-plantillas.ts—. No abre la ventana: la abre la respuesta
+   * del cliente. Hasta entonces el recuadro sigue diciendo que no se puede
+   * escribir libre, que es la verdad.
+   */
+  const reabrirConversacion = async () => {
+    if (!selectedConversation || reabriendo) return;
+    setReabriendo(true);
+    setErrorEnvio(null);
+    try {
+      const res = await fetch('/api/whatsapp/reabrir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: selectedConversation }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorEnvio(data.error || 'No se pudo reabrir la conversación.');
+        return;
+      }
+      fetchMessages(selectedConversation);
+      fetchConversations();
+    } catch {
+      setErrorEnvio('No se pudo reabrir la conversación. Revisá la conexión.');
+    } finally {
+      setReabriendo(false);
     }
   };
 
@@ -650,7 +683,7 @@ export default function WhatsAppPage() {
                   : null;
                 // WhatsApp solo permite texto libre dentro de las 24 horas del
                 // último mensaje del cliente. Fuera de eso hace falta una
-                // plantilla aprobada por Meta, que todavía no tenemos.
+                // plantilla aprobada por Meta.
                 const ventanaAbierta = horas !== null && horas < 24;
                 const pausado =
                   !!selectedConv.bot_pausado_hasta &&
@@ -679,14 +712,35 @@ export default function WhatsAppPage() {
                     )}
 
                     {!ventanaAbierta ? (
-                      <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                      <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 space-y-2">
                         <p className="text-xs text-amber-900">
                           {horas === null
-                            ? 'Esta persona todavía no escribió, así que no se le puede mandar un mensaje libre.'
+                            ? 'Esta persona todavía no escribió, así que no se le puede mandar nada.'
                             : `El último mensaje del cliente fue hace ${horas} horas.`}{' '}
-                          WhatsApp solo permite escribir libremente dentro de las 24 horas. Para
-                          reabrir la conversación hace falta una plantilla aprobada por Meta.
+                          WhatsApp solo permite escribir libremente dentro de las 24 horas.
                         </p>
+
+                        {/* El botón aparece solo si el cliente escribió alguna vez.
+                            Mandarle una plantilla a alguien que nunca nos habló es
+                            exactamente lo que hace que Meta marque el número por
+                            spam, y ese número es el canal de ventas. */}
+                        {horas !== null && (
+                          <>
+                            <p className="text-xs text-amber-900">
+                              Podés mandarle un mensaje breve aprobado por Meta para que te
+                              conteste. <strong>Cuando responda</strong> se reabre la ventana y ahí
+                              sí le escribís lo que quieras.
+                            </p>
+                            {errorEnvio && <p className="text-xs text-red-600">{errorEnvio}</p>}
+                            <button
+                              onClick={reabrirConversacion}
+                              disabled={reabriendo}
+                              className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-40"
+                            >
+                              {reabriendo ? 'Enviando…' : 'Pedirle que responda'}
+                            </button>
+                          </>
+                        )}
                       </div>
                     ) : (
                       <>

@@ -1,0 +1,137 @@
+/**
+ * El contrato del transporte de WhatsApp.
+ *
+ * POR QUÉ EXISTE
+ *
+ * El webhook tiene casi mil líneas y son casi todas lógica de negocio: cotizar,
+ * derivar, guardar el lead, pausar al asistente. Twilio aparecía metido en
+ * cuatro lugares de esa lógica —cómo entra el mensaje, cómo se responde, cómo
+ * se envía, cómo se valida la firma— así que cambiar de proveedor obligaba a
+ * abrir el archivo entero y tocar cosas que no tienen nada que ver con el
+ * proveedor.
+ *
+ * Con esta capa en el medio, la lógica de negocio no sabe quién trae el mensaje.
+ * Cambiar de proveedor es cambiar una variable de entorno.
+ *
+ * POR QUÉ DOS IMPLEMENTACIONES Y NO UN REEMPLAZO DIRECTO
+ *
+ * La cuenta de WhatsApp Business con Meta necesita verificación de negocio, que
+ * es un trámite de días. Hasta que esté, el canal tiene que seguir funcionando.
+ * Con las dos adentro se prueba en Twilio mientras el trámite avanza, se cambia
+ * la variable cuando la cuenta está lista, y si algo sale mal se vuelve atrás en
+ * un minuto. Cuando Meta esté estable, se borra la implementación de Twilio.
+ */
+
+/** Un mensaje entrante, ya sin las particularidades del proveedor. */
+export interface MensajeEntrante {
+  /**
+   * En formato E.164 con el más adelante: +5491133411781.
+   *
+   * Es la forma en que ya está guardado el historial, así que los dos
+   * proveedores tienen que normalizar a esto. Twilio lo manda como
+   * "whatsapp:+549…" y Meta como "549…" sin el más: si alguno de los dos se
+   * desvía, las conversaciones de ese cliente se parten en dos y el panel
+   * muestra la mitad.
+   */
+  telefono: string;
+  /** El texto del mensaje. Vacío cuando el cliente mandó solo un audio o una foto. */
+  texto: string;
+  tieneMedia: boolean;
+  /**
+   * El id que le puso el proveedor a este mensaje.
+   *
+   * Todavía no se usa. Queda expuesto porque es lo que hace falta para volver
+   * idempotente al webhook —hoy no lo es, y el propio código lo comenta—: un
+   * reintento del proveedor puede avanzar el flujo dos veces.
+   */
+  id: string | null;
+}
+
+/** Una plantilla lista para mandar, con sus variables ya resueltas. */
+export interface PlantillaAEnviar {
+  /** El nombre con que está dada de alta en Meta. */
+  nombre: string;
+  /** El código de idioma con que está dada de alta: "es", "es_AR". */
+  idioma: string;
+  /** Los valores de {{1}}, {{2}}… en orden. Vacío si la plantilla no tiene. */
+  variables?: string[];
+}
+
+/** Lo que el webhook necesita de un proveedor, y nada más. */
+export interface Transporte {
+  readonly nombre: 'twilio' | 'meta';
+
+  /** Si hay credenciales para operar. Sin esto el webhook no intenta responder. */
+  configurado(): boolean;
+
+  enviarTexto(telefono: string, texto: string): Promise<boolean>;
+  enviarDocumento(telefono: string, urlDelArchivo: string): Promise<boolean>;
+
+  /**
+   * Manda una plantilla aprobada por Meta.
+   *
+   * Es la unica forma de escribirle a alguien fuera de la ventana de 24 horas.
+   * Ver src/lib/whatsapp-plantillas.ts para el porque y para los textos.
+   *
+   * Es opcional porque el modelo de plantillas de Twilio es otro —van por
+   * Content SID, dadas de alta en el panel de Twilio, no en el de Meta— y no
+   * tiene sentido inventar una traduccion para un proveedor que estamos por
+   * dejar. Cuando no esta, quien llama tiene que decirlo claro en vez de fallar
+   * en silencio.
+   */
+  enviarPlantilla?(telefono: string, plantilla: PlantillaAEnviar): Promise<boolean>;
+
+  /**
+   * Valida que la llamada venga de verdad del proveedor.
+   *
+   * Devuelve null cuando no se puede validar por falta de configuración, que es
+   * distinto de false: false es "vino firmado y la firma no cierra", null es
+   * "no tenemos con qué comprobarlo". El webhook decide qué hacer con cada uno.
+   */
+  firmaValida(request: Request, cuerpoCrudo: string): Promise<boolean | null>;
+
+  /** Interpreta el cuerpo del webhook. Devuelve null si no es un mensaje que nos interese. */
+  leerEntrante(cuerpoCrudo: string, request: Request): MensajeEntrante | null;
+
+  /**
+   * Lo que hay que contestarle al proveedor para que dé el mensaje por recibido.
+   *
+   * Twilio espera TwiML —un XML vacío significa "no respondas nada por tu
+   * cuenta"—; Meta espera un 200 pelado. Es la clase de detalle que estaba
+   * repetido seis veces en el webhook.
+   */
+  respuestaDeRecibido(): Response;
+
+  /**
+   * El saludo de alta, si el proveedor lo pide.
+   *
+   * Meta verifica el webhook con un GET que trae un desafío y espera que se le
+   * devuelva tal cual. Twilio no hace nada parecido, así que devuelve null.
+   */
+  responderVerificacionDeAlta?(request: Request): Response | null;
+}
+
+/**
+ * Deja un teléfono en la forma en que está guardado el historial.
+ *
+ * OJO CON ARGENTINA. Los celulares argentinos llevan un 9 después del código de
+ * país —+54 9 11…— pero ese 9 no siempre viaja: según por dónde entre el
+ * mensaje puede llegar como +5411… Si se guardan las dos formas, el mismo
+ * cliente aparece como dos conversaciones distintas y quien atiende ve la mitad
+ * de lo que se habló.
+ *
+ * Acá se normaliza a la forma CON 9, que es la que ya está en la base. No está
+ * verificado contra tráfico real de Meta todavía: cuando la cuenta esté activa
+ * hay que confirmar con qué forma llegan los mensajes de verdad antes de darlo
+ * por bueno.
+ */
+export function normalizarTelefono(crudo: string): string {
+  let n = crudo.replace('whatsapp:', '').replace(/[^\d+]/g, '');
+  if (!n.startsWith('+')) n = '+' + n;
+
+  // +54 seguido de un area y un numero, sin el 9 de celular.
+  if (n.startsWith('+54') && !n.startsWith('+549')) {
+    n = '+549' + n.slice(3);
+  }
+  return n;
+}

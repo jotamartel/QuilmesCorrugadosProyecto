@@ -1,17 +1,12 @@
-import twilio from 'twilio';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { transporte } from '@/lib/whatsapp-transporte';
+import type { Plantilla } from '@/lib/whatsapp-plantillas';
 import { CONTACTO } from '@/lib/contacto';
 import { HORARIO, RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
 import { SITE_URL } from '@/lib/site';
 import { precioUnitarioARS, type QuoteResult } from '@/lib/cotizacion/motor';
 import { calculateUnfolded } from '@/lib/utils/box-calculations';
 
-// Cliente Twilio - solo se inicializa si hay credenciales configuradas
-const client = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
-  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-  : null;
-
-const TWILIO_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
 const BUSINESS_PHONE = process.env.WHATSAPP_BUSINESS_NUMBER || CONTACTO.tel;
 
 // Timeout de conversación (30 minutos por defecto, configurable)
@@ -70,59 +65,63 @@ export interface ConversationState {
 const memoryCache = new Map<string, ConversationState>();
 
 /**
- * Envía un mensaje de WhatsApp via Twilio
+ * Envía un mensaje de WhatsApp por el proveedor activo.
+ * Cuál es sale de WHATSAPP_PROVEEDOR: ver src/lib/whatsapp-transporte/.
  */
 export async function sendWhatsAppMessage({ to, body }: WhatsAppMessage): Promise<boolean> {
-  if (!client) {
-    console.log('[WhatsApp] Twilio no configurado. Mensaje pendiente:', { to, body: body.substring(0, 50) + '...' });
-    return false;
-  }
-
-  try {
-    const formattedTo = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
-
-    await client.messages.create({
-      from: TWILIO_NUMBER,
-      to: formattedTo,
-      body,
-    });
-
-    console.log('[WhatsApp] Mensaje enviado a:', to);
-    return true;
-  } catch (error) {
-    console.error('[WhatsApp] Error enviando mensaje:', error);
-    return false;
-  }
+  const ok = await transporte.enviarTexto(to, body);
+  if (ok) console.log('[WhatsApp] mensaje enviado por %s a %s', transporte.nombre, to);
+  return ok;
 }
 
 /**
- * Envía un documento (PDF) por WhatsApp via Twilio.
+ * Envía un documento (PDF) por WhatsApp.
  * La URL debe ser pública y accesible (ej: /api/box-template?length=400&width=700&height=280).
  */
 export async function sendWhatsAppDocument({
   to,
   mediaUrl,
 }: WhatsAppDocumentMessage): Promise<boolean> {
-  if (!client) {
-    console.log('[WhatsApp] Twilio no configurado. Documento pendiente:', { to, mediaUrl });
-    return false;
+  const ok = await transporte.enviarDocumento(to, mediaUrl);
+  if (ok) console.log('[WhatsApp] documento enviado por %s a %s', transporte.nombre, to);
+  return ok;
+}
+
+/**
+ * Manda una plantilla aprobada por Meta.
+ *
+ * Es la unica forma de escribirle a alguien que hace mas de 24 horas que no
+ * escribe. El resultado distingue tres cosas, porque quien atiende necesita
+ * saber cual de las tres le paso:
+ *
+ *   'enviada'          — salio; cuando el cliente conteste se abre la ventana
+ *   'sin_soporte'      — el proveedor actual no manda plantillas (Twilio)
+ *   'error'            — Meta la rechazo: nombre, idioma o aprobacion
+ */
+export async function enviarPlantillaWhatsApp(
+  telefono: string,
+  plantilla: Plantilla,
+  variables: string[] = [],
+): Promise<'enviada' | 'sin_soporte' | 'error'> {
+  if (!transporte.enviarPlantilla) {
+    console.error(
+      '[WhatsApp] %s no manda plantillas: no se puede reabrir la conversacion con %s',
+      transporte.nombre, telefono,
+    );
+    return 'sin_soporte';
   }
 
-  try {
-    const formattedTo = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
-    // WhatsApp no permite body junto con documentos; se envía el texto en un mensaje aparte
-    await client.messages.create({
-      from: TWILIO_NUMBER,
-      to: formattedTo,
-      mediaUrl: [mediaUrl],
-    });
+  const ok = await transporte.enviarPlantilla(telefono, {
+    nombre: plantilla.nombre,
+    idioma: plantilla.idioma,
+    variables,
+  });
 
-    console.log('[WhatsApp] Documento enviado a:', to);
-    return true;
-  } catch (error) {
-    console.error('[WhatsApp] Error enviando documento:', error);
-    return false;
+  if (ok) {
+    console.log('[WhatsApp] plantilla "%s" enviada a %s', plantilla.nombre, telefono);
+    return 'enviada';
   }
+  return 'error';
 }
 
 /**
@@ -950,7 +949,7 @@ Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
  * Verifica si WhatsApp esta configurado
  */
 export function isWhatsAppEnabled(): boolean {
-  return !!client;
+  return transporte.configurado();
 }
 
 /**

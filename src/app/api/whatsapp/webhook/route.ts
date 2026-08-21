@@ -36,9 +36,8 @@ import { CONTACTO } from '@/lib/contacto';
 import { sendNotification } from '@/lib/notifications';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { SITE_URL } from '@/lib/site';
-import { firmaTwilioValida, urlsPosibles } from '@/lib/webhooks/firmas';
-import { getPricePerM2, getProductionDays, getActivePricingConfig } from '@/lib/utils/pricing';
-import { createClient } from '@/lib/supabase/server';
+import { transporte, responderAltaDeWebhook } from '@/lib/whatsapp-transporte';
+import { getActivePricingConfig } from '@/lib/utils/pricing';
 import { classifyIntent, isGroqEnabled } from '@/lib/groq';
 import type { PricingConfig } from '@/lib/types/database';
 import {
@@ -97,8 +96,9 @@ async function saveCommunication(
   clientId?: string | null
 ) {
   try {
-    // Service role a proposito: este endpoint lo llama Twilio, no un usuario
-    // logueado, asi que no hay sesion que satisfaga las policies de RLS.
+    // Service role a proposito: este endpoint lo llama el proveedor de
+    // WhatsApp, no un usuario logueado, asi que no hay sesion que satisfaga las
+    // policies de RLS.
     const supabase = createAdminClient();
     const { error } = await supabase.from('communications').insert({
       channel: 'whatsapp',
@@ -194,20 +194,6 @@ async function createWhatsAppLead(data: {
 }
 
 /**
- * Detecta si el mensaje contiene media (audio, imagen, video)
- */
-function hasMediaContent(formData: FormData): boolean {
-  const mediaFields = ['MediaUrl0', 'MediaContentType0', 'NumMedia'];
-  for (const field of mediaFields) {
-    const value = formData.get(field);
-    if (value && value !== '0') {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
  * Manda la respuesta del agente y, si menciona la plantilla, tambien el PDF.
  *
  * En WhatsApp un archivo adjunto es mejor que un link: se abre sin salir de la
@@ -230,70 +216,64 @@ async function enviarRespuestaDelAgente(
 }
 
 export async function POST(request: NextRequest) {
+  // Se guarda apenas se conoce para poder avisarle al cliente si algo explota
+  // mas adelante: el cuerpo se lee una sola vez, asi que en el catch ya no hay
+  // de donde sacar el numero.
+  let telefonoParaAvisarDelError: string | null = null;
+
   try {
-    const formData = await request.formData();
+    // El cuerpo se lee crudo UNA vez: la firma se calcula sobre los bytes
+    // exactos que llegaron, asi que no se puede parsear antes.
+    const cuerpoCrudo = await request.text();
 
     // ─────────────────────────────────────────────────────────────────────
-    // Verificar que la llamada viene de Twilio.
+    // Verificar que la llamada viene del proveedor.
     //
-    // Sin esto, el destinatario del mensaje sale de `From`, que es un campo
-    // de un formulario sin autenticar. Cualquiera podia hacer un POST con el
-    // numero que quisiera y esta cuenta le mandaba —y pagaba— un WhatsApp.
-    // Repetido, ademas de la factura, expone el numero a que Meta lo marque
-    // por spam, y ese numero es el canal de ventas.
+    // Sin esto, el destinatario del mensaje sale de un campo sin autenticar.
+    // Cualquiera podia hacer un POST con el numero que quisiera y esta cuenta
+    // le mandaba —y pagaba— un WhatsApp. Repetido, ademas de la factura,
+    // expone el numero a que Meta lo marque por spam, y ese numero es el canal
+    // de ventas.
     //
-    // Se valida contra las dos formas del dominio porque Twilio firma la URL
-    // exacta que tiene cargada en su panel, y el apex responde 308 hacia www:
-    // si alla quedo la del apex, la request llega por www con una firma que
-    // corresponde al apex.
+    // Como se valida depende del proveedor y eso vive en la capa de transporte:
+    // Twilio firma la URL mas los campos del formulario, Meta un HMAC sobre el
+    // cuerpo. Aca solo importa el resultado.
     // ─────────────────────────────────────────────────────────────────────
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
-    const firma = request.headers.get('x-twilio-signature');
+    const firmaOk = await transporte.firmaValida(request, cuerpoCrudo);
 
-    if (authToken) {
-      const params: Record<string, string> = {};
-      formData.forEach((valor, clave) => {
-        if (typeof valor === 'string') params[clave] = valor;
-      });
-
-      // La query string va incluida: Twilio firma la URL completa, y si en el
-      // panel quedo cargada con parametros, sin esto la firma nunca coincide.
-      const candidatas = urlsPosibles(request.nextUrl.pathname, request.nextUrl.search.slice(1));
-      const valida = !!firma && candidatas.some((url) => firmaTwilioValida(authToken, firma, url, params));
-
-      if (!valida) {
-        // MODO OBSERVACION, a proposito y por poco tiempo.
-        //
-        // Bloquear de entrada arriesga el canal de ventas a que yo haya
-        // reconstruido mal la URL: Twilio firma la que tiene cargada en su
-        // panel, que puede diferir en dominio o en query de la que llega. Si
-        // me equivoco, los mensajes de clientes reales se caen en silencio.
-        //
-        // Entonces primero se mide. Este log dice si la validacion habria
-        // pasado con mensajes de verdad; cuando se confirme que si, se
-        // reemplaza este bloque por el 403 y queda cerrado.
-        console.error(
-          '[whatsapp][firma] NO VALIDA — se dejo pasar. firma=%s urls=%s params=%s',
-          firma ? firma.slice(0, 12) + '...' : '(ausente)',
-          candidatas.join(' | '),
-          Object.keys(params).sort().join(','),
-        );
-      } else {
-        console.log('[whatsapp][firma] valida');
-      }
-    } else {
-      // Sin token no se puede verificar nada. Se sigue atendiendo para no
-      // cortar el servicio, pero queda registrado: es una configuracion
-      // incompleta, no una decision.
+    if (firmaOk === null) {
+      // Sin con que verificar. Se sigue atendiendo para no cortar el servicio,
+      // pero queda registrado: es una configuracion incompleta, no una
+      // decision.
       console.error(
-        '[whatsapp] TWILIO_AUTH_TOKEN no configurado: el webhook esta ' +
-          'aceptando mensajes sin verificar su origen',
+        '[whatsapp] no hay con que verificar el origen (%s): el webhook esta ' +
+          'aceptando mensajes sin comprobar quien los manda',
+        transporte.nombre,
       );
+    } else if (!firmaOk) {
+      // MODO OBSERVACION, a proposito y por poco tiempo.
+      //
+      // Bloquear de entrada arriesga el canal de ventas a que la URL este
+      // reconstruida mal. Primero se mide: este log dice si la validacion
+      // habria pasado con mensajes de verdad. Cuando se confirme que si, esto
+      // pasa a ser un 403 y queda cerrado.
+      console.error('[whatsapp][firma] NO VALIDA (%s) — se dejo pasar', transporte.nombre);
+    } else {
+      console.log('[whatsapp][firma] valida (%s)', transporte.nombre);
     }
 
-    const from = formData.get('From') as string;
-    const body = (formData.get('Body') as string || '').trim();
-    const phoneNumber = from.replace('whatsapp:', '');
+    const entrante = transporte.leerEntrante(cuerpoCrudo, request);
+    if (!entrante) {
+      // Meta manda por el mismo webhook los avisos de estado —entregado,
+      // leido—, que no son mensajes de nadie. Darlos por recibidos y no hacer
+      // nada es lo correcto.
+      return transporte.respuestaDeRecibido();
+    }
+
+    const phoneNumber = entrante.telefono;
+    const body = entrante.texto;
+    const from = phoneNumber;
+    telefonoParaAvisarDelError = phoneNumber;
     const bodyLower = body.toLowerCase();
 
     // Omnicanalidad: upsert contact_profile y matching con client
@@ -314,7 +294,7 @@ export async function POST(request: NextRequest) {
 
     // Guardar mensaje entrante con client_id si hay match
     await saveCommunication(phoneNumber, 'inbound', body, {
-      hasMedia: hasMediaContent(formData),
+      hasMedia: entrante.tieneMedia,
     }, clientId);
     // ─────────────────────────────────────────────────────────────────────
     // Si una persona esta atendiendo esta conversacion, el asistente se calla.
@@ -328,10 +308,7 @@ export async function POST(request: NextRequest) {
     // ─────────────────────────────────────────────────────────────────────
     if (await asistentePausado(phoneNumber)) {
       console.log('[WhatsApp] conversacion atendida por una persona, el asistente no responde:', phoneNumber);
-      return new NextResponse(
-        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-        { headers: { 'Content-Type': 'text/xml' } },
-      );
+      return transporte.respuestaDeRecibido();
     }
 
     let responseMessage: string | BoxTemplateResponse = '';
@@ -350,7 +327,7 @@ export async function POST(request: NextRequest) {
     // a alguien que quedo esperando responder "1" o "2".
     // ─────────────────────────────────────────────────────────────────────
     const enFlujoViejo = state.step !== 'initial';
-    if (!hasMediaContent(formData) && !enFlujoViejo && agenteDisponible()) {
+    if (!entrante.tieneMedia && !enFlujoViejo && agenteDisponible()) {
       try {
         const historial = await getRecentConversationHistory(phoneNumber, 10);
         const r = await responder(body, historial, {
@@ -370,10 +347,7 @@ export async function POST(request: NextRequest) {
           // chequeo evita empezar; este evita terminar.
           if (await asistentePausado(phoneNumber)) {
             console.log('[WhatsApp] una persona tomo la conversacion mientras el agente pensaba, no se envia:', phoneNumber);
-            return new NextResponse(
-              '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-              { headers: { 'Content-Type': 'text/xml' } },
-            );
+            return transporte.respuestaDeRecibido();
           }
 
           await enviarRespuestaDelAgente(from, phoneNumber, r.texto, clientId);
@@ -394,10 +368,7 @@ export async function POST(request: NextRequest) {
               },
             }).catch((e) => console.error('[WhatsApp] no se pudo avisar de la derivacion:', e));
           }
-          return new NextResponse(
-            '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-            { headers: { 'Content-Type': 'text/xml' } },
-          );
+          return transporte.respuestaDeRecibido();
         }
         console.error('[WhatsApp] el agente devolvio vacio, pasando al respaldo');
       } catch (error) {
@@ -406,7 +377,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Detectar media (audio/imagen/video)
-    if (hasMediaContent(formData)) {
+    if (entrante.tieneMedia) {
       responseMessage = getUnsupportedMediaMessage();
     }
     // Continuar con el flujo normal si no hay media
@@ -925,10 +896,7 @@ Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
     // una persona tomo la conversacion, no se envia nada.
     if (await asistentePausado(phoneNumber)) {
       console.log('[WhatsApp] una persona tomo la conversacion, el respaldo no envia:', phoneNumber);
-      return new NextResponse(
-        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-        { headers: { 'Content-Type': 'text/xml' } },
-      );
+      return transporte.respuestaDeRecibido();
     }
 
     if (boxTemplateDims) {
@@ -947,25 +915,20 @@ Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
     // Guardar mensaje saliente con client_id
     await saveCommunication(phoneNumber, 'outbound', textToSend, outboundMetadata, clientId);
 
-    // TwiML vacío
-    return new NextResponse(
-      '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-      { headers: { 'Content-Type': 'text/xml' } }
-    );
+    return transporte.respuestaDeRecibido();
 
   } catch (error) {
     console.error('[WhatsApp] Webhook error:', error);
 
-    // Antes esto devolvia 200 con TwiML vacio: la persona escribia y no le
+    // Antes esto devolvia un recibido vacio: la persona escribia y no le
     // contestaba nadie, sin forma de saber si el mensaje habia llegado. Se le
     // avisa y se le deja una salida humana. El 200 se mantiene a proposito:
-    // con un 500 Twilio reintenta y, como el handler todavia no es idempotente,
-    // el reintento puede avanzar el flujo dos veces.
+    // ante un 500 los dos proveedores reintentan y, como el handler todavia no
+    // es idempotente, el reintento puede avanzar el flujo dos veces.
     try {
-      const from = (await request.clone().formData()).get('From') as string | null;
-      if (from) {
+      if (telefonoParaAvisarDelError) {
         await sendWhatsAppMessage({
-          to: from,
+          to: telefonoParaAvisarDelError,
           body:
             `Perdon, tuvimos un problema tecnico y no pude procesar tu mensaje.\n\n` +
             `Escribinos directamente al ${CONTACTO.telefonoVisible} o a ${CONTACTO.email} ` +
@@ -976,15 +939,26 @@ Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
       console.error('[WhatsApp] Tampoco se pudo avisar del error:', avisoError);
     }
 
-    return new NextResponse(
-      '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-      { status: 200, headers: { 'Content-Type': 'text/xml' } }
-    );
+    return transporte.respuestaDeRecibido();
   }
 }
 
-// Health check
-export async function GET() {
+/**
+ * Alta del webhook y health check, en ese orden.
+ *
+ * Meta verifica la URL con un GET que trae hub.mode, hub.verify_token y
+ * hub.challenge, y espera el desafio devuelto tal cual. Si eso no contesta
+ * bien, la suscripcion no se activa y no llega ni un mensaje.
+ *
+ * Se contesta este alta aunque el proveedor activo sea Twilio —ver
+ * responderAltaDeWebhook— para poder dar de alta el webhook de Meta sin dejar
+ * el canal sin atender mientras tanto. Un GET que no trae el desafio sigue
+ * siendo el health check de siempre.
+ */
+export async function GET(request: NextRequest) {
+  const alta = responderAltaDeWebhook(request);
+  if (alta) return alta;
+
   return NextResponse.json({
     status: 'active',
     service: 'WhatsApp webhook',

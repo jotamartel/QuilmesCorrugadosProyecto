@@ -84,11 +84,32 @@ export interface Transporte {
   /**
    * Valida que la llamada venga de verdad del proveedor.
    *
-   * Devuelve null cuando no se puede validar por falta de configuración, que es
-   * distinto de false: false es "vino firmado y la firma no cierra", null es
-   * "no tenemos con qué comprobarlo". El webhook decide qué hacer con cada uno.
+   * Devuelve null SOLO cuando no tenemos con qué comprobarlo —falta la clave en
+   * la configuración—. Que la request no traiga firma NO es null: si tenemos la
+   * clave y el que llama no firmó, no es el proveedor, y eso es false.
+   *
+   * La distinción importa porque el webhook bloquea con false y deja pasar con
+   * null: si "sin firma" contara como null, cualquiera que descubra la URL entra
+   * simplemente omitiendo la cabecera, que es el agujero exacto que esto cierra.
    */
   firmaValida(request: Request, cuerpoCrudo: string): Promise<boolean | null>;
+
+  /**
+   * Si una firma que no cierra corta la request o solo queda anotada.
+   *
+   * No es lo mismo para los dos proveedores y por eso lo decide cada uno:
+   *
+   * - Meta firma un HMAC sobre el cuerpo crudo. Es determinístico, no depende de
+   *   reconstruir nada, y está probado en scripts/qa-transporte-whatsapp.mts. Si
+   *   no cierra, o la clave está mal o no es Meta. Bloquea.
+   * - Twilio firma la URL más los campos del formulario, y la URL que firma es la
+   *   que tiene cargada en su panel, que detrás de un proxy puede no ser la que
+   *   ve el servidor. Ahí un rechazo puede ser culpa nuestra y se lleva puestos
+   *   mensajes de clientes reales. No bloquea.
+   *
+   * WHATSAPP_FIRMA_ESTRICTA lo fuerza en cualquiera de los dos sentidos.
+   */
+  readonly rechazaFirmaInvalida: boolean;
 
   /** Interpreta el cuerpo del webhook. Devuelve null si no es un mensaje que nos interese. */
   leerEntrante(cuerpoCrudo: string, request: Request): MensajeEntrante | null;

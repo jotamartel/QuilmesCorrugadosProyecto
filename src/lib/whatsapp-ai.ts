@@ -7,9 +7,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import {
   getActivePricingConfig,
   getPricePerM2,
-  getProductionDays,
 } from '@/lib/utils/pricing';
-import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
+import { MEDIDA_MINIMA, MEDIDA_MAXIMA } from '@/lib/utils/box-calculations';
+import { mensajeDeImpedimento } from '@/lib/cotizacion/motor';
 import { SITE_URL } from '@/lib/site';
 import { parseBoxDimensions, validateDimensions } from '@/lib/whatsapp';
 import type { PricingConfig } from '@/lib/types/database';
@@ -96,8 +96,14 @@ const KNOWLEDGE_PROMPT = `Sos el asistente de WhatsApp de Quilmes Corrugados, un
 - Solo Argentina: no exportamos
 
 ### Medidas y límites
-- Mínimo por caja: 200 x 200 x 100 mm
-- Máximo: ancho + alto no puede superar 1200 mm (limitación de plancha)
+- Mínimo por caja: ${MEDIDA_MINIMA.largo} x ${MEDIDA_MINIMA.ancho} x ${MEDIDA_MINIMA.alto} mm
+- Máximo por caja: ${MEDIDA_MAXIMA.largo} x ${MEDIDA_MAXIMA.ancho} x ${MEDIDA_MAXIMA.alto} mm
+- El ancho de plancha sale de sumar ancho + alto y no puede superar
+  ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho del rollo de cartón. El largo no
+  entra en esa cuenta
+- Estos tres límites NO son mínimos de compra: una caja fuera de rango no se fabrica a
+  ninguna cantidad. Si piden una así, decir por qué y ofrecer las medidas de catálogo
+  más parecidas. NUNCA pedirles más cajas para "llegar al mínimo"
 - El mínimo se mide en m² de cartón, NO en cantidad de cajas: ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² para
   comprar, y ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m² para cualquier caja a medida,
   troquelada o impresa. Si piden 50 o 100 cajas personalizadas, decir el mínimo y
@@ -427,27 +433,23 @@ async function tryQuoteFromConversation(
 
   const configToUse = config || getFallbackPricingConfig();
 
-  // El piso se mide en m² de carton desplegado, no en cajas. Cortar por cantidad
-  // rechazaba a quien pedia 90 cajas grandes —que pasan los 500 m² de sobra— y
-  // dejaba pasar 100 cajas chicas, que no llegan ni a 40 m².
-  {
-    const m2Caja = calculateUnfolded(parsed.length, parsed.width, parsed.height).m2;
-    const m2Pedido = calculateTotalM2(m2Caja, parsed.quantity);
-    if (m2Pedido < RETAIL_CONFIG.MIN_M2_PEDIDO) {
-      const cajasMinimo = Math.ceil(RETAIL_CONFIG.MIN_M2_PEDIDO / m2Caja);
-      return (
-        `El mínimo de compra es ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón y ` +
-        `${parsed.quantity.toLocaleString('es-AR')} cajas de ${parsed.length}x${parsed.width}x${parsed.height} ` +
-        `son ${m2Pedido.toFixed(1)} m². Con esa medida el mínimo son ` +
-        `${cajasMinimo.toLocaleString('es-AR')} cajas. ¿Te sirve esa cantidad?`
-      );
-    }
-  }
-
+  // PRIMERO si la caja se puede fabricar, DESPUES si el pedido llega al minimo.
+  //
+  // Estaba al reves, y ademas el minimo se chequeaba aca con su propia cuenta.
+  // Las dos cosas juntas daban esto: alguien pedia 50 cajas de 900x800x700 —que
+  // no entra en el rollo— y le contestabamos "con esa medida el minimo son 194
+  // cajas, te sirve?". O sea que le pediamos mas cajas de una caja que la
+  // fabrica no puede hacer, y si decia que si, se las volviamos a rechazar.
   const validation = validateDimensions(parsed.length, parsed.width, parsed.height);
   if (!validation.valid) {
     return validation.error || null;
   }
+
+  // El piso ya no se chequea aca: lo decide calcularCotizacion() unas lineas
+  // mas abajo, que ademas devuelve las medidas de catalogo mas parecidas ya
+  // cotizadas. Esta copia local del minimo era una de las cinco que habia, y la
+  // unica que no ofrecia alternativas: decia "el minimo son N cajas" y ahi
+  // terminaba la conversacion.
 
   const hasPrinting =
     /impres[ií]on|impreso|logo|2\s*colores?|dos\s*colores?|con\s*impres[ií]on|con\s*impreso/i.test(combinedText) ||
@@ -491,9 +493,12 @@ async function tryQuoteFromConversation(
         `(${Math.round(alt.total_con_iva).toLocaleString('es-AR')} con IVA). ¿Te sirve?`
       );
     }
+    // El cierre lo arma el motor: aca decia "no cotizamos por debajo de ese
+    // volumen" para los tres impedimentos, y para una caja que no entra en el
+    // rollo eso contradice al motivo que viene justo antes.
     return (
-      `${imp.motivo} No cotizamos por debajo de ese volumen.` +
-      (imp.cajas_necesarias
+      mensajeDeImpedimento(imp) +
+      (imp.tipo !== 'no_fabricable' && imp.cajas_necesarias
         ? ` Si te sirven ${imp.cajas_necesarias.toLocaleString('es-AR')} cajas de esa medida, decime y te paso el precio.`
         : '')
     );

@@ -17,6 +17,13 @@ interface PriceSummaryProps {
   submitting?: boolean; // Estado de envío
   stockMaxM2?: number; // Debajo de esto se vende de stock desde /cajas
   volumeThresholdM2?: number; // Desde acá aplica precio por volumen
+  /**
+   * Piso EXCLUYENTE de venta (RETAIL_CONFIG.MIN_M2_PEDIDO, hoy 500 m²). Por
+   * debajo NO se publica precio y tampoco se deriva a /cajas —que también
+   * arranca en 500—. Antes no llegaba hasta acá y el total salía cotizado
+   * igual, que es la queja del dueño ("recién al final te dice que no").
+   */
+  pisoMinM2?: number;
 }
 
 export function PriceSummary({
@@ -29,6 +36,7 @@ export function PriceSummary({
   onRequestContact,
   stockMaxM2 = 1000,
   volumeThresholdM2 = 5000,
+  pisoMinM2 = 500,
   submitting = false,
 }: PriceSummaryProps) {
   // Calcular totales
@@ -41,6 +49,42 @@ export function PriceSummary({
   const hasVolumeDiscount = totalSqm >= volumeThresholdM2;
   // Volumen de stock: no se produce a medida, se compra hecho desde /cajas.
   const esPedidoDeStock = totalSqm > 0 && totalSqm < stockMaxM2;
+  // Piso de venta EXCLUYENTE. Por debajo no hay precio ni derivacion a /cajas
+  // (ese canal tambien pide 500 m² minimo). Es agregado, no por caja: dos
+  // cajas de 300 m² suman 600 y sí llegan.
+  const bajoMinimoPiso = totalSqm > 0 && totalSqm < pisoMinM2;
+  const m2Faltantes = Math.max(0, pisoMinM2 - totalSqm);
+  // Con una sola medida podemos ser concretos y decirle exactamente cuantas
+  // cajas mas hacen falta —como hace el motor con impedimento.cajas_necesarias—.
+  // Con varias, no tiene sentido: la cuenta depende de cual crezca.
+  const cajasParaMinimo =
+    boxes.length === 1 && validCalculations.length === 1 && validCalculations[0].sqmPerBox > 0
+      ? Math.ceil(pisoMinM2 / validCalculations[0].sqmPerBox)
+      : null;
+
+  // Aviso de "no llegas al minimo". Aparece MIENTRAS ajusta cantidades, no al
+  // final, y dice m² faltantes (y cajas cuando hay una sola medida) en vez de
+  // solo "no llegas". El minimo no se negocia: por eso el tono rojo y no se
+  // ofrece "hablemoslo".
+  const panelBajoMinimo = (
+    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+      <p className="text-red-900 font-medium">Todavía no llegás al mínimo de compra</p>
+      <p className="text-sm text-red-800 mt-1">
+        Fabricamos desde <strong>{pisoMinM2.toLocaleString('es-AR')} m²</strong> de cartón.
+        Con este pedido son{' '}
+        {totalSqm.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m²: te faltan{' '}
+        <strong>{m2Faltantes.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m²</strong>
+        {cajasParaMinimo !== null ? (
+          <>
+            , o sea <strong>{cajasParaMinimo.toLocaleString('es-AR')}</strong> cajas de
+            esta medida.
+          </>
+        ) : (
+          '.'
+        )}
+      </p>
+    </div>
+  );
 
   const panelStock = (
     <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
@@ -100,7 +144,7 @@ export function PriceSummary({
                 {box.has_printing && <p className="text-[#002E55]">Con impresión ({box.printing_colors} color{box.printing_colors > 1 ? 'es' : ''})</p>}
                 <div className="flex justify-between text-xs text-gray-500">
                   <span>{calc.totalSqm.toLocaleString('es-AR', { minimumFractionDigits: 2 })} m²</span>
-                  {showPrice && <span className="font-medium text-gray-700">{formatCurrency(calc.subtotal)}</span>}
+                  {showPrice && !bajoMinimoPiso && <span className="font-medium text-gray-700">{formatCurrency(calc.subtotal)}</span>}
                 </div>
               </div>
             </div>
@@ -143,8 +187,36 @@ export function PriceSummary({
 
       {/* Volumen de stock: ya no es un bloqueo, es una derivacion. Antes decia
           "Aumentá la cantidad para continuar" y ahi se cortaba la visita.
-          Con el precio ya revelado se muestran los dos: precio y derivacion. */}
-      {esPedidoDeStock && !showPrice ? (
+          Con el precio ya revelado se muestran los dos: precio y derivacion.
+          Debajo del piso EXCLUYENTE de 500 m² no entra ni una cosa ni la otra:
+          no hay precio y tampoco tiene sentido mandarlo a /cajas, que arranca
+          en el mismo piso. Antes ese aviso caía al final; ahora aparece ni
+          bien las cantidades no llegan. */}
+      {bajoMinimoPiso ? (
+        <>
+          {panelBajoMinimo}
+          {showPrice && onRequestContact && (
+            <button
+              type="button"
+              onClick={onRequestContact}
+              disabled={submitting}
+              className="w-full px-4 py-3 bg-[#002E55] hover:bg-[#001a33] disabled:bg-gray-300 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors mt-4"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  Quiero que me contacten
+                </>
+              )}
+            </button>
+          )}
+        </>
+      ) : esPedidoDeStock && !showPrice ? (
         panelStock
       ) : !showPrice ? (
         /* Mensaje cuando el precio está oculto (paso 1) */

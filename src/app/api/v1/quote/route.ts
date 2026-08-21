@@ -682,7 +682,13 @@ export async function GET(request: NextRequest) {
     // que sale bien pero NO llega al minimo. El asistente recibe un precio
     // correcto y aun asi el negocio no puede vender eso, asi que cuenta como
     // demanda no atendida aunque el status sea 200.
-    registrar(200, quote.cotizable ? 'cotizado' : 'rechazado_bajo_minimo', {
+    //
+    // Antes el rechazo se etiquetaba fijo como "rechazado_bajo_minimo", pero
+    // el motor ahora distingue tres tipos de impedimento (bajo_minimo,
+    // medida_propia_sin_volumen y no_fabricable), asi que esa etiqueta unica
+    // metia dos rechazos distintos en la misma bolsa. Se toma el discriminante
+    // real del motor para que la telemetria diga lo que efectivamente paso.
+    registrar(200, quote.cotizable ? 'cotizado' : `rechazado_${quote.impedimento.tipo}`, {
       total_m2: quote.total_m2,
       total_amount: quote.subtotal ?? undefined,
       rateLimitRemaining: rateLimitCheck.remaining,

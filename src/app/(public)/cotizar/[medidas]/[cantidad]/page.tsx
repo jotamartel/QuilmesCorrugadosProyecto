@@ -251,7 +251,10 @@ export default async function CotizarPage({ params }: Props) {
   // en la pagina ni en el schema.org. Esta URL la comparte el agente, asi que
   // un precio aca es un precio que despues hay que sostener.
   if (!q.cotizable) {
-    const cajasMinimo = q.impedimento.cajas_necesarias;
+    // Solo hay una cantidad que sirva si el problema es la cantidad. Una caja
+    // que no se puede fabricar no se arregla pidiendo mas.
+    const cajasMinimo =
+      q.impedimento.tipo === 'no_fabricable' ? null : q.impedimento.cajas_necesarias;
     return (
       <div className="min-h-screen bg-white">
         <LandingHeader />

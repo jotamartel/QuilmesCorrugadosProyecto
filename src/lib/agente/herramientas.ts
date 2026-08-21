@@ -1,7 +1,13 @@
 import { betaTool } from '@anthropic-ai/sdk/helpers/beta/json-schema';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getActivePricingConfig } from '@/lib/utils/pricing';
-import { calcularCotizacion, precioUnitarioARS, urlPlantilla, notaImpresion } from '@/lib/cotizacion/motor';
+import {
+  calcularCotizacion,
+  precioUnitarioARS,
+  urlPlantilla,
+  notaImpresion,
+  instruccionDeImpedimento,
+} from '@/lib/cotizacion/motor';
 import { RETAIL_CONFIG, MINIMOS, ENVIO, HORARIO, MATERIAL } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
 import { upsertContactProfile } from '@/lib/contact-matching';
@@ -155,10 +161,22 @@ export function crearHerramientas(ctx: ContextoAgente) {
         medidas_mm: `${largo_mm}x${ancho_mm}x${alto_mm}`,
         cantidad,
         metros_cuadrados: q.total_m2,
-        minimo_de_compra_m2: RETAIL_CONFIG.MIN_M2_PEDIDO,
+        // El tipo viaja al modelo, no solo el texto: si la instruccion falla,
+        // esto le sigue diciendo de que clase de "no" se trata.
+        motivo_tipo: imp.tipo,
         motivo: imp.motivo,
-        cajas_necesarias_de_esta_medida: imp.cajas_necesarias,
-        m2_faltantes: imp.m2_faltantes,
+        // Los numeros del minimo SOLO cuando el minimo es el problema. Para una
+        // caja que no entra en el rollo, mandar "minimo_de_compra_m2: 500" y
+        // "cajas_necesarias: null" es darle al modelo justo los ingredientes
+        // para escribir "te faltan cajas para llegar al minimo", que es lo que
+        // hacia.
+        ...(imp.tipo === 'no_fabricable'
+          ? {}
+          : {
+              minimo_de_compra_m2: RETAIL_CONFIG.MIN_M2_PEDIDO,
+              cajas_necesarias_de_esta_medida: imp.cajas_necesarias,
+              m2_faltantes: imp.m2_faltantes,
+            }),
         // Las medidas de catalogo mas parecidas, YA COTIZADAS al minimo. No
         // hace falta otra llamada ni derivar a nadie: el precio de cada una es
         // el que se factura, sale de la misma escalera.
@@ -177,17 +195,22 @@ export function crearHerramientas(ctx: ContextoAgente) {
           link_para_compartir: `${SITE_URL}/cotizar/${a.length_mm}x${a.width_mm}x${a.height_mm}/${a.cantidad}`,
         })),
         instruccion:
-          'NO des ningun precio para la medida que pidió: no lo tenés y no existe. Decí el ' +
-          'mínimo, cuántos m² son y cuántas cajas hacen falta. ' +
+          'NO des ningun precio para la medida que pidió: no lo tenés y no existe. ' +
+          // El resto sale del motor, que es el que sabe de que clase de "no" se
+          // trata. Antes esta instruccion decia "decí el mínimo y cuántas cajas
+          // hacen falta" para los tres impedimentos, incluida la caja que no se
+          // puede fabricar.
+          instruccionDeImpedimento(imp) +
+          ' ' +
           (imp.alternativas.length
-            ? 'Y OFRECELE DIRECTAMENTE las de alternativas_de_catalogo, con su medida, su ' +
+            ? 'OFRECELE DIRECTAMENTE las de alternativas_de_catalogo, con su medida, su ' +
               'cantidad y su precio, que ya están calculados acá. No preguntes si querés que ' +
               'las busque: son estas. Si alguna tiene entra_lo_que_iba_en_la_pedida en false, ' +
               'avisá que es más chica que la medida que pidió, pero ofrecela igual: el cliente ' +
               'sabe qué va adentro. '
             : '') +
           'NO ofrezcas coordinarlo por WhatsApp, ni consultarlo, ni pasarlo a un asesor para ' +
-          'que la busque una persona: el mínimo es excluyente y la alternativa ya la tenés.',
+          'que la busque una persona: la alternativa ya la tenés.',
       });
     }
 

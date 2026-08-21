@@ -11,7 +11,7 @@ import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculation
 import { getPricePerM2, getProductionDays, getActivePricingConfig } from '@/lib/utils/pricing';
 import { createClient } from '@/lib/supabase/server';
 import type { PricingConfig } from '@/lib/types/database';
-import { calcularCotizacion } from '@/lib/cotizacion/motor';
+import { calcularCotizacion, type Impedimento } from '@/lib/cotizacion/motor';
 
 // Cliente Resend para enviar respuestas
 const resend = process.env.RESEND_API_KEY
@@ -26,14 +26,37 @@ const resend = process.env.RESEND_API_KEY
  * volumen configurado en printing_included_min_m2 la impresion ya viene
  * incluida en el precio por m², asi que aca se estaba cobrando dos veces.
  */
+/**
+ * Resultado del intento de cotizar por mail.
+ *
+ * Antes esto era `QuoteData | null` y colapsaba las dos razones por las que
+ * un pedido no tiene precio —bajo minimo, medida no fabricable— en el mismo
+ * null que devolvia cuando el mail no traia datos parseables. La respuesta
+ * automatica entonces caia en la rama "no entendi tus datos" y le pedia al
+ * cliente que reenviara las medidas y la cantidad que YA habia mandado. La
+ * union discriminada obliga a distinguir "no lo puedo cotizar" de "no
+ * entendi el pedido".
+ */
+type QuoteAttempt =
+  | {
+      cotizable: true;
+      subtotal: number;
+      tax_amount: number;
+      total_with_tax: number;
+      m2_total: number;
+      unit_price: number;
+      delivery_days: number;
+    }
+  | { cotizable: false; impedimento: Impedimento };
+
 async function calculateQuote(
   length: number,
   width: number,
   height: number,
   quantity: number,
   hasPrinting: boolean,
-  config: PricingConfig
-): Promise<{ total: number; m2_total: number; unit_price: number; delivery_days: number } | null> {
+  config: PricingConfig,
+): Promise<QuoteAttempt> {
   const q = calcularCotizacion(
     [{
       length_mm: length,
@@ -45,13 +68,19 @@ async function calculateQuote(
     config,
   );
 
-  // Por debajo del minimo no hay precio: se devuelve null y la respuesta al
-  // mail explica el minimo en vez de cotizar. El minimo es excluyente, asi que
-  // mandar un numero "para que se den una idea" abria la negociacion.
-  if (!q.cotizable) return null;
+  // Por debajo del minimo, medida propia sin volumen o medida no fabricable:
+  // el motor arma el "por que" con `mensajeDeImpedimento` y trae, cuando hay,
+  // alternativas de catalogo ya cotizadas. Todo eso viaja hasta el mail para
+  // no caer en "no entendi tus datos" cuando en realidad los entendimos.
+  if (!q.cotizable) {
+    return { cotizable: false, impedimento: q.impedimento };
+  }
 
   return {
-    total: Math.round(q.subtotal),
+    cotizable: true,
+    subtotal: Math.round(q.subtotal),
+    tax_amount: Math.round(q.tax_amount),
+    total_with_tax: Math.round(q.total_with_tax),
     m2_total: q.total_m2,
     unit_price: Math.round(q.boxes[0].unit_price),
     delivery_days: q.estimated_days,
@@ -86,26 +115,38 @@ export async function POST(request: NextRequest) {
       parsed.clientName = fromName;
     }
 
-    let quote = null;
+    let attempt: QuoteAttempt | null = null;
 
     // Si tenemos suficientes datos, calcular cotizacion
     if (parsed.dimensions && parsed.quantity) {
       // Obtener configuración de precios activa
       const pricingConfig = await getActivePricingConfig();
       if (pricingConfig) {
-        quote = await calculateQuote(
+        attempt = await calculateQuote(
           parsed.dimensions.length,
           parsed.dimensions.width,
           parsed.dimensions.height,
           parsed.quantity,
           parsed.hasPrinting || false,
-          pricingConfig
+          pricingConfig,
         );
       }
     }
 
+    // `quote` cuando hubo precio, `impedimento` cuando el motor entendio el
+    // pedido y no lo pudo vender. Se separan a proposito: si se mezclaran en
+    // un solo null, la respuesta al mail volveria a caer en la rama "no
+    // entendi tus datos" y le pediria al cliente lo que ya mando.
+    const quote = attempt && attempt.cotizable ? attempt : null;
+    const impedimento =
+      attempt && !attempt.cotizable ? attempt.impedimento : undefined;
+
     // Generar respuesta
-    const emailResponse = generateEmailResponse(parsed, quote || undefined);
+    const emailResponse = generateEmailResponse(
+      parsed,
+      quote || undefined,
+      impedimento,
+    );
 
     // Guardar en communications
     const supabase = await createClient();
@@ -161,7 +202,7 @@ export async function POST(request: NextRequest) {
         origin: 'Email',
         box: parsed.dimensions || { length: 0, width: 0, height: 0 },
         quantity: parsed.quantity || 0,
-        totalArs: quote?.total || 0,
+        totalArs: quote?.subtotal || 0,
         contact: {
           name: parsed.clientName,
           company: parsed.clientCompany,

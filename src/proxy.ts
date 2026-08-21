@@ -77,7 +77,10 @@ const PUBLICO: Array<{ patron: RegExp; metodos?: string[]; nota: string }> = [
   // los rompería. Cada uno tiene que validar su propia firma o su token, que
   // es un trabajo aparte de este archivo.
   { patron: /^\/api\/webhooks\/mercadopago$/, nota: 'webhook: valida firma HMAC' },
-  { patron: /^\/api\/whatsapp\/webhook$/, nota: 'webhook: valida firma de Twilio' },
+  // El proveedor de WhatsApp sale de WHATSAPP_PROVEEDOR (Twilio o Meta), asi
+  // que la nota no puede clavar uno de los dos: la ruta valida la firma que
+  // corresponda al proveedor activo.
+  { patron: /^\/api\/whatsapp\/webhook$/, nota: 'webhook: valida firma del proveedor activo' },
   { patron: /^\/api\/telegram\/webhook$/, nota: 'webhook: valida secret token' },
   { patron: /^\/api\/retell\//, nota: 'agente de voz, con su propia API key' },
   { patron: /^\/api\/email\/inbound$/, nota: 'correo entrante, con API key' },

@@ -310,7 +310,13 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
 
     const cotizacion = calcularCotizacion([caja], config, catalogo || []);
 
-    registrar(req, nombre, 200, cotizacion.cotizable ? 'cotizado' : 'rechazado_bajo_minimo', {
+    // El motor distingue tres tipos de impedimento (bajo_minimo,
+    // medida_propia_sin_volumen y no_fabricable). Etiquetar todo rechazo como
+    // "rechazado_bajo_minimo" —como estaba antes— metia en la misma bolsa
+    // rechazos que no tienen nada que ver: alguien mirando la telemetria via
+    // este canal MCP leia "bajo minimo" cuando en realidad la caja no se
+    // fabrica a ninguna cantidad. Se toma el discriminante real.
+    registrar(req, nombre, 200, cotizacion.cotizable ? 'cotizado' : `rechazado_${cotizacion.impedimento.tipo}`, {
       total_m2: cotizacion.total_m2,
       total_amount: cotizacion.subtotal ?? undefined,
     });
@@ -325,15 +331,22 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
         // El umbral que manda depende del impedimento: para una medida propia
         // es el de produccion a medida, no el piso de venta. Decir "minimo 500"
         // y al lado "hacen falta 1.766 cajas" son dos umbrales mezclados.
-        imp.tipo === 'medida_propia_sin_volumen'
-          ? `Producción a medida (cualquier medida fuera del catálogo): desde ` +
-            `${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m². Este pedido son ` +
-            `${cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m².`
-          : `Mínimo de compra: ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón. Este pedido son ` +
-            `${cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m².`,
-        imp.cajas_necesarias
-          ? `Con esa medida hacen falta ${imp.cajas_necesarias.toLocaleString('es-AR')} cajas.`
-          : `Faltan ${imp.m2_faltantes.toLocaleString('es-AR')} m².`,
+        // Los umbrales solo cuando el problema ES un umbral. Para una caja que
+        // no entra en el rollo, hablar del minimo de compra es cambiarle el
+        // tema al cliente: no le falta volumen, le sobra ancho.
+        ...(imp.tipo === 'no_fabricable'
+          ? []
+          : [
+              imp.tipo === 'medida_propia_sin_volumen'
+                ? `Producción a medida (cualquier medida fuera del catálogo): desde ` +
+                  `${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m². Este pedido son ` +
+                  `${cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m².`
+                : `Mínimo de compra: ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón. Este pedido son ` +
+                  `${cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m².`,
+              imp.cajas_necesarias
+                ? `Con esa medida hacen falta ${imp.cajas_necesarias.toLocaleString('es-AR')} cajas.`
+                : `Faltan ${imp.m2_faltantes.toLocaleString('es-AR')} m².`,
+            ]),
         ...(imp.alternativas.length
           ? [
               '',

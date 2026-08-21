@@ -36,7 +36,11 @@ import { CONTACTO } from '@/lib/contacto';
 import { sendNotification } from '@/lib/notifications';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { SITE_URL } from '@/lib/site';
-import { transporte, responderAltaDeWebhook } from '@/lib/whatsapp-transporte';
+import {
+  transporte,
+  responderAltaDeWebhook,
+  bloqueaPorFirmaInvalida,
+} from '@/lib/whatsapp-transporte';
 import { reclamarMensaje, marcarMensajeCompletado } from '@/lib/whatsapp-idempotencia';
 import { getActivePricingConfig } from '@/lib/utils/pricing';
 import { classifyIntent, isGroqEnabled } from '@/lib/groq';
@@ -252,12 +256,24 @@ export async function POST(request: NextRequest) {
         transporte.nombre,
       );
     } else if (!firmaOk) {
-      // MODO OBSERVACION, a proposito y por poco tiempo.
-      //
-      // Bloquear de entrada arriesga el canal de ventas a que la URL este
-      // reconstruida mal. Primero se mide: este log dice si la validacion
-      // habria pasado con mensajes de verdad. Cuando se confirme que si, esto
-      // pasa a ser un 403 y queda cerrado.
+      if (bloqueaPorFirmaInvalida()) {
+        // Con Meta esto corta, y esta bien que corte: su firma es un HMAC sobre
+        // el cuerpo, no depende de reconstruir ninguna URL. Si no cierra, o
+        // META_WA_APP_SECRET esta mal o el que llama no es Meta.
+        //
+        // SI EL CANAL SE QUEDA MUDO Y ESTE ES EL LOG QUE APARECE, el secreto
+        // esta mal. Se arregla corrigiendolo, o se destraba en el momento con
+        // WHATSAPP_FIRMA_ESTRICTA=0 mientras tanto.
+        console.error(
+          '[whatsapp][firma] NO VALIDA (%s) — RECHAZADA. Si son mensajes de ' +
+            'clientes reales, revisa la clave del proveedor.',
+          transporte.nombre,
+        );
+        return new NextResponse('Firma invalida', { status: 403 });
+      }
+      // Twilio queda en modo observacion: firma la URL que tiene cargada en su
+      // panel, que detras de un proxy puede no ser la que ve el servidor, asi
+      // que un rechazo puede ser culpa nuestra.
       console.error('[whatsapp][firma] NO VALIDA (%s) — se dejo pasar', transporte.nombre);
     } else {
       console.log('[whatsapp][firma] valida (%s)', transporte.nombre);
@@ -690,13 +706,28 @@ Ejemplo: 500`;
             );
           if (!cotizacion.cotizable) {
             // El minimo es excluyente: no hay precio, no hay lead de venta y no
-            // se notifica al equipo como si fuera una oportunidad. Se le dice
-            // cuantas cajas hacen falta y se lo deja volver a pedir.
+            // se notifica al equipo como si fuera una oportunidad.
             responseMessage = getQuoteMessage(dimensions, quantity, cotizacion);
-            await updateConversationState(phoneNumber, {
-              step: 'waiting_quantity',
-              hasPrinting,
-            });
+
+            if (cotizacion.impedimento.tipo === 'no_fabricable') {
+              // Volver a preguntar la cantidad seria pedirle otra cantidad de una
+              // caja que no se puede hacer, y el flujo entraria en un ciclo:
+              // manda un numero, se recotiza, se rechaza igual, se le pregunta
+              // de nuevo. Lo que hay que cambiar es la MEDIDA, asi que se vuelve
+              // ahi.
+              await updateConversationState(phoneNumber, {
+                step: 'waiting_dimensions',
+                dimensions: undefined,
+                hasPrinting,
+              });
+            } else {
+              // Aca si: una cantidad distinta arregla el pedido, y el mensaje ya
+              // le dice cuantas cajas hacen falta.
+              await updateConversationState(phoneNumber, {
+                step: 'waiting_quantity',
+                hasPrinting,
+              });
+            }
           } else {
             const quote = {
               total: cotizacion.subtotal,

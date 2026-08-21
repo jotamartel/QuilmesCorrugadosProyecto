@@ -4,7 +4,12 @@ import type { Plantilla } from '@/lib/whatsapp-plantillas';
 import { CONTACTO } from '@/lib/contacto';
 import { HORARIO, RETAIL_CONFIG, ENVIO } from '@/lib/retail/config';
 import { SITE_URL } from '@/lib/site';
-import { precioUnitarioARS, type QuoteResult } from '@/lib/cotizacion/motor';
+import {
+  precioUnitarioARS,
+  mensajeDeImpedimento,
+  porQueNoSeFabrica,
+  type QuoteResult,
+} from '@/lib/cotizacion/motor';
 import { calculateUnfolded } from '@/lib/utils/box-calculations';
 
 const BUSINESS_PHONE = process.env.WHATSAPP_BUSINESS_NUMBER || CONTACTO.tel;
@@ -614,19 +619,27 @@ export function validateDimensions(length: number, width: number, height: number
   valid: boolean;
   error?: string;
 } {
-  const sheetWidth = height + width;
+  // Los limites salen del motor, no de una copia local.
+  //
+  // Aca estaban escritos a mano el ancho de rollo y las medidas minimas, pero
+  // NO la medida maxima —2000x2000x1500—, que si esta en el motor. Resultado:
+  // por WhatsApp se aceptaba una caja de 2500x900x400, se seguia el flujo
+  // preguntandole la cantidad, y recien mucho despues —o nunca— se enteraba de
+  // que esa caja no se fabrica. Con porQueNoSeFabrica() los tres limites son
+  // exactamente los mismos que usa la web.
+  const motivos = porQueNoSeFabrica({
+    length_mm: length,
+    width_mm: width,
+    height_mm: height,
+    quantity: 1,
+  });
 
-  if (sheetWidth > LIMITS.maxSheetWidth) {
+  if (motivos.length > 0) {
     return {
       valid: false,
-      error: `Esas medidas exceden nuestro limite de produccion.\n\nEl ancho de plancha (Alto + Ancho = ${sheetWidth}mm) no puede superar ${LIMITS.maxSheetWidth}mm.\n\nPor favor, indica otras medidas o escribe "asesor" para hablar con alguien.`,
-    };
-  }
-
-  if (length < LIMITS.minLength || width < LIMITS.minWidth || height < LIMITS.minHeight) {
-    return {
-      valid: false,
-      error: `Las medidas minimas son ${LIMITS.minLength}x${LIMITS.minWidth}x${LIMITS.minHeight}mm.\n\nPor favor, indica medidas mayores.`,
+      error:
+        `Esa caja no la podemos fabricar: ${motivos.join('; y ')}.\n\n` +
+        `Pasame otras medidas y la cotizamos.`,
     };
   }
 
@@ -753,9 +766,7 @@ Caja: ${boxDesc}
 Cantidad: ${quantity.toLocaleString('es-AR')} unidades
 Total m2: ${cotizacion.total_m2.toLocaleString('es-AR', { maximumFractionDigits: 1 })}
 
-${imp.motivo}
-
-No cotizamos por debajo de ese volumen.${
+${mensajeDeImpedimento(imp)}${
       // Si hay una medida de catalogo parecida va con precio: decir que no sin
       // decir que si termina en que alguien tenga que buscarla a mano.
       imp.alternativas.length
@@ -768,7 +779,7 @@ No cotizamos por debajo de ese volumen.${
             )
             .join('\n') +
           '\n\nEscribi la medida que te sirve y avanzamos.'
-        : imp.cajas_necesarias
+        : imp.tipo !== 'no_fabricable' && imp.cajas_necesarias
           ? `\n\nSi te sirven ${imp.cajas_necesarias.toLocaleString('es-AR')} cajas, escribi esa cantidad y te paso el precio.`
           : ''
     }`;

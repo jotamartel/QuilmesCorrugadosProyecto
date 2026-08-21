@@ -594,8 +594,13 @@ export function QuoterForm() {
             )}
 
             {/* Este volumen no se produce a medida: se vende de stock.
-                Se ofrece el autoservicio y se deja continuar para tomar el dato. */}
-            {esPedidoDeStock && (
+                Se ofrece el autoservicio y se deja continuar para tomar el dato.
+                Solo cuando el pedido ya llega al piso de venta: por debajo de
+                minM2Pedido no tiene sentido derivar a /cajas porque ese canal
+                arranca en el mismo piso, y el PriceSummary ya muestra el
+                "todavia no llegas al minimo" en rojo. Antes se mostraban los
+                dos avisos a la vez y decian cosas distintas. */}
+            {esPedidoDeStock && totals.totalSqm >= minM2Pedido && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <p className="text-sm text-amber-900 leading-relaxed">
                   Para {totals.totalSqm.toLocaleString('es-AR', { maximumFractionDigits: 0 })} m² no
@@ -1065,6 +1070,7 @@ export function QuoterForm() {
           submitting={submitting}
           stockMaxM2={wholesaleMinM2}
           volumeThresholdM2={pricingConfig?.volume_threshold_m2 ?? 5000}
+          pisoMinM2={minM2Pedido}
         />
       </div>
       </div>

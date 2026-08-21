@@ -26,7 +26,7 @@ process.env.META_WA_VERIFY_TOKEN = 'token-de-alta';
 process.env.META_WA_TOKEN = process.env.META_WA_TOKEN || 'token-falso';
 process.env.META_WA_PHONE_NUMBER_ID = process.env.META_WA_PHONE_NUMBER_ID || '000';
 
-const { transporteMeta } = await import('../src/lib/whatsapp-transporte/meta');
+const { transporteMeta, verificarFirmaMeta } = await import('../src/lib/whatsapp-transporte/meta');
 const { transporteTwilio } = await import('../src/lib/whatsapp-transporte/twilio');
 const { normalizarTelefono } = await import('../src/lib/whatsapp-transporte/tipos');
 
@@ -118,11 +118,15 @@ verificar('firma de largo distinto',
   await transporteMeta.firmaValida(pedido('https://x/y', { 'x-hub-signature-256': 'sha256=corta' }), mensajeDeTexto),
   false);
 
-// null, no false: sin cabecera no es que la firma este mal, es que no hay con
-// que verificar. El webhook los trata distinto a proposito.
-verificar('sin cabecera devuelve null',
+// Con la clave configurada, que NO venga firma no es "no puedo comprobarlo": es
+// que el que llama no es Meta, porque Meta siempre firma. Tiene que dar false,
+// que es lo que bloquea. Si diera null, cualquiera entra omitiendo la cabecera.
+verificar('con clave y sin cabecera: false, no null',
   await transporteMeta.firmaValida(pedido('https://x/y'), mensajeDeTexto),
-  null);
+  false);
+
+verificar('Meta bloquea cuando la firma no cierra', transporteMeta.rechazaFirmaInvalida, true);
+verificar('Twilio no bloquea, sigue observando', transporteTwilio.rechazaFirmaInvalida, false);
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\nMeta — alta del webhook');
@@ -179,6 +183,25 @@ verificar('sin From no hay mensaje',
 const recibido = transporteTwilio.respuestaDeRecibido();
 verificar('el recibido sigue siendo TwiML', recibido.headers.get('content-type'), 'text/xml');
 verificar('y va vacio', (await recibido.text()).includes('<Response></Response>'), true);
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\nSin clave configurada no se puede comprobar nada');
+
+// Esta es la valvula que mantiene vivo el canal si falta META_WA_APP_SECRET, y
+// pasa a importar ahora que una firma invalida BLOQUEA: si este caso devolviera
+// false en vez de null, un despliegue sin la clave dejaria el WhatsApp mudo.
+//
+// Se prueba contra verificarFirmaMeta(), que es la misma comprobacion sin la
+// configuracion adentro. Antes esto intentaba recargar el modulo con la variable
+// borrada y era mas harness que prueba.
+verificar('sin clave: null (se atiende y se avisa)',
+  verificarFirmaMeta(undefined, 'sha256=loquesea', '{}'), null);
+verificar('clave vacia tambien es null',
+  verificarFirmaMeta('', 'sha256=loquesea', '{}'), null);
+verificar('con clave y sin cabecera: false',
+  verificarFirmaMeta(APP_SECRET, null, mensajeDeTexto), false);
+verificar('con clave y firma buena: true',
+  verificarFirmaMeta(APP_SECRET, firmaBuena, mensajeDeTexto), true);
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\nNumeros argentinos');

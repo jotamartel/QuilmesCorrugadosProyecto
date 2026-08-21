@@ -6,7 +6,11 @@
 import { SITE_URL } from '@/lib/site';
 import { HORARIO } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
-import { precioUnitarioARS } from '@/lib/cotizacion/motor';
+import {
+  precioUnitarioARS,
+  mensajeDeImpedimento,
+  type Impedimento,
+} from '@/lib/cotizacion/motor';
 
 export interface ParsedEmailData {
   dimensions?: { length: number; width: number; height: number };
@@ -132,7 +136,15 @@ export function parseEmailForQuote(subject: string, body: string): ParsedEmailDa
 }
 
 interface QuoteData {
-  total: number;
+  /**
+   * Subtotal SIN IVA. Antes se llamaba `total` y se etiquetaba "TOTAL" en el
+   * mail, y esa misma confusion —decirle TOTAL a un numero sin IVA— ya viajo
+   * hasta una orden de compra en este proyecto. El nombre ahora dice lo que
+   * es, y el mail muestra las dos cifras con etiquetas claras.
+   */
+  subtotal: number;
+  tax_amount: number;
+  total_with_tax: number;
   m2_total: number;
   unit_price: number;
   delivery_days: number;
@@ -143,7 +155,8 @@ interface QuoteData {
  */
 export function generateEmailResponse(
   parsed: ParsedEmailData,
-  quote?: QuoteData
+  quote?: QuoteData,
+  impedimento?: Impedimento,
 ): { subject: string; body: string } {
   const greeting = parsed.clientName
     ? `Hola ${parsed.clientName}`
@@ -153,6 +166,10 @@ export function generateEmailResponse(
   if (quote && parsed.dimensions && parsed.quantity) {
     const { dimensions: d, quantity, hasPrinting } = parsed;
 
+    // Antes esto decia "TOTAL: $X" con X = subtotal sin IVA. Ese error —
+    // etiquetar como TOTAL a un numero sin IVA— es exactamente el que ya viajo
+    // hasta una orden de compra en este proyecto. Se muestran las dos cifras
+    // con etiquetas claras y el IVA en el medio.
     return {
       subject: `Re: Cotizacion cajas ${d.length}x${d.width}x${d.height}mm - Quilmes Corrugados`,
       body: `${greeting},
@@ -165,14 +182,63 @@ CAJA: ${d.length} x ${d.width} x ${d.height} mm ${hasPrinting ? '(con impresion)
 CANTIDAD: ${quantity.toLocaleString('es-AR')} unidades
 TOTAL m2: ${quote.m2_total.toLocaleString('es-AR', { maximumFractionDigits: 1 })}
 
-TOTAL: $${quote.total.toLocaleString('es-AR')}
+Subtotal (sin IVA): $${quote.subtotal.toLocaleString('es-AR')}
+IVA 21%: $${quote.tax_amount.toLocaleString('es-AR')}
+TOTAL (con IVA): $${quote.total_with_tax.toLocaleString('es-AR')}
 Precio unitario: ${precioUnitarioARS(quote.unit_price)}
 
 Tiempo de entrega: ${quote.delivery_days} dias habiles
 Validez de la cotizacion: 7 dias
 
-${quote.m2_total < 3000 ? 'Nota: Este pedido esta por debajo del minimo recomendado de 3.000 m2.\n' : ''}
 Para confirmar tu pedido o si tenes alguna consulta, responde este email o contactanos:
+- WhatsApp: ${CONTACTO.telefonoVisible}
+- Horario: ${HORARIO.corto}
+
+Saludos!
+Equipo Quilmes Corrugados
+
+---
+Quilmes Corrugados
+Fabrica de cajas de carton corrugado
+${SITE_URL}`,
+    };
+  }
+
+  // Se entendio el pedido pero el motor no lo pudo cotizar —bajo minimo,
+  // medida propia sin volumen o directamente no fabricable—. Antes esta rama
+  // no existia y todo caia en la de abajo pidiendole al cliente que reenviara
+  // las medidas y la cantidad que YA habia mandado. Ahora se le lee el "por
+  // que" que arma el motor y, cuando hay, las alternativas de catalogo ya
+  // cotizadas al minimo.
+  if (impedimento && parsed.dimensions && parsed.quantity) {
+    const { dimensions: d, quantity } = parsed;
+
+    const bloqueAlternativas = impedimento.alternativas.length
+      ? '\n\nMedidas de catalogo mas parecidas, ya cotizadas al minimo:\n' +
+        impedimento.alternativas
+          .map((a) => {
+            const etiquetaEntra = a.entra ? '' : ' (mas chica que la que pediste)';
+            return (
+              `- ${a.length_mm} x ${a.width_mm} x ${a.height_mm} mm${etiquetaEntra}: ` +
+              `${a.cantidad.toLocaleString('es-AR')} cajas, ` +
+              `${precioUnitarioARS(a.precio_por_caja)} por caja, ` +
+              `subtotal $${a.subtotal.toLocaleString('es-AR')} (sin IVA)`
+            );
+          })
+          .join('\n')
+      : '';
+
+    return {
+      subject: `Re: Cotizacion cajas ${d.length}x${d.width}x${d.height}mm - Quilmes Corrugados`,
+      body: `${greeting},
+
+Gracias por tu consulta!
+
+${mensajeDeImpedimento(impedimento)}
+
+Pedido recibido: ${quantity.toLocaleString('es-AR')} cajas de ${d.length} x ${d.width} x ${d.height} mm.${bloqueAlternativas}
+
+Cualquier duda, respondenos este mail o escribinos:
 - WhatsApp: ${CONTACTO.telefonoVisible}
 - Horario: ${HORARIO.corto}
 

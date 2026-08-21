@@ -67,9 +67,17 @@ export const transporteTwilio: Transporte = {
     }
   },
 
+  // No bloquea, a propósito. Twilio firma la URL que tiene cargada en su panel,
+  // que detrás de un proxy puede no ser la que ve el servidor: un rechazo acá
+  // puede ser culpa nuestra y se lleva puestos mensajes de clientes reales.
+  // Este proveedor además está de salida.
+  rechazaFirmaInvalida: false,
+
   async firmaValida(request, cuerpoCrudo) {
+    if (!TOKEN) return null;
+
     const firma = request.headers.get('x-twilio-signature');
-    if (!TOKEN || !firma) return null;
+    if (!firma) return false;
 
     // Twilio firma sobre la URL exacta que tiene configurada, y detrás de un
     // proxy la que ve el servidor puede no ser esa. Por eso se prueban las

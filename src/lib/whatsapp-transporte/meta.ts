@@ -80,6 +80,36 @@ async function postear(cuerpo: unknown): Promise<boolean> {
   }
 }
 
+/**
+ * La comprobacion de la firma, sin depender de la configuracion.
+ *
+ * Va separada del transporte porque es la unica pieza de todo esto que decide
+ * si un mensaje entra o se rechaza, y ahora que una firma invalida BLOQUEA, un
+ * error aca deja el canal mudo. Como funcion pura se prueba con los tres casos
+ * —clave ausente, cabecera ausente, firma que no cierra— sin tener que recargar
+ * modulos ni levantar procesos, que es lo que hacia que no estuviera probada.
+ *
+ * Devuelve null SOLO si no hay clave con que comprobar. Que no venga cabecera
+ * es false: Meta siempre firma, asi que el que no firma no es Meta.
+ */
+export function verificarFirmaMeta(
+  secreto: string | undefined,
+  cabecera: string | null,
+  cuerpoCrudo: string,
+): boolean | null {
+  if (!secreto) return null;
+  if (!cabecera) return false;
+
+  const esperada =
+    'sha256=' + crypto.createHmac('sha256', secreto).update(cuerpoCrudo, 'utf8').digest('hex');
+
+  // timingSafeEqual explota si los largos difieren, asi que se chequea antes.
+  const a = Buffer.from(cabecera);
+  const b = Buffer.from(esperada);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 export const transporteMeta: Transporte = {
   nombre: 'meta',
 
@@ -147,19 +177,17 @@ export const transporteMeta: Transporte = {
     });
   },
 
+  // La firma de Meta es un HMAC sobre el cuerpo crudo: no depende de
+  // reconstruir una URL ni de qué proxy haya en el medio. Si no cierra, o la
+  // clave está mal o no es Meta. En los dos casos corresponde cortar.
+  rechazaFirmaInvalida: true,
+
   async firmaValida(request, cuerpoCrudo) {
-    const cabecera = request.headers.get('x-hub-signature-256');
-    if (!APP_SECRET || !cabecera) return null;
-
-    const esperada =
-      'sha256=' +
-      crypto.createHmac('sha256', APP_SECRET).update(cuerpoCrudo, 'utf8').digest('hex');
-
-    // timingSafeEqual explota si los largos difieren, así que se chequea antes.
-    const a = Buffer.from(cabecera);
-    const b = Buffer.from(esperada);
-    if (a.length !== b.length) return false;
-    return crypto.timingSafeEqual(a, b);
+    return verificarFirmaMeta(
+      APP_SECRET,
+      request.headers.get('x-hub-signature-256'),
+      cuerpoCrudo,
+    );
   },
 
   leerEntrante(cuerpoCrudo) {

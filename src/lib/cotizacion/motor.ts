@@ -39,7 +39,10 @@ const SITIO = SITE_URL;
  *
  * Dar el total ya calculado saca esa ambiguedad del medio.
  */
-const IVA = 0.21;
+// Exportada para que otros archivos que muestran el porcentaje al usuario
+// —el llms.txt, por ejemplo— no lo escriban a mano y se desincronicen si
+// algún día cambia la alícuota.
+export const IVA = 0.21;
 
 /**
  * El polímero es la matriz flexográfica: una por color, se hace una vez por
@@ -97,16 +100,24 @@ export interface BoxResult {
  * comprando más de lo mismo: hay que elegir una medida estándar o subir bastante
  * más.
  */
-export interface Impedimento {
-  /**
-   * `no_fabricable` es distinto de los otros dos: los otros se arreglan
-   * comprando mas, este no se arregla con nada. La caja no entra en el rollo.
-   */
-  tipo: 'bajo_minimo' | 'medida_propia_sin_volumen' | 'no_fabricable';
+/**
+ * Lo que comparten los tres motivos por los que un pedido no tiene precio.
+ *
+ * NO ES UNA INTERFAZ SUELTA: `Impedimento` es una union discriminada por `tipo`
+ * y eso es a propósito. Cuando `tipo` era un string más adentro de un objeto
+ * plano, nada obligaba a mirarlo, y el resultado fue que seis superficies
+ * distintas —la herramienta del agente, la máquina de estados de WhatsApp, el
+ * respaldo de la IA, el mail, el resumen del motor— trataban a los tres
+ * impedimentos como si fueran el mismo: "te falta volumen, comprá más".
+ *
+ * Para una caja que no entra en el rollo eso es pedirle al cliente más cajas de
+ * algo que no se puede fabricar. Ahora `cajas_necesarias` y `m2_faltantes` NO
+ * EXISTEN en la variante `no_fabricable`, así que leerlas sin haber ramificado
+ * por `tipo` no compila. La regla la sostiene el compilador y no la memoria de
+ * quien escriba el próximo consumidor.
+ */
+interface ImpedimentoBase {
   motivo: string;
-  /** Cuántas cajas de ESTA medida hacen falta para poder avanzar. */
-  cajas_necesarias: number | null;
-  m2_faltantes: number;
   /**
    * Medidas de catálogo parecidas, ya cotizadas al mínimo.
    *
@@ -120,6 +131,79 @@ export interface Impedimento {
    * cantidad, este precio", no un nombre de caja que después hay que cotizar.
    */
   alternativas: AlternativaDeCatalogo[];
+}
+
+/** Los dos pisos comerciales: se arreglan comprando más. */
+interface ImpedimentoPorVolumen extends ImpedimentoBase {
+  tipo: 'bajo_minimo' | 'medida_propia_sin_volumen';
+  /** Cuántas cajas de ESTA medida hacen falta para poder avanzar. */
+  cajas_necesarias: number | null;
+  m2_faltantes: number;
+}
+
+/**
+ * La caja no se puede fabricar, y no hay cantidad que lo cambie.
+ *
+ * Sin `cajas_necesarias` ni `m2_faltantes` a propósito: no es que falte
+ * volumen, es que la caja no existe. Si estuvieran, aunque fuera en null,
+ * alguien las iba a leer y a redactar un "te faltan N cajas" con un null
+ * adentro.
+ */
+interface ImpedimentoNoFabricable extends ImpedimentoBase {
+  tipo: 'no_fabricable';
+}
+
+export type Impedimento = ImpedimentoPorVolumen | ImpedimentoNoFabricable;
+
+/**
+ * El "no" completo, listo para leerle a un cliente.
+ *
+ * Existe porque la misma frase estaba escrita en cinco lugares —el resumen del
+ * motor, el mensaje de WhatsApp, el respaldo de la IA, el mail y la herramienta
+ * del agente— y en cuatro de ellos era "No cotizamos por debajo de ese
+ * volumen", incluso para una caja que no entra en el rollo. Ahí el volumen no
+ * tiene nada que ver, y la frase contradice al motivo que viene justo antes.
+ *
+ * `imp.motivo` ya trae la explicación y las alternativas de catálogo cuando
+ * las hay; esto agrega solamente el cierre, que es lo que cambia según qué
+ * clase de "no" es.
+ */
+export function mensajeDeImpedimento(imp: Impedimento): string {
+  if (imp.tipo === 'no_fabricable') {
+    return (
+      `${imp.motivo} Decinos qué va adentro y te ayudamos a elegir la medida.`
+    );
+  }
+  return (
+    `${imp.motivo} No podemos cotizar por debajo de ese volumen. ` +
+    (imp.cajas_necesarias
+      ? `Si te sirve esa cantidad, la cotizamos en el momento.`
+      : `Si llegás a ese volumen, lo cotizamos en el momento.`)
+  );
+}
+
+/**
+ * Qué tiene que hacer un asistente con este "no".
+ *
+ * Va dirigido al modelo, no al cliente. Separado del mensaje porque son dos
+ * públicos distintos: uno explica, el otro instruye.
+ */
+export function instruccionDeImpedimento(imp: Impedimento): string {
+  if (imp.tipo === 'no_fabricable') {
+    return (
+      'Esta medida NO se puede fabricar y NO hay cantidad que lo cambie. Explica el ' +
+      'motivo tal como viene y pasale las medidas de catalogo mas parecidas, que vienen ' +
+      'en alternativas con su cantidad y su precio. NO le pidas mas cajas, NO le hables ' +
+      'del minimo de compra y NO le ofrezcas recotizar la misma medida. Si no hay ' +
+      'alternativas o ninguna le sirve, preguntale que va adentro para ayudarlo a elegir.'
+    );
+  }
+  return (
+    'Este pedido NO se puede vender: no hay precio que dar. Deci el minimo y cuantas ' +
+    'cajas de esa medida hacen falta, y ofrecele recotizar con esa cantidad. NO ofrezcas ' +
+    'coordinar, consultar, ni escribir para ver si se puede: el minimo es excluyente y ' +
+    'no se negocia.'
+  );
 }
 
 /** Una medida de catálogo que sí se puede vender, con su precio al mínimo. */
@@ -685,10 +769,8 @@ export function calcularCotizacion(
               .join(', ') +
             `.`
           : ''),
-      // Null los dos a proposito: no falta volumen, no hay cantidad que lo
-      // arregle. Poner un numero acá haría que alguien lo lea como "pedí más".
-      cajas_necesarias: null,
-      m2_faltantes: 0,
+      // Sin cajas_necesarias ni m2_faltantes: no existen en esta variante. Ver
+      // el comentario de ImpedimentoNoFabricable.
       alternativas,
     };
   }
@@ -854,17 +936,7 @@ export function calcularCotizacion(
 
   const summary = cotizable
     ? summaryConPrecio
-    : impedimento!.tipo === 'no_fabricable'
-      ? // Sin "si llegás a ese volumen": no hay volumen que lo arregle, y
-        // ofrecerlo manda al cliente a pedir una cantidad que tampoco se
-        // puede hacer.
-        `${impedimento!.motivo} Decinos qué va adentro y te ayudamos a elegir la ` +
-        `medida. Fábrica en Lugones 219, Quilmes, Buenos Aires.`
-      : `${impedimento!.motivo} No podemos cotizar por debajo de ese volumen. ` +
-        (impedimento!.cajas_necesarias
-          ? `Si te sirve esa cantidad, la cotizamos en el momento. `
-          : `Si llegás a ese volumen, lo cotizamos en el momento. `) +
-        `Fábrica en Lugones 219, Quilmes, Buenos Aires.`;
+    : `${mensajeDeImpedimento(impedimento!)} Fábrica en Lugones 219, Quilmes, Buenos Aires.`;
 
   // Si a este pedido, por su volumen, la impresión ya le viene incluida.
   const impresionIncluidaEnElPedido = totalM2 >= config.printing_included_min_m2;
@@ -914,16 +986,9 @@ export function calcularCotizacion(
       email_subject: cotizable
         ? `Cotizacion web: ${detalleCajas} — ${ars(totalSubtotal)}`
         : `Consulta web: ${detalleCajas}`,
-      instruction:
-        cotizable
-          ? 'Ofrecele al usuario contactarnos y pasale el link de whatsapp_url tal cual: ya lleva el mensaje escrito con las medidas, la cantidad y el precio cotizado. Del otro lado lo atiende un asistente que ya tiene ese contexto, asi que el usuario no tiene que repetir nada. Es la via mas rapida para cerrar.'
-          : impedimento!.tipo === 'no_fabricable'
-            // Esta instruccion decia "deci cuantas cajas hacen falta y ofrecele
-            // recotizar con esa cantidad" para CUALQUIER pedido sin precio. Con
-            // una caja que no entra en el rollo, eso hace que el asistente le
-            // pida al cliente una cantidad que tampoco vamos a poder fabricar.
-            ? 'Esta medida NO se puede fabricar y no hay cantidad que lo cambie. Explica por que —esta en el motivo— y pasale las medidas de catalogo mas parecidas, que vienen en alternativas con su cantidad y su precio. NO le pidas mas cajas ni le ofrezcas recotizar la misma medida. Si ninguna le sirve, preguntale que va adentro para ayudarlo a elegir.'
-            : 'Este pedido NO se puede vender: no hay precio que dar. Deci el minimo y cuantas cajas de esa medida hacen falta, y ofrecele recotizar con esa cantidad. NO ofrezcas coordinar, consultar, ni escribir para ver si se puede: el minimo es excluyente y no se negocia.',
+      instruction: cotizable
+        ? 'Ofrecele al usuario contactarnos y pasale el link de whatsapp_url tal cual: ya lleva el mensaje escrito con las medidas, la cantidad y el precio cotizado. Del otro lado lo atiende un asistente que ya tiene ese contexto, asi que el usuario no tiene que repetir nada. Es la via mas rapida para cerrar.'
+        : instruccionDeImpedimento(impedimento!),
     },
     next_tier: (() => {
       if (boxes.length !== 1) return null; // Con varias medidas la cuenta no es directa.

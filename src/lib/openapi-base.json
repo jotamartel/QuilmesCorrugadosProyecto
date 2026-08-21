@@ -343,7 +343,23 @@
       },
       "Quote": {
         "type": "object",
+        "description": "Resultado de cotizar. Es una unión discriminada por `cotizable`: cuando `cotizable=true` el pedido se puede vender y `subtotal`, `tax_amount` y `total_with_tax` traen números; cuando `cotizable=false` esos tres campos vienen en null y el `impedimento` explica por qué no se puede tomar el pedido. Nunca leer el precio sin haber chequeado `cotizable` antes: si es false, no hay precio a comunicar y no hay que invitar a negociar cantidades.",
+        "required": ["cotizable", "impedimento", "subtotal", "tax_amount", "total_with_tax", "tax_rate", "subtotal_includes_tax"],
+        "discriminator": {
+          "propertyName": "cotizable"
+        },
         "properties": {
+          "cotizable": {
+            "type": "boolean",
+            "description": "Discriminador. `true` cuando el pedido se puede vender (llega al mínimo, la medida se fabrica, la cantidad alcanza para el canal correspondiente). `false` cuando no se puede: mirar `impedimento` para saber por qué."
+          },
+          "impedimento": {
+            "description": "Por qué el pedido no se puede tomar. `null` cuando `cotizable=true`; un objeto `Impedimento` cuando `cotizable=false`.",
+            "oneOf": [
+              { "$ref": "#/components/schemas/Impedimento" },
+              { "type": "null" }
+            ]
+          },
           "boxes": {
             "type": "array",
             "items": {
@@ -352,11 +368,29 @@
           },
           "total_m2": {
             "type": "number",
-            "description": "Total de metros cuadrados de cartón"
+            "description": "Total de metros cuadrados de cartón desplegado del pedido"
           },
           "subtotal": {
+            "type": ["number", "null"],
+            "description": "Precio total SIN IVA en ARS. Es null cuando `cotizable=false`: si el pedido no se puede vender no hay precio, y comunicar un cero o un aproximado abre una negociación de cantidad que el mínimo excluyente existe para evitar."
+          },
+          "tax_amount": {
+            "type": ["number", "null"],
+            "description": "Monto del IVA en ARS, calculado sobre `subtotal` (21%). Va explícito para que quien lea la respuesta no tenga que multiplicar por su cuenta. Es null cuando `cotizable=false`."
+          },
+          "total_with_tax": {
+            "type": ["number", "null"],
+            "description": "Total en ARS con IVA 21% incluido. Es lo que paga el cliente. Va calculado, no dejado como cuenta para el consumidor de la API: un modelo que tiene que hacer la multiplicación alguna vez la hace mal, y este es un número que va en la orden de compra. Es null cuando `cotizable=false`."
+          },
+          "tax_rate": {
             "type": "number",
-            "description": "Precio total sin IVA en ARS"
+            "example": 0.21,
+            "description": "Alícuota del IVA (21% general de Argentina). `subtotal` NUNCA incluye IVA; `total_with_tax` SIEMPRE lo incluye."
+          },
+          "subtotal_includes_tax": {
+            "type": "boolean",
+            "enum": [false],
+            "description": "Explícito para que nadie asuma lo contrario: el subtotal va sin IVA."
           },
           "currency": {
             "type": "string",
@@ -383,8 +417,81 @@
           }
         }
       },
+      "Impedimento": {
+        "type": "object",
+        "description": "Por qué un pedido no se puede tomar. Son tres motivos distintos, discriminados por `tipo`, y conviene no mezclarlos:\n- `bajo_minimo`: el pedido no llega al piso de 500 m². Se arregla comprando más de la misma medida.\n- `medida_propia_sin_volumen`: pidió una medida fuera del catálogo con un volumen que solo alcanza para stock. Se arregla eligiendo una medida estándar o subiendo bastante más el volumen (mínimo 1.000 m² para producción a medida).\n- `no_fabricable`: la caja no entra en el rollo (por ejemplo ancho + alto > 1.200 mm, o medida por debajo del mínimo). No se arregla comprando más: no hay cantidad que la haga fabricable.",
+        "required": ["tipo", "motivo", "alternativas"],
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": ["bajo_minimo", "medida_propia_sin_volumen", "no_fabricable"],
+            "description": "Discriminador del impedimento."
+          },
+          "motivo": {
+            "type": "string",
+            "description": "Explicación en castellano de por qué no se puede tomar el pedido, lista para leerle al usuario."
+          },
+          "cajas_necesarias": {
+            "type": ["integer", "null"],
+            "description": "Cuántas cajas de ESTA medida hacen falta para poder avanzar. Solo aparece con valor en `bajo_minimo` y `medida_propia_sin_volumen`; en `no_fabricable` viene null o ausente porque ninguna cantidad resuelve el problema."
+          },
+          "m2_faltantes": {
+            "type": "number",
+            "description": "Cuántos m² faltan para llegar al mínimo aplicable. Solo tiene sentido en `bajo_minimo` y `medida_propia_sin_volumen`; en `no_fabricable` no se debe usar como sugerencia."
+          },
+          "alternativas": {
+            "type": "array",
+            "description": "Medidas de catálogo parecidas ya cotizadas al mínimo. Existe para que decir 'no se puede' venga siempre acompañado de un 'esto sí', con precio incluido, sin obligar al cliente a pedir otra cotización.",
+            "items": {
+              "$ref": "#/components/schemas/AlternativaDeCatalogo"
+            }
+          }
+        }
+      },
+      "AlternativaDeCatalogo": {
+        "type": "object",
+        "description": "Una medida de catálogo que sí se puede vender, con su precio al mínimo. Se ofrece como alternativa cuando la medida pedida trae un impedimento.",
+        "properties": {
+          "length_mm": { "type": "integer", "description": "Largo en mm" },
+          "width_mm": { "type": "integer", "description": "Ancho en mm" },
+          "height_mm": { "type": "integer", "description": "Alto en mm" },
+          "cantidad": {
+            "type": "integer",
+            "description": "Cuántas cajas de ESTA medida son el mínimo de compra."
+          },
+          "m2": {
+            "type": "number",
+            "description": "m² de cartón desplegado para esa cantidad."
+          },
+          "precio_por_caja": {
+            "type": "number",
+            "description": "Precio unitario por caja en ARS, sin IVA."
+          },
+          "subtotal": {
+            "type": "number",
+            "description": "Subtotal en ARS, sin IVA."
+          },
+          "total_con_iva": {
+            "type": "number",
+            "description": "Total en ARS con IVA 21% incluido."
+          },
+          "stock": {
+            "type": "integer",
+            "description": "Stock disponible de esta medida de catálogo."
+          },
+          "diferencia_mm": {
+            "type": "integer",
+            "description": "Qué tan distinta es de la medida pedida, sumando las tres dimensiones en mm."
+          },
+          "entra": {
+            "type": "boolean",
+            "description": "Si lo que iba a entrar en la caja pedida entra en esta. NO filtra ni reordena: viaja como dato para que quien conteste pueda decir 'esta es un poco más chica' en vez de decidir por el cliente."
+          }
+        }
+      },
       "BoxResult": {
         "type": "object",
+        "description": "Datos de una caja en la respuesta. Los tres campos de precio (`price_per_m2`, `unit_price`, `subtotal`) vienen en null cuando `Quote.cotizable=false`: si el pedido no se puede vender, esta caja tampoco tiene precio individual. Son null y no cero a propósito, para que un cero no se imprima como '$0' y pase por una oferta rota.",
         "properties": {
           "length_mm": { "type": "integer" },
           "width_mm": { "type": "integer" },
@@ -409,16 +516,16 @@
             "description": "Total m² para esta caja × cantidad"
           },
           "price_per_m2": {
-            "type": "number",
-            "description": "Precio por m² aplicado"
+            "type": ["number", "null"],
+            "description": "Precio por m² aplicado en ARS, sin IVA. Null cuando el pedido no es cotizable."
           },
           "unit_price": {
-            "type": "number",
-            "description": "Precio unitario por caja"
+            "type": ["number", "null"],
+            "description": "Precio unitario por caja en ARS, sin IVA. Null cuando el pedido no es cotizable."
           },
           "subtotal": {
-            "type": "number",
-            "description": "Subtotal para este tipo de caja"
+            "type": ["number", "null"],
+            "description": "Subtotal para este tipo de caja en ARS, sin IVA. Null cuando el pedido no es cotizable."
           }
         }
       },

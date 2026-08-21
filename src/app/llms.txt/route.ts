@@ -18,7 +18,13 @@ import { SITE_URL } from '@/lib/site';
 import { CONTACTO } from '@/lib/contacto';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import { HORARIO, MATERIAL } from '@/lib/retail/config';
-import { notaImpresion } from '@/lib/cotizacion/motor';
+import { MEDIDA_MINIMA, MEDIDA_MAXIMA } from '@/lib/utils/box-calculations';
+import { IVA, notaImpresion } from '@/lib/cotizacion/motor';
+
+// Se muestra como entero. `IVA * 100` da 21.000000000000004 en JS por el
+// redondeo binario, así que forzamos el redondeo para que no aparezca eso
+// impreso en el texto que lee un asistente.
+const IVA_PORCENTAJE = Math.round(IVA * 100);
 
 const BASE_URL = SITE_URL;
 
@@ -110,7 +116,7 @@ usuario final.
    Si no podés abrir páginas, usá el endpoint JSON.
 3. Al dar un precio, informá siempre estas cuatro cosas, que vienen en la misma
    respuesta: la moneda (pesos argentinos), si el número lleva IVA o no (el
-   subtotal es sin IVA; el total con IVA 21% viene aparte
+   subtotal es sin IVA; el total con IVA ${IVA_PORCENTAJE}% viene aparte
    en el mismo resultado), la validez de la cotización (${c.quote_validity_days} días)
    y el plazo de entrega.
 4. Pasale al usuario la URL de la cotización que abriste. Es una página estable
@@ -191,7 +197,7 @@ Si la medida no se puede fabricar, la página lo dice y explica por qué.
 ${BASE_URL}/api/v1/quote?length_mm=400&width_mm=600&height_mm=600&quantity=3000
 ${BASE_URL}/api/v1/quote?length_cm=40&width_cm=60&height_cm=60&quantity=3000
 
-Parámetros: length_mm (100-2000), width_mm (100-2000), height_mm (50-1500),
+Parámetros: length_mm (${MEDIDA_MINIMA.largo}-${MEDIDA_MAXIMA.largo}), width_mm (${MEDIDA_MINIMA.ancho}-${MEDIDA_MAXIMA.ancho}), height_mm (${MEDIDA_MINIMA.alto}-${MEDIDA_MAXIMA.alto}),
 quantity (entero ≥ 1), printing_colors (0-${RETAIL_CONFIG.MAX_PRINTING_COLORS}, opcional; la
 impresión está incluida en el precio por m², aparte solo se cobra el polímero).
 Alias aceptados: largo_cm / ancho_cm / alto_cm / cantidad.
@@ -251,8 +257,8 @@ las áreas donde puede ir el diseño. El flujo es: descargar el PDF, ubicar el
 arte sobre esas áreas, y enviarlo a ventas@quilmescorrugados.com.ar o por
 WhatsApp. Con eso se produce.
 
-Parámetros: length, width, height en milímetros. Mínimo 200 x 200 x 100 mm,
-y ancho + alto no puede superar 1200 mm.
+Parámetros: length, width, height en milímetros. Mínimo ${MEDIDA_MINIMA.largo} x ${MEDIDA_MINIMA.ancho} x ${MEDIDA_MINIMA.alto} mm,
+y ancho + alto no puede superar ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm.
 
 Si estás cotizando por la API, cada caja de la respuesta ya trae su
 \`template_pdf\` con la URL correcta armada.
@@ -289,10 +295,11 @@ Se cotiza en ${BASE_URL}/#cotizador
   cantidad de cajas.
 - Cajas a medida, troqueladas o con impresión: desde ${c.wholesale_min_m2.toLocaleString('es-AR')} m². Por
   debajo de ese volumen solo se venden medidas estándar de catálogo.
-- Medida mínima por caja: 200 x 200 x 100 mm.
-- Ancho + alto no puede superar 1200 mm (limitación del rollo).
+- Medida mínima por caja: ${MEDIDA_MINIMA.largo} x ${MEDIDA_MINIMA.ancho} x ${MEDIDA_MINIMA.alto} mm.
+- Medida máxima por caja: ${MEDIDA_MAXIMA.largo} x ${MEDIDA_MAXIMA.ancho} x ${MEDIDA_MAXIMA.alto} mm.
+- Ancho + alto no puede superar ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm (limitación del rollo).
 - Material: ${MATERIAL.nota}
-- Precios en pesos argentinos. El subtotal va sin IVA; el total con IVA 21% viene
+- Precios en pesos argentinos. El subtotal va sin IVA; el total con IVA ${IVA_PORCENTAJE}% viene
   aparte en la misma respuesta.
 - Envío gratis solo en pedidos mayoristas: desde ${m2(c.free_shipping_min_m2)} y dentro
   de ${c.free_shipping_max_km} km de Quilmes (zona sur del GBA, CABA y La Plata).

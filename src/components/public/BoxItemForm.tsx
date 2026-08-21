@@ -3,7 +3,7 @@
 import { Trash2, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { BoxTemplateDownload } from './BoxTemplateDownload';
 import { DesignUploader } from './DesignUploader';
-import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
+import { calculateUnfolded, calculateTotalM2, excedeMedidaMaxima, MEDIDA_MAXIMA } from '@/lib/utils/box-calculations';
 import { getPricePerM2 } from '@/lib/utils/pricing';
 import type { PricingConfig } from '@/lib/types/database';
 
@@ -74,6 +74,14 @@ export function calculateBoxItem(box: BoxItemData, pricingConfig?: PricingConfig
     return null;
   }
 
+  // Tope de fabricacion: 2000x2000x1500. Estaba faltando y por eso una caja de
+  // 2500x900x400 salia cotizada sin que la fabrica pueda producirla. La
+  // constante y el helper viven en box-calculations para no duplicar el tope
+  // —ya paso una vez, y quedo un valor viejo escrito en otro lado—.
+  if (excedeMedidaMaxima(length_mm, width_mm, height_mm)) {
+    return null;
+  }
+
   const unfolded = calculateUnfolded(length_mm, width_mm, height_mm);
   const totalSqm = calculateTotalM2(unfolded.m2, quantity);
   
@@ -125,6 +133,16 @@ export function validateBoxDimensions(box: BoxItemData): { isValid: boolean; err
     return {
       isValid: false,
       error: `La suma de Ancho + Alto no puede superar ${MAX_LENGTH_PLUS_WIDTH}mm (actual: ${box.width_mm + box.height_mm}mm)`
+    };
+  }
+
+  // Tope de fabricacion. Antes esta validacion no existia en el formulario:
+  // la caja quedaba cotizada y recien saltaba el problema al pedirla.
+  if (excedeMedidaMaxima(box.length_mm, box.width_mm, box.height_mm)) {
+    return {
+      isValid: false,
+      error: `Fabricamos hasta ${MEDIDA_MAXIMA.largo}×${MEDIDA_MAXIMA.ancho}×${MEDIDA_MAXIMA.alto} mm. Con esta medida ` +
+        `(${box.length_mm}×${box.width_mm}×${box.height_mm}) no llegamos.`
     };
   }
   return { isValid: true };

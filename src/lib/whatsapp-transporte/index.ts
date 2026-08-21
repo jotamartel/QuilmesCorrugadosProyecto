@@ -67,6 +67,23 @@ export const transporte: Transporte = elegir();
  * Contestarlo con Twilio activo no abre nada: el desafio solo se devuelve si el
  * token coincide con META_WA_VERIFY_TOKEN, que es nuestro.
  */
+/**
+ * Si una firma que no cierra tiene que cortar la request.
+ *
+ * Lo decide el transporte —ver `rechazaFirmaInvalida`— y WHATSAPP_FIRMA_ESTRICTA
+ * lo pisa en los dos sentidos: en "1" bloquea siempre, en "0" nunca. Existe para
+ * las dos emergencias opuestas y ninguna es hipotética: cerrar de urgencia si
+ * alguien empieza a golpear el webhook, y abrir de urgencia si la validación se
+ * lleva puestos mensajes de clientes reales un sábado. Las dos se resuelven con
+ * una variable y un redespliegue, sin tocar código.
+ */
+export function bloqueaPorFirmaInvalida(): boolean {
+  const forzado = (process.env.WHATSAPP_FIRMA_ESTRICTA || '').trim();
+  if (forzado === '1' || forzado.toLowerCase() === 'true') return true;
+  if (forzado === '0' || forzado.toLowerCase() === 'false') return false;
+  return transporte.rechazaFirmaInvalida;
+}
+
 export function responderAltaDeWebhook(request: Request): Response | null {
   return transporteMeta.responderVerificacionDeAlta?.(request) ?? null;
 }

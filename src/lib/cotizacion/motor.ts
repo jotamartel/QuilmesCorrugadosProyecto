@@ -453,17 +453,20 @@ export function validarCajas(boxes: BoxInput[]): string[] {
       return;
     }
 
-    // Los límites de fabricación salen de una sola función, la misma que usa
-    // calcularCotizacion() para negarse a poner precio. Antes estaban acá
-    // escritos a mano y el motor no los conocía: la API pública rechazaba una
-    // caja que la herramienta del agente cotizaba igual.
-    const noSeFabrica = porQueNoSeFabrica(box);
-    if (noSeFabrica.length > 0) {
-      errors.push(
-        `${cual}Esa caja no se puede fabricar: ${noSeFabrica.join('; y ')}. Pediste ` +
-          `${box.length_mm}x${box.width_mm}x${box.height_mm} mm.`,
-      );
-    }
+    // LOS LIMITES DE FABRICACION NO SE VALIDAN ACA, A PROPOSITO.
+    //
+    // Estaban, y funcionaban, pero cortaban antes de tiempo: quien llama a
+    // validarCajas() —la API publica, el MCP, la pagina /cotizar— lo hace justo
+    // antes de cotizar, asi que un rechazo aca le gana al del motor. Y el del
+    // motor es mejor: viene con las medidas de catalogo mas parecidas, ya
+    // cotizadas. El cliente terminaba recibiendo "esa caja no se puede
+    // fabricar" a secas cuando podia recibir eso mismo mas tres medidas que si
+    // podia comprar.
+    //
+    // La regla no se perdio: vive en porQueNoSeFabrica(), la usa
+    // calcularCotizacion() y de ahi sale un impedimento de tipo
+    // 'no_fabricable'. Esta funcion se queda con lo que el motor NO mira:
+    // medidas ausentes, cantidades que no son enteros, colores fuera de rango.
 
     if (!box.quantity || box.quantity < 1 || !Number.isInteger(box.quantity)) {
       errors.push(`${cual}La cantidad tiene que ser un número entero de cajas.`);

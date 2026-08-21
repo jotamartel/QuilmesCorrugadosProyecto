@@ -27,6 +27,7 @@ process.env.META_WA_TOKEN = process.env.META_WA_TOKEN || 'token-falso';
 process.env.META_WA_PHONE_NUMBER_ID = process.env.META_WA_PHONE_NUMBER_ID || '000';
 
 const { transporteMeta, verificarFirmaMeta } = await import('../src/lib/whatsapp-transporte/meta');
+import type { MensajeEntrante } from '../src/lib/whatsapp-transporte/tipos';
 const { transporteTwilio } = await import('../src/lib/whatsapp-transporte/twilio');
 const { normalizarTelefono } = await import('../src/lib/whatsapp-transporte/tipos');
 
@@ -41,6 +42,11 @@ function verificar(nombre: string, obtenido: unknown, esperado: unknown) {
     fallos++;
     console.log(`  FALLA ${nombre}\n        esperado: ${b}\n        obtenido: ${a}`);
   }
+}
+
+/** El unico mensaje de un lote, o null si el lote vino vacio. */
+function uno(lote: MensajeEntrante[]): MensajeEntrante | null {
+  return lote.length === 1 ? lote[0] : null;
 }
 
 function pedido(url: string, cabeceras: Record<string, string> = {}): Request {
@@ -72,7 +78,7 @@ const mensajeDeTexto = JSON.stringify({
   }],
 });
 
-verificar('texto', transporteMeta.leerEntrante(mensajeDeTexto, pedido('https://x/y')), {
+verificar('texto', uno(transporteMeta.leerEntrantes(mensajeDeTexto, pedido('https://x/y'))), {
   telefono: '+5491133334444',
   texto: 'Hola, necesito cajas',
   tieneMedia: false,
@@ -84,12 +90,12 @@ verificar('texto', transporteMeta.leerEntrante(mensajeDeTexto, pedido('https://x
 const avisoDeEstado = JSON.stringify({
   entry: [{ changes: [{ value: { statuses: [{ id: 'wamid.ABC', status: 'delivered' }] } }] }],
 });
-verificar('aviso de estado se ignora', transporteMeta.leerEntrante(avisoDeEstado, pedido('https://x/y')), null);
+verificar('aviso de estado se ignora', transporteMeta.leerEntrantes(avisoDeEstado, pedido('https://x/y')).length, 0);
 
 const audio = JSON.stringify({
   entry: [{ changes: [{ value: { messages: [{ from: '5491133334444', id: 'w2', type: 'audio', audio: { id: 'a1' } }] } }] }],
 });
-verificar('audio marca media', transporteMeta.leerEntrante(audio, pedido('https://x/y'))?.tieneMedia, true);
+verificar('audio marca media', uno(transporteMeta.leerEntrantes(audio, pedido('https://x/y')))?.tieneMedia, true);
 
 const boton = JSON.stringify({
   entry: [{ changes: [{ value: { messages: [{
@@ -97,9 +103,73 @@ const boton = JSON.stringify({
     interactive: { type: 'button_reply', button_reply: { id: 'si', title: 'Si, cotizar' } },
   }] } }] }],
 });
-verificar('boton trae su texto', transporteMeta.leerEntrante(boton, pedido('https://x/y'))?.texto, 'Si, cotizar');
+verificar('boton trae su texto', uno(transporteMeta.leerEntrantes(boton, pedido('https://x/y')))?.texto, 'Si, cotizar');
 
-verificar('cuerpo roto no explota', transporteMeta.leerEntrante('{no es json', pedido('https://x/y')), null);
+verificar('cuerpo roto no explota', transporteMeta.leerEntrantes('{no es json', pedido('https://x/y')).length, 0);
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\nMeta — un POST con varios mensajes');
+
+// Meta batchea: cuando alguien manda dos mensajes seguidos, y cuando reintenta
+// una entrega que se le acumulo, en un mismo POST vienen varios. Antes se leia
+// entry[0].changes[0].messages[0] y del resto no quedaba ni registro en el
+// panel: el cliente escribia "hola" y "necesito 500 cajas" y del segundo, nada.
+const lote = JSON.stringify({
+  entry: [
+    {
+      changes: [
+        {
+          value: {
+            messages: [
+              { from: '5491133334444', id: 'w1', type: 'text', text: { body: 'hola' } },
+              { from: '5491133334444', id: 'w2', type: 'text', text: { body: 'necesito 500 cajas' } },
+            ],
+          },
+        },
+        // Un segundo change en el mismo entry: el formato lo permite.
+        {
+          value: {
+            messages: [
+              { from: '5491133334444', id: 'w3', type: 'text', text: { body: 'de 40x30x30' } },
+            ],
+          },
+        },
+      ],
+    },
+    // Y un segundo entry, con un aviso de estado mezclado que hay que saltear.
+    {
+      changes: [
+        { value: { statuses: [{ id: 'w1', status: 'delivered' }] } },
+        {
+          value: {
+            messages: [
+              { from: '5491133334444', id: 'w4', type: 'text', text: { body: 'urgente' } },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+});
+
+const leidos = transporteMeta.leerEntrantes(lote, pedido('https://x/y'));
+verificar('no se pierde ninguno', leidos.length, 4);
+verificar('vienen en orden', leidos.map((m) => m.id), ['w1', 'w2', 'w3', 'w4']);
+verificar('los avisos de estado no cuentan', leidos.some((m) => m.id === null), false);
+verificar('el texto de cada uno', leidos.map((m) => m.texto), [
+  'hola', 'necesito 500 cajas', 'de 40x30x30', 'urgente',
+]);
+
+// Un mensaje sin `from` no es de nadie: se saltea sin llevarse el resto puesto.
+const loteConBasura = JSON.stringify({
+  entry: [{ changes: [{ value: { messages: [
+    { id: 'x1', type: 'text', text: { body: 'sin remitente' } },
+    { from: '5491133334444', id: 'x2', type: 'text', text: { body: 'este si' } },
+  ] } }] }],
+});
+verificar('un mensaje roto no se lleva al resto',
+  transporteMeta.leerEntrantes(loteConBasura, pedido('https://x/y')).map((m) => m.id),
+  ['x2']);
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\nMeta — firma del webhook');
@@ -159,7 +229,7 @@ const formTwilio = new URLSearchParams({
   NumMedia: '0',
 }).toString();
 
-verificar('texto', transporteTwilio.leerEntrante(formTwilio, pedido('https://x/y')), {
+verificar('texto', uno(transporteTwilio.leerEntrantes(formTwilio, pedido('https://x/y'))), {
   telefono: '+5491133334444',
   texto: 'Hola',
   tieneMedia: false,
@@ -174,11 +244,11 @@ const formConAudio = new URLSearchParams({
   MediaUrl0: 'https://api.twilio.com/media/1',
   MediaContentType0: 'audio/ogg',
 }).toString();
-verificar('audio marca media', transporteTwilio.leerEntrante(formConAudio, pedido('https://x/y'))?.tieneMedia, true);
+verificar('audio marca media', uno(transporteTwilio.leerEntrantes(formConAudio, pedido('https://x/y')))?.tieneMedia, true);
 
 verificar('sin From no hay mensaje',
-  transporteTwilio.leerEntrante('Body=hola', pedido('https://x/y')),
-  null);
+  transporteTwilio.leerEntrantes('Body=hola', pedido('https://x/y')).length,
+  0);
 
 const recibido = transporteTwilio.respuestaDeRecibido();
 verificar('el recibido sigue siendo TwiML', recibido.headers.get('content-type'), 'text/xml');
@@ -214,6 +284,12 @@ verificar('sin 9', normalizarTelefono('+541133334444'), '+5491133334444');
 verificar('sin mas', normalizarTelefono('5491133334444'), '+5491133334444');
 verificar('con prefijo del canal', normalizarTelefono('whatsapp:+5491133334444'), '+5491133334444');
 verificar('con espacios', normalizarTelefono('+54 9 11 3333-4444'), '+5491133334444');
+
+// Sin un solo digito no es un telefono. Devolvia "+", que es truthy, y con eso
+// se abria una conversacion a nombre de "+".
+verificar('vacio', normalizarTelefono(''), '');
+verificar('solo texto', normalizarTelefono('whatsapp:'), '');
+verificar('solo signos', normalizarTelefono('+- ()'), '');
 
 console.log(fallos === 0 ? '\nTodo bien.\n' : `\n${fallos} fallas.\n`);
 process.exit(fallos === 0 ? 0 : 1);

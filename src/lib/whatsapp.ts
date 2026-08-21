@@ -26,14 +26,9 @@ const BUSINESS_HOURS = {
   workDays: [...HORARIO.dias] as number[],
 };
 
-// Límites de dimensiones (consistente con el resto del sistema)
-const LIMITS = {
-  maxSheetWidth: RETAIL_CONFIG.MAX_SHEET_WIDTH,
-  minLength: RETAIL_CONFIG.MIN_LARGO,
-  minWidth: RETAIL_CONFIG.MIN_ANCHO,
-  minHeight: RETAIL_CONFIG.MIN_ALTO,
-  minQuantity: RETAIL_CONFIG.MIN_CANTIDAD,
-};
+// Los limites de fabricacion ya no viven aca: los decide porQueNoSeFabrica() en
+// el motor, que es la misma funcion que usa la web. Esta copia local no tenia la
+// medida maxima, asi que por WhatsApp entraban cajas que la fabrica no hace.
 
 interface WhatsAppMessage {
   to: string;

@@ -89,10 +89,11 @@ export const transporteTwilio: Transporte = {
     );
   },
 
-  leerEntrante(cuerpoCrudo) {
+  // Twilio manda un mensaje por request: la lista trae cero o uno.
+  leerEntrantes(cuerpoCrudo) {
     const params = comoFormulario(cuerpoCrudo);
     const from = params.From;
-    if (!from) return null;
+    if (!from) return [];
 
     const numMedia = Number(params.NumMedia || '0');
     const tieneMedia =
@@ -104,7 +105,7 @@ export const transporteTwilio: Transporte = {
       tieneMedia,
       id: params.MessageSid || null,
     };
-    return entrante;
+    return [entrante];
   },
 
   respuestaDeRecibido() {

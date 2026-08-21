@@ -279,19 +279,15 @@ export async function POST(request: NextRequest) {
       console.log('[whatsapp][firma] valida (%s)', transporte.nombre);
     }
 
-    const entrante = transporte.leerEntrante(cuerpoCrudo, request);
-    if (!entrante) {
+    // Un POST puede traer VARIOS mensajes: Meta batchea cuando llegan juntos y
+    // cuando reintenta una entrega acumulada.
+    const entrantes = transporte.leerEntrantes(cuerpoCrudo, request);
+    if (entrantes.length === 0) {
       // Meta manda por el mismo webhook los avisos de estado —entregado,
       // leido—, que no son mensajes de nadie. Darlos por recibidos y no hacer
       // nada es lo correcto.
       return transporte.respuestaDeRecibido();
     }
-
-    const phoneNumber = entrante.telefono;
-    const body = entrante.texto;
-    const from = phoneNumber;
-    telefonoParaAvisarDelError = phoneNumber;
-    const bodyLower = body.toLowerCase();
 
     // ─────────────────────────────────────────────────────────────────────
     // Un reintento del proveedor NO vuelve a correr todo esto.
@@ -302,23 +298,63 @@ export async function POST(request: NextRequest) {
     // maquina de estados de nuevo —lo que puede saltear un paso— y le
     // contestaba al cliente dos veces.
     //
+    // Se reclama CADA mensaje del lote por separado. Un reintento puede traer
+    // un lote que se solapa con uno anterior —dos mensajes ya atendidos y uno
+    // nuevo—: quedandose solo con los que se pudo reclamar, lo viejo no se
+    // reprocesa y lo nuevo no se pierde.
+    //
     // Va ANTES de cualquier efecto: guardar el entrante ya es uno.
     // ─────────────────────────────────────────────────────────────────────
-    const reclamo = await reclamarMensaje(entrante.id, transporte.nombre, phoneNumber);
-    if (reclamo === 'duplicado') {
-      console.log('[WhatsApp] mensaje repetido (%s), ya se esta atendiendo:', entrante.id, phoneNumber);
-      return transporte.respuestaDeRecibido();
+    const aAtender: typeof entrantes = [];
+    for (const e of entrantes) {
+      const reclamo = await reclamarMensaje(e.id, transporte.nombre, e.telefono);
+      if (reclamo === 'duplicado') {
+        console.log('[WhatsApp] mensaje repetido (%s), ya se esta atendiendo:', e.id, e.telefono);
+        continue;
+      }
+      aAtender.push(e);
+    }
+    if (aAtender.length === 0) return transporte.respuestaDeRecibido();
+
+    // ─────────────────────────────────────────────────────────────────────
+    // El lote se atiende como UNA consulta, no como N.
+    //
+    // Alguien que manda "hola" y despues "necesito 500 cajas de 40x30x30" en el
+    // mismo segundo hizo una sola pregunta, y contestarle dos veces es peor que
+    // tarde. El texto va junto —en el orden en que lo escribio— y la respuesta
+    // sale una sola vez.
+    //
+    // Si el lote mezclara telefonos distintos —Meta no lo hace, pero el formato
+    // lo permite— se atiende el primero y los demas quedan guardados como
+    // entrantes sin respuesta, que es preferible a contestarle al que no
+    // pregunto.
+    // ─────────────────────────────────────────────────────────────────────
+    const entrante = {
+      telefono: aAtender[0].telefono,
+      texto: aAtender.map((e) => e.texto).filter(Boolean).join('\n').trim(),
+      tieneMedia: aAtender.some((e) => e.tieneMedia),
+      id: aAtender[0].id,
+    };
+    if (aAtender.length > 1) {
+      console.log('[WhatsApp] lote de %d mensajes de %s, se atiende junto', aAtender.length, entrante.telefono);
     }
 
+    const phoneNumber = entrante.telefono;
+    const body = entrante.texto;
+    const from = phoneNumber;
+    telefonoParaAvisarDelError = phoneNumber;
+    const bodyLower = body.toLowerCase();
+
     /**
-     * Contestarle al proveedor, dejando el mensaje como terminado.
+     * Contestarle al proveedor, dejando TODOS los mensajes del lote como
+     * terminados.
      *
      * Se completa aca y no en un `finally` a proposito: si el proceso se muere
      * de golpe el `finally` tampoco corre, y ese es justo el caso donde
      * queremos que la marca quede sin completar para que el reintento sirva.
      */
     const recibido = async () => {
-      await marcarMensajeCompletado(entrante.id);
+      for (const e of aAtender) await marcarMensajeCompletado(e.id);
       return transporte.respuestaDeRecibido();
     };
 

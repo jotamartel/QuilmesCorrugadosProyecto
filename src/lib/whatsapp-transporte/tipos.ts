@@ -111,8 +111,20 @@ export interface Transporte {
    */
   readonly rechazaFirmaInvalida: boolean;
 
-  /** Interpreta el cuerpo del webhook. Devuelve null si no es un mensaje que nos interese. */
-  leerEntrante(cuerpoCrudo: string, request: Request): MensajeEntrante | null;
+  /**
+   * Interpreta el cuerpo del webhook. Devuelve una lista vacía si lo que llegó
+   * no es un mensaje de nadie.
+   *
+   * DEVUELVE UNA LISTA, no uno solo, porque Meta batchea: un mismo POST puede
+   * traer varios `entry`, varios `changes` y varios `messages`, y pasa sobre
+   * todo cuando alguien manda dos mensajes seguidos y cuando Meta reintenta una
+   * entrega que se le acumuló. Leyendo solo el primero, el resto se perdía en
+   * silencio: el cliente escribía "hola" y "necesito cajas" y del segundo no
+   * quedaba ni registro en el panel.
+   *
+   * Twilio manda uno por request, así que ahí la lista trae cero o uno.
+   */
+  leerEntrantes(cuerpoCrudo: string, request: Request): MensajeEntrante[];
 
   /**
    * Lo que hay que contestarle al proveedor para que dé el mensaje por recibido.
@@ -148,6 +160,14 @@ export interface Transporte {
  */
 export function normalizarTelefono(crudo: string): string {
   let n = crudo.replace('whatsapp:', '').replace(/[^\d+]/g, '');
+
+  // Sin un solo digito no es un telefono, y devolver algo igual es peor que
+  // devolver vacio: con la version anterior, un mensaje sin remitente salia de
+  // aca como "+" —el mas que se agrega abajo, y nada mas— y eso pasaba el
+  // control de "tiene telefono?" de los dos transportes. Se abria una
+  // conversacion a nombre de "+", con su historial y su pausa.
+  if (!/\d/.test(n)) return '';
+
   if (!n.startsWith('+')) n = '+' + n;
 
   // +54 seguido de un area y un numero, sin el 9 de celular.

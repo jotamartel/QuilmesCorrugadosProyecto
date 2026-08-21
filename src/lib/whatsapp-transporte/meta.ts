@@ -110,6 +110,33 @@ export function verificarFirmaMeta(
   return crypto.timingSafeEqual(a, b);
 }
 
+/** Un mensaje del payload de Meta, o null si no trae de quien viene. */
+function comoMensajeEntrante(mensaje: Record<string, unknown>): MensajeEntrante | null {
+  const tipo = String(mensaje?.type || '');
+  const texto: string =
+    tipo === 'text'
+      ? String((mensaje.text as Record<string, unknown>)?.body || '')
+      // Un boton o una opcion de lista llegan con el texto en otro lado, y para
+      // la logica de arriba son lo mismo que si lo hubiera tipeado.
+      : tipo === 'button'
+        ? String((mensaje.button as Record<string, unknown>)?.text || '')
+        : tipo === 'interactive'
+          ? String(
+              ((mensaje.interactive as Record<string, unknown>)?.button_reply as Record<string, unknown>)?.title ||
+                ((mensaje.interactive as Record<string, unknown>)?.list_reply as Record<string, unknown>)?.title ||
+                '',
+            )
+          : '';
+
+  const entrante: MensajeEntrante = {
+    telefono: normalizarTelefono(String(mensaje?.from || '')),
+    texto: texto.trim(),
+    tieneMedia: ['audio', 'image', 'video', 'document', 'sticker', 'voice'].includes(tipo),
+    id: mensaje?.id ? String(mensaje.id) : null,
+  };
+  return entrante.telefono ? entrante : null;
+}
+
 export const transporteMeta: Transporte = {
   nombre: 'meta',
 
@@ -190,41 +217,43 @@ export const transporteMeta: Transporte = {
     );
   },
 
-  leerEntrante(cuerpoCrudo) {
+  leerEntrantes(cuerpoCrudo) {
     try {
       const j = JSON.parse(cuerpoCrudo);
-      const cambio = j?.entry?.[0]?.changes?.[0]?.value;
-      const mensaje = cambio?.messages?.[0];
+      const entradas: unknown[] = Array.isArray(j?.entry) ? j.entry : [];
+      const entrantes: MensajeEntrante[] = [];
 
-      // Sin messages es un aviso de estado —entregado, leído, fallido—. Llega
-      // por el mismo webhook y no es un mensaje de nadie: ignorarlo es correcto,
-      // no un error.
-      if (!mensaje) return null;
+      // Se recorren TODOS los niveles. Antes se leia entry[0].changes[0]
+      // .messages[0] y se descartaba el resto: Meta batchea cuando llegan varios
+      // mensajes juntos y cuando reintenta una entrega que se le acumulo, asi
+      // que del segundo mensaje en adelante no quedaba ni registro.
+      for (const entrada of entradas) {
+        const cambios: unknown[] = Array.isArray((entrada as Record<string, unknown>)?.changes)
+          ? ((entrada as Record<string, unknown>).changes as unknown[])
+          : [];
 
-      const tipo: string = mensaje.type || '';
-      const texto: string =
-        tipo === 'text'
-          ? (mensaje.text?.body || '')
-          // Un botón o una opción de lista llegan con el texto en otro lado, y
-          // para la lógica de arriba son lo mismo que si lo hubiera tipeado.
-          : tipo === 'button'
-            ? (mensaje.button?.text || '')
-            : tipo === 'interactive'
-              ? (mensaje.interactive?.button_reply?.title ||
-                 mensaje.interactive?.list_reply?.title ||
-                 '')
-              : '';
+        for (const cambio of cambios) {
+          const valor = (cambio as Record<string, unknown>)?.value as
+            | Record<string, unknown>
+            | undefined;
+          // Sin `messages` es un aviso de estado —entregado, leido, fallido—.
+          // Llega por el mismo webhook y no es un mensaje de nadie: saltearlo es
+          // correcto, no un error.
+          const mensajes: unknown[] = Array.isArray(valor?.messages)
+            ? (valor!.messages as unknown[])
+            : [];
 
-      const entrante: MensajeEntrante = {
-        telefono: normalizarTelefono(mensaje.from || ''),
-        texto: texto.trim(),
-        tieneMedia: ['audio', 'image', 'video', 'document', 'sticker', 'voice'].includes(tipo),
-        id: mensaje.id || null,
-      };
-      return entrante.telefono ? entrante : null;
+          for (const bruto of mensajes) {
+            const entrante = comoMensajeEntrante(bruto as Record<string, unknown>);
+            if (entrante) entrantes.push(entrante);
+          }
+        }
+      }
+
+      return entrantes;
     } catch (error) {
       console.error('[whatsapp:meta] no se pudo interpretar el cuerpo:', error);
-      return null;
+      return [];
     }
   },
 

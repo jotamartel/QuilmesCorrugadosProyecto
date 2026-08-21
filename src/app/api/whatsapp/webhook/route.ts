@@ -23,6 +23,9 @@ import {
   isWithinBusinessHours,
   getPhoneQuoteHistory,
   detectarOpcion,
+  asistentePausado,
+  pausarAsistente,
+  PAUSA_TRAS_DERIVAR_MS,
   ClientType,
 } from '@/lib/whatsapp';
 import { calcularCotizacion } from '@/lib/cotizacion/motor';
@@ -313,6 +316,24 @@ export async function POST(request: NextRequest) {
     await saveCommunication(phoneNumber, 'inbound', body, {
       hasMedia: hasMediaContent(formData),
     }, clientId);
+    // ─────────────────────────────────────────────────────────────────────
+    // Si una persona esta atendiendo esta conversacion, el asistente se calla.
+    //
+    // Va DESPUES de guardar el mensaje entrante y ANTES de cualquier respuesta:
+    // el mensaje tiene que quedar registrado igual, porque es lo que la persona
+    // va a leer en el panel. Lo unico que se suprime es la respuesta automatica.
+    //
+    // Antes esto no existia: el webhook nunca miraba si alguien habia tomado la
+    // conversacion, asi que el asistente le hablaba por encima al vendedor.
+    // ─────────────────────────────────────────────────────────────────────
+    if (await asistentePausado(phoneNumber)) {
+      console.log('[WhatsApp] conversacion atendida por una persona, el asistente no responde:', phoneNumber);
+      return new NextResponse(
+        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+        { headers: { 'Content-Type': 'text/xml' } },
+      );
+    }
+
     let responseMessage: string | BoxTemplateResponse = '';
     let quoteData: { total: number; totalM2: number } | null = null;
     let needsAdvisor = false;
@@ -341,7 +362,38 @@ export async function POST(request: NextRequest) {
             '[WhatsApp] agente ok. herramientas: %s',
             r.herramientasUsadas.join(',') || 'ninguna',
           );
+
+          // Segundo chequeo, y no sobra: entre el primero y esta linea paso una
+          // llamada al modelo, que tarda segundos. En ese rato el vendedor pudo
+          // haber leido el mensaje en el panel y contestado, y entonces la
+          // respuesta del asistente saldria PISANDO la de la persona. El primer
+          // chequeo evita empezar; este evita terminar.
+          if (await asistentePausado(phoneNumber)) {
+            console.log('[WhatsApp] una persona tomo la conversacion mientras el agente pensaba, no se envia:', phoneNumber);
+            return new NextResponse(
+              '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+              { headers: { 'Content-Type': 'text/xml' } },
+            );
+          }
+
           await enviarRespuestaDelAgente(from, phoneNumber, r.texto, clientId);
+
+          // Pidio hablar con una persona. Hasta ahora esto no avisaba a nadie:
+          // la notificacion existia solo en la maquina de estados de abajo, y
+          // el agente corta antes de llegar. Si el cliente no escribia por su
+          // cuenta al numero que le pasaba el asistente, el pedido se perdia.
+          if (r.herramientasUsadas.includes('derivar_a_humano')) {
+            await pausarAsistente(phoneNumber, PAUSA_TRAS_DERIVAR_MS);
+            await sendNotification({
+              type: 'advisor_request',
+              origin: 'WhatsApp',
+              contact: {
+                phone: phoneNumber,
+                name: state.clientName || state.companyName,
+                email: state.clientEmail,
+              },
+            }).catch((e) => console.error('[WhatsApp] no se pudo avisar de la derivacion:', e));
+          }
           return new NextResponse(
             '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
             { headers: { 'Content-Type': 'text/xml' } },
@@ -866,6 +918,17 @@ Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
       boxTemplateDims = responseMessage.boxTemplate;
     } else {
       textToSend = responseMessage as string;
+    }
+
+    // Mismo rechequeo que en el camino del agente: desde el chequeo de arriba
+    // hasta aca pasaron consultas a la base y, a veces, a Groq. Si en ese rato
+    // una persona tomo la conversacion, no se envia nada.
+    if (await asistentePausado(phoneNumber)) {
+      console.log('[WhatsApp] una persona tomo la conversacion, el respaldo no envia:', phoneNumber);
+      return new NextResponse(
+        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+        { headers: { 'Content-Type': 'text/xml' } },
+      );
     }
 
     if (boxTemplateDims) {

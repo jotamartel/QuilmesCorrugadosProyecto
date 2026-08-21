@@ -36,6 +36,8 @@ interface WhatsAppConversation {
   attended: boolean;
   attended_at?: string;
   attended_by?: string;
+  /** Mientras esté en el futuro, el asistente no responde esta conversación. */
+  bot_pausado_hasta?: string | null;
   notes?: string;
   last_interaction: string;
   created_at: string;
@@ -90,6 +92,11 @@ export default function WhatsAppPage() {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [profile, setProfile] = useState<ContactProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  // Responder desde el panel: hasta ahora había que abrir WhatsApp en el celular
+  // y lo que se hablaba ahí no quedaba registrado.
+  const [respuesta, setRespuesta] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
   // Filtros
   const [filter, setFilter] = useState<FilterType>('all');
@@ -144,6 +151,48 @@ export default function WhatsAppPage() {
       console.error('Error fetching profile:', error);
     } finally {
       setProfileLoading(false);
+    }
+  };
+
+  /**
+   * Contestar es tomar la conversación: además de mandar el mensaje, el
+   * asistente queda pausado en esa línea para que no le hable por encima a
+   * quien está atendiendo.
+   */
+  const enviarRespuesta = async () => {
+    if (!selectedConversation || !respuesta.trim() || enviando) return;
+    setEnviando(true);
+    setErrorEnvio(null);
+    try {
+      const res = await fetch('/api/whatsapp/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: selectedConversation, message: respuesta.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorEnvio(data.error || 'No se pudo enviar.');
+        return;
+      }
+      setRespuesta('');
+      fetchMessages(selectedConversation);
+      fetchConversations();
+    } catch {
+      setErrorEnvio('No se pudo enviar. Revisá la conexión.');
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const devolverAlAsistente = async () => {
+    if (!selectedConversation) return;
+    try {
+      await fetch(`/api/whatsapp/reply?phoneNumber=${encodeURIComponent(selectedConversation)}`, {
+        method: 'DELETE',
+      });
+      fetchConversations();
+    } catch (error) {
+      console.error('Error reanudando el asistente:', error);
     }
   };
 
@@ -538,33 +587,136 @@ export default function WhatsAppPage() {
                 </div>
               </div>
               <div className="p-4 space-y-4 max-h-[500px] overflow-y-auto bg-gray-50">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
-                  >
+                {messages.map((msg) => {
+                  // Tres autores, no dos: el cliente, el asistente y la persona
+                  // del equipo. Sin distinguirlos no se sabe si un mensaje lo
+                  // mandó el bot o alguien de la fábrica.
+                  const dePersona = msg.direction === 'outbound' && !!msg.metadata?.humano;
+                  const saliente = msg.direction === 'outbound';
+                  return (
                     <div
-                      className={`max-w-[80%] rounded-lg p-3 ${
-                        msg.direction === 'outbound'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-white border border-gray-200'
-                      }`}
+                      key={msg.id}
+                      className={`flex ${saliente ? 'justify-end' : 'justify-start'}`}
                     >
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                      <p
-                        className={`text-xs mt-1 ${
-                          msg.direction === 'outbound' ? 'text-green-200' : 'text-gray-400'
+                      <div
+                        className={`max-w-[80%] rounded-lg p-3 ${
+                          dePersona
+                            ? 'bg-blue-600 text-white'
+                            : saliente
+                              ? 'bg-green-600 text-white'
+                              : 'bg-white border border-gray-200'
                         }`}
                       >
-                        {new Date(msg.created_at).toLocaleTimeString('es-AR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
+                        {saliente && (
+                          <p className={`text-[11px] font-medium mb-1 ${dePersona ? 'text-blue-200' : 'text-green-200'}`}>
+                            {dePersona
+                              ? `${String(msg.metadata?.usuario ?? 'Equipo')}`
+                              : 'Asistente'}
+                          </p>
+                        )}
+                        {/* Un audio o una foto llegan sin texto: sin esto la
+                            burbuja quedaba vacía y quien atiende no se enteraba
+                            de que el cliente había mandado algo. */}
+                        {!msg.content?.trim() && msg.metadata?.hasMedia ? (
+                          <p className="text-sm italic opacity-80">
+                            Mandó un audio o una imagen — se ve en WhatsApp
+                          </p>
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                        )}
+                        <p
+                          className={`text-xs mt-1 ${
+                            dePersona ? 'text-blue-200' : saliente ? 'text-green-200' : 'text-gray-400'
+                          }`}
+                        >
+                          {new Date(msg.created_at).toLocaleTimeString('es-AR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+              {/* Responder desde acá. Antes había que abrir WhatsApp en el
+                  celular, el cliente veía otro número y lo que se hablaba ahí
+                  no quedaba registrado en ningún lado. */}
+              {(() => {
+                const ultimoEntrante = [...messages].reverse().find((m) => m.direction === 'inbound');
+                const horas = ultimoEntrante
+                  ? Math.floor((Date.now() - new Date(ultimoEntrante.created_at).getTime()) / 3_600_000)
+                  : null;
+                // WhatsApp solo permite texto libre dentro de las 24 horas del
+                // último mensaje del cliente. Fuera de eso hace falta una
+                // plantilla aprobada por Meta, que todavía no tenemos.
+                const ventanaAbierta = horas !== null && horas < 24;
+                const pausado =
+                  !!selectedConv.bot_pausado_hasta &&
+                  new Date(selectedConv.bot_pausado_hasta).getTime() > Date.now();
+
+                return (
+                  <div className="border-t border-gray-200 p-4 space-y-2">
+                    {pausado && (
+                      <div className="flex items-center justify-between gap-3 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2">
+                        <p className="text-xs text-blue-900">
+                          El asistente está en pausa en esta conversación
+                          {selectedConv.attended_by ? ` — la tomó ${selectedConv.attended_by}` : ''}.
+                          Vuelve solo el{' '}
+                          {new Date(selectedConv.bot_pausado_hasta!).toLocaleString('es-AR', {
+                            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+                          })}
+                          .
+                        </p>
+                        <button
+                          onClick={devolverAlAsistente}
+                          className="shrink-0 text-xs font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900"
+                        >
+                          Devolver al asistente
+                        </button>
+                      </div>
+                    )}
+
+                    {!ventanaAbierta ? (
+                      <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                        <p className="text-xs text-amber-900">
+                          {horas === null
+                            ? 'Esta persona todavía no escribió, así que no se le puede mandar un mensaje libre.'
+                            : `El último mensaje del cliente fue hace ${horas} horas.`}{' '}
+                          WhatsApp solo permite escribir libremente dentro de las 24 horas. Para
+                          reabrir la conversación hace falta una plantilla aprobada por Meta.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <textarea
+                          value={respuesta}
+                          onChange={(e) => setRespuesta(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) enviarRespuesta();
+                          }}
+                          placeholder="Escribí tu respuesta. Al enviarla, el asistente deja de contestar esta conversación."
+                          rows={3}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                        />
+                        {errorEnvio && <p className="text-xs text-red-600">{errorEnvio}</p>}
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-gray-400">Ctrl + Enter para enviar</p>
+                          <button
+                            onClick={enviarRespuesta}
+                            disabled={enviando || !respuesta.trim()}
+                            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-40"
+                          >
+                            {enviando ? 'Enviando…' : 'Enviar'}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+
               {selectedConv.total_quoted > 0 && (
                 <div className="p-4 border-t border-gray-200 bg-green-50">
                   <div className="flex items-center justify-between">

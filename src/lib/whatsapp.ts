@@ -407,6 +407,98 @@ export async function updateConversationState(
 }
 
 /**
+ * El traspaso de una conversacion del asistente a una persona.
+ *
+ * Es una fecha y no un booleano a proposito: una pausa que no vence sola se
+ * queda prendida. Alguien atiende, se olvida de devolverle la conversacion al
+ * asistente, y esa linea queda muda para siempre sin hacer ruido. Con una fecha,
+ * si nadie contesta el asistente vuelve y el cliente al menos recibe algo.
+ */
+
+/** Cuanto se calla el asistente cuando una persona escribe desde el panel. */
+export const PAUSA_POR_RESPUESTA_HUMANA_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Cuanto se calla cuando el propio asistente deriva a una persona.
+ *
+ * Mas corta que la anterior: nadie tomo la conversacion todavia, solo se pidio.
+ * Si en ese rato no contesta nadie, conviene que el asistente vuelva a estar
+ * disponible antes que dejar al cliente hablando solo.
+ */
+export const PAUSA_TRAS_DERIVAR_MS = 3 * 60 * 60 * 1000;
+
+/** Calla al asistente en esta conversacion por el tiempo indicado. */
+export async function pausarAsistente(
+  phoneNumber: string,
+  duracionMs: number,
+  quien?: string,
+): Promise<Date | null> {
+  const hasta = new Date(Date.now() + duracionMs);
+  try {
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from('whatsapp_conversations')
+      .upsert(
+        {
+          phone_number: phoneNumber,
+          bot_pausado_hasta: hasta.toISOString(),
+          ...(quien ? { attended: true, attended_at: new Date().toISOString(), attended_by: quien } : {}),
+        },
+        { onConflict: 'phone_number' },
+      );
+    if (error) {
+      console.error('[WhatsApp] No se pudo pausar el asistente:', error);
+      return null;
+    }
+    return hasta;
+  } catch (error) {
+    console.error('[WhatsApp] No se pudo pausar el asistente:', error);
+    return null;
+  }
+}
+
+/** Le devuelve la conversacion al asistente. */
+export async function reanudarAsistente(phoneNumber: string): Promise<boolean> {
+  try {
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from('whatsapp_conversations')
+      .update({ bot_pausado_hasta: null })
+      .eq('phone_number', phoneNumber);
+    if (error) {
+      console.error('[WhatsApp] No se pudo reanudar el asistente:', error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('[WhatsApp] No se pudo reanudar el asistente:', error);
+    return false;
+  }
+}
+
+/**
+ * Si hay una persona atendiendo esta conversacion ahora mismo.
+ *
+ * Ante un error de lectura devuelve false —o sea, el asistente contesta—. Es la
+ * eleccion menos mala: que el bot hable de mas es molesto, que un cliente quede
+ * sin respuesta porque la base tuvo un hipo es peor.
+ */
+export async function asistentePausado(phoneNumber: string): Promise<boolean> {
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from('whatsapp_conversations')
+      .select('bot_pausado_hasta')
+      .eq('phone_number', phoneNumber)
+      .maybeSingle();
+    if (error || !data?.bot_pausado_hasta) return false;
+    return new Date(data.bot_pausado_hasta).getTime() > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Limpia el estado de conversacion
  */
 export async function clearConversationState(phoneNumber: string): Promise<void> {

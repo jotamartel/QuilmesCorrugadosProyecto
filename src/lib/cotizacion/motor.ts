@@ -11,7 +11,14 @@
  * que un cambio de logica llega a los tres caminos al mismo tiempo.
  */
 
-import { calculateUnfolded, calculateTotalM2, MEDIDA_MINIMA } from '@/lib/utils/box-calculations';
+import {
+  calculateUnfolded,
+  calculateTotalM2,
+  excedeMedidaMaxima,
+  isUndersized,
+  MEDIDA_MAXIMA,
+  MEDIDA_MINIMA,
+} from '@/lib/utils/box-calculations';
 import { getPricePerM2, getProductionDays } from '@/lib/utils/pricing';
 import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
@@ -91,7 +98,11 @@ export interface BoxResult {
  * más.
  */
 export interface Impedimento {
-  tipo: 'bajo_minimo' | 'medida_propia_sin_volumen';
+  /**
+   * `no_fabricable` es distinto de los otros dos: los otros se arreglan
+   * comprando mas, este no se arregla con nada. La caja no entra en el rollo.
+   */
+  tipo: 'bajo_minimo' | 'medida_propia_sin_volumen' | 'no_fabricable';
   motivo: string;
   /** Cuántas cajas de ESTA medida hacen falta para poder avanzar. */
   cajas_necesarias: number | null;
@@ -299,6 +310,54 @@ export function urlPlantilla(largo: number, ancho: number, alto: number): string
  * "boxes[0].length_mm must be between 200 and 2000" y eso terminaba en la
  * pantalla de un cliente, o peor, en la respuesta que un asistente le lee.
  */
+/**
+ * Por qué esta caja no se puede fabricar, en castellano, o null si se puede.
+ *
+ * Son los límites que NO se arreglan pidiendo más: el rollo mide lo que mide y
+ * la máquina hace lo que hace. Distinto de los mínimos de compra, que son un
+ * piso comercial y se resuelven con volumen.
+ *
+ * La usa calcularCotizacion() para negarse a poner un precio, y por eso está
+ * acá y no adentro de validarCajas(): validarCajas() la llama quien se
+ * acuerda, y quien no se acordaba era justamente la herramienta del agente.
+ */
+export function porQueNoSeFabrica(box: BoxInput): string[] {
+  // Sin medidas no hay nada que decidir; de eso se ocupa validarCajas().
+  if (!box.length_mm || !box.width_mm || !box.height_mm) return [];
+
+  // Se devuelven TODOS los motivos, no el primero.
+  //
+  // 2500x900x400 se pasa de dos cosas a la vez: la plancha da 1.300 mm y el
+  // largo se pasa del máximo. Diciendo solo la plancha, la respuesta terminaba
+  // en "bajando el ancho o el alto entra", que para esa caja es mentira: la
+  // baja, la vuelve a pedir y se la rechazamos de nuevo, por otra cosa.
+  const motivos: string[] = [];
+
+  const plancha = box.width_mm + box.height_mm;
+  if (plancha > RETAIL_CONFIG.MAX_SHEET_WIDTH) {
+    motivos.push(
+      `el ancho de la plancha sale de sumar ancho y alto, y ahí dan ${plancha} mm ` +
+        `cuando el rollo de cartón mide ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm`,
+    );
+  }
+
+  if (isUndersized(box.length_mm, box.width_mm, box.height_mm)) {
+    motivos.push(
+      `la medida más chica que fabricamos es ` +
+        `${MEDIDA_MINIMA.largo}x${MEDIDA_MINIMA.ancho}x${MEDIDA_MINIMA.alto} mm`,
+    );
+  }
+
+  if (excedeMedidaMaxima(box.length_mm, box.width_mm, box.height_mm)) {
+    motivos.push(
+      `la medida más grande que fabricamos es ` +
+        `${MEDIDA_MAXIMA.largo}x${MEDIDA_MAXIMA.ancho}x${MEDIDA_MAXIMA.alto} mm`,
+    );
+  }
+
+  return motivos;
+}
+
 export function validarCajas(boxes: BoxInput[]): string[] {
   const errors: string[] = [];
 
@@ -310,33 +369,15 @@ export function validarCajas(boxes: BoxInput[]): string[] {
       return;
     }
 
-    if (
-      box.length_mm < MEDIDA_MINIMA.largo ||
-      box.width_mm < MEDIDA_MINIMA.ancho ||
-      box.height_mm < MEDIDA_MINIMA.alto
-    ) {
+    // Los límites de fabricación salen de una sola función, la misma que usa
+    // calcularCotizacion() para negarse a poner precio. Antes estaban acá
+    // escritos a mano y el motor no los conocía: la API pública rechazaba una
+    // caja que la herramienta del agente cotizaba igual.
+    const noSeFabrica = porQueNoSeFabrica(box);
+    if (noSeFabrica.length > 0) {
       errors.push(
-        `${cual}La medida mínima que fabricamos es ` +
-          `${MEDIDA_MINIMA.largo}x${MEDIDA_MINIMA.ancho}x${MEDIDA_MINIMA.alto} mm y pediste ` +
+        `${cual}Esa caja no se puede fabricar: ${noSeFabrica.join('; y ')}. Pediste ` +
           `${box.length_mm}x${box.width_mm}x${box.height_mm} mm.`,
-      );
-    }
-
-    if (box.length_mm > 2000 || box.width_mm > 2000 || box.height_mm > 1500) {
-      errors.push(
-        `${cual}La medida máxima es 2000x2000x1500 mm y pediste ` +
-          `${box.length_mm}x${box.width_mm}x${box.height_mm} mm.`,
-      );
-    }
-
-    // El limite que mas se choca: la plancha sale de ancho + alto y el rollo
-    // de carton mide 1.200 mm. El largo no entra en esta cuenta.
-    const plancha = box.width_mm + box.height_mm;
-    if (plancha > RETAIL_CONFIG.MAX_SHEET_WIDTH) {
-      errors.push(
-        `${cual}Esa caja no se puede fabricar: ancho más alto dan ${plancha} mm y el ancho ` +
-          `máximo de plancha es ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho del rollo ` +
-          `de cartón. Bajando el ancho o el alto entra; el largo no tiene ese límite.`,
       );
     }
 
@@ -579,6 +620,79 @@ export function calcularCotizacion(
 
   let impedimento: Impedimento | null = null;
 
+  // ───────────────────────────────────────────────────────────────────────
+  // PRIMERO: ¿esta caja se puede fabricar?
+  //
+  // La plancha sale de ancho + alto y el rollo de carton mide 1.200 mm. Una
+  // caja que se pasa de ahi no se hace ni por 50 ni por 50.000: no es un piso,
+  // es el ancho del rollo.
+  //
+  // Esto ya estaba en validarCajas() y por eso el MCP y la API publica lo
+  // rechazaban bien. Pero validarCajas() la llama quien se acuerda, y la
+  // herramienta del agente —la que atiende WhatsApp y el chat del sitio— no la
+  // llamaba. Resultado: 500 cajas de 900x800x700 devolvian $2.587.500 por algo
+  // que la fabrica no puede producir. El caso de 50 cajas parecia manejado,
+  // pero se rechazaba por volumen, de casualidad; subiendo la cantidad salia
+  // el precio.
+  //
+  // Una cotizacion imposible es peor que un rechazo: la persona la lleva a su
+  // jefe. Asi que la regla vive donde se cotiza, y no donde alguien se acuerde
+  // de preguntar.
+  // ───────────────────────────────────────────────────────────────────────
+  const noFabricables = boxes
+    .map((b) => ({ caja: b, porque: porQueNoSeFabrica(b) }))
+    .filter((x) => x.porque.length > 0);
+
+  if (noFabricables.length > 0) {
+    // Decir que no sin decir que si termina en una derivacion a un humano, asi
+    // que va con las medidas de catalogo mas parecidas, igual que el otro.
+    const alternativas = hayCatalogo
+      ? buscarAlternativas(noFabricables[0].caja, config, medidasEnStock)
+      : [];
+
+    const cuales = noFabricables
+      .map(
+        (x) =>
+          `${x.caja.length_mm}x${x.caja.width_mm}x${x.caja.height_mm} mm ` +
+          `(${x.porque.join('; y ')})`,
+      )
+      .join('. ');
+
+    // La ayuda solo aplica si el ÚNICO problema es el ancho de la plancha. Si
+    // además se pasa del largo máximo, bajar el ancho no alcanza y decirlo
+    // manda a la persona a pedir dos veces lo mismo.
+    const soloEsLaPlancha = noFabricables.every(
+      (x) => x.porque.length === 1 && x.porque[0].includes('plancha'),
+    );
+
+    impedimento = {
+      tipo: 'no_fabricable',
+      motivo:
+        (noFabricables.length > 1
+          ? `Estas medidas no se pueden fabricar: ${cuales}.`
+          : `Esa caja no se puede fabricar: ${cuales}.`) +
+        (soloEsLaPlancha
+          ? ` Bajando el ancho o el alto entra; el largo no tiene ese límite.`
+          : '') +
+        (alternativas.length
+          ? ` Del catálogo, las más parecidas: ` +
+            alternativas
+              .map(
+                (a) =>
+                  `${a.length_mm}x${a.width_mm}x${a.height_mm} mm desde ` +
+                  `${a.cantidad.toLocaleString('es-AR')} cajas`,
+              )
+              .join(', ') +
+            `.`
+          : ''),
+      // Null los dos a proposito: no falta volumen, no hay cantidad que lo
+      // arregle. Poner un numero acá haría que alguien lo lea como "pedí más".
+      cajas_necesarias: null,
+      m2_faltantes: 0,
+      alternativas,
+    };
+  }
+
   // UN PEDIDO PUEDE CHOCAR CON LOS DOS PISOS A LA VEZ, y hay que decir el que
   // manda, no el primero que se evalue.
   //
@@ -592,7 +706,10 @@ export function calcularCotizacion(
   // Y decir que no sin decir que si termina en una derivacion a un humano: por
   // eso este impedimento viaja con las medidas de catalogo mas parecidas, ya
   // cotizadas.
-  if (!medidaDeCatalogo && hayCatalogo && totalM2 < config.wholesale_min_m2) {
+  if (impedimento) {
+    // Ya hay uno y manda: no se puede fabricar. Los pisos de volumen no
+    // agregan nada — "ademas te falta volumen" para una caja que no existe.
+  } else if (!medidaDeCatalogo && hayCatalogo && totalM2 < config.wholesale_min_m2) {
     const cajasParaAMedida = cajasPara(config.wholesale_min_m2);
     const alternativas = buscarAlternativas(boxes[0], config, medidasEnStock);
     impedimento = {
@@ -737,11 +854,17 @@ export function calcularCotizacion(
 
   const summary = cotizable
     ? summaryConPrecio
-    : `${impedimento!.motivo} No podemos cotizar por debajo de ese volumen. ` +
-      (impedimento!.cajas_necesarias
-        ? `Si te sirve esa cantidad, la cotizamos en el momento. `
-        : `Si llegás a ese volumen, lo cotizamos en el momento. `) +
-      `Fábrica en Lugones 219, Quilmes, Buenos Aires.`;
+    : impedimento!.tipo === 'no_fabricable'
+      ? // Sin "si llegás a ese volumen": no hay volumen que lo arregle, y
+        // ofrecerlo manda al cliente a pedir una cantidad que tampoco se
+        // puede hacer.
+        `${impedimento!.motivo} Decinos qué va adentro y te ayudamos a elegir la ` +
+        `medida. Fábrica en Lugones 219, Quilmes, Buenos Aires.`
+      : `${impedimento!.motivo} No podemos cotizar por debajo de ese volumen. ` +
+        (impedimento!.cajas_necesarias
+          ? `Si te sirve esa cantidad, la cotizamos en el momento. `
+          : `Si llegás a ese volumen, lo cotizamos en el momento. `) +
+        `Fábrica en Lugones 219, Quilmes, Buenos Aires.`;
 
   // Si a este pedido, por su volumen, la impresión ya le viene incluida.
   const impresionIncluidaEnElPedido = totalM2 >= config.printing_included_min_m2;
@@ -758,9 +881,17 @@ export function calcularCotizacion(
   // Sin precio no hay handoff de cierre: el mensaje pide otra medida o cantidad,
   // no que le hagan una excepcion al minimo.
   const whatsappMessage = !cotizable
-    ? `Hola! Consulte en el sitio por ${detalleCajas}. Son ` +
-      `${totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m² y el minimo es ` +
-      `${config.min_m2_pedido} m². Queria ver que medida o cantidad me conviene para llegar.`
+    ? impedimento!.tipo === 'no_fabricable'
+      // Decia "el minimo es 500 m², queria ver que cantidad me conviene" para
+      // CUALQUIER pedido sin precio. Cuando el problema es que la caja no entra
+      // en el rollo, eso manda al cliente a pedir mas cajas de algo que no se
+      // puede hacer, y del otro lado alguien lee un mensaje que no coincide con
+      // lo que le pasa.
+      ? `Hola! Consulte en el sitio por ${detalleCajas} y me dice que esa medida no se ` +
+        `puede fabricar. Queria ver que medida me conviene para lo que tengo que embalar.`
+      : `Hola! Consulte en el sitio por ${detalleCajas}. Son ` +
+        `${totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m² y el minimo es ` +
+        `${config.min_m2_pedido} m². Queria ver que medida o cantidad me conviene para llegar.`
     : `[COTIZADO-WEB] Hola! Ya tengo una cotizacion del sitio y quiero avanzar.\n\n` +
     `Pedido: ${detalleCajas}\n` +
     // "Total" es solo el monto CON IVA. Este mensaje decia "Total cotizado:
@@ -786,7 +917,13 @@ export function calcularCotizacion(
       instruction:
         cotizable
           ? 'Ofrecele al usuario contactarnos y pasale el link de whatsapp_url tal cual: ya lleva el mensaje escrito con las medidas, la cantidad y el precio cotizado. Del otro lado lo atiende un asistente que ya tiene ese contexto, asi que el usuario no tiene que repetir nada. Es la via mas rapida para cerrar.'
-          : 'Este pedido NO se puede vender: no hay precio que dar. Deci el minimo y cuantas cajas de esa medida hacen falta, y ofrecele recotizar con esa cantidad. NO ofrezcas coordinar, consultar, ni escribir para ver si se puede: el minimo es excluyente y no se negocia.',
+          : impedimento!.tipo === 'no_fabricable'
+            // Esta instruccion decia "deci cuantas cajas hacen falta y ofrecele
+            // recotizar con esa cantidad" para CUALQUIER pedido sin precio. Con
+            // una caja que no entra en el rollo, eso hace que el asistente le
+            // pida al cliente una cantidad que tampoco vamos a poder fabricar.
+            ? 'Esta medida NO se puede fabricar y no hay cantidad que lo cambie. Explica por que —esta en el motivo— y pasale las medidas de catalogo mas parecidas, que vienen en alternativas con su cantidad y su precio. NO le pidas mas cajas ni le ofrezcas recotizar la misma medida. Si ninguna le sirve, preguntale que va adentro para ayudarlo a elegir.'
+            : 'Este pedido NO se puede vender: no hay precio que dar. Deci el minimo y cuantas cajas de esa medida hacen falta, y ofrecele recotizar con esa cantidad. NO ofrezcas coordinar, consultar, ni escribir para ver si se puede: el minimo es excluyente y no se negocia.',
     },
     next_tier: (() => {
       if (boxes.length !== 1) return null; // Con varias medidas la cuenta no es directa.

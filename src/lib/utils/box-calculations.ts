@@ -80,6 +80,30 @@ export function isOversized(length: number, width: number, height: number): bool
  */
 export const MEDIDA_MINIMA = { largo: 200, ancho: 200, alto: 100 } as const;
 
+/**
+ * La medida más grande que la fábrica puede producir.
+ *
+ * OJO, NO CONFUNDIR con isOversized() de más arriba, que suena igual y dice
+ * otra cosa: aquella pregunta si la caja se pasa del tamaño estándar de
+ * catálogo —600x400x400— y por eso necesita cotización aparte. Ésta pregunta
+ * si la máquina directamente no la hace. Una caja de 700x500x500 es
+ * "oversized" y se fabrica todos los días.
+ *
+ * Estaba escrita a mano adentro de validarCajas() y en ningún otro lado, así
+ * que el motor de cotización no la conocía: una caja de 2500x900x400 la
+ * rechazaba la API pública —que sí valida— pero salía cotizada por la
+ * herramienta del agente, que no.
+ */
+export const MEDIDA_MAXIMA = { largo: 2000, ancho: 2000, alto: 1500 } as const;
+
+export function excedeMedidaMaxima(length: number, width: number, height: number): boolean {
+  return (
+    length > MEDIDA_MAXIMA.largo ||
+    width > MEDIDA_MAXIMA.ancho ||
+    height > MEDIDA_MAXIMA.alto
+  );
+}
+
 export function isUndersized(length: number, width: number, height: number): boolean {
   return (
     length < MEDIDA_MINIMA.largo ||

@@ -48,7 +48,9 @@ const ESCENARIOS: Escenario[] = [
     canal: 'web',
     intencion:
       'Presiona por un precio sin dar datos y después pide descuento. No debe estimar ni ' +
-      'inventar un descuento; debe derivar a un vendedor.',
+      'inventar un descuento; debe derivar a un vendedor. 800 cajas de 400x300x300 son 696 m²: ' +
+      'está arriba del mínimo de 500 y abajo de los 1.000, así que se cotiza a precio minorista ' +
+      'y sin impresión, y la medida sí está en el catálogo.',
     turnos: [
       'cuanto sale una caja mediana?',
       'dale pero decime un numero aproximado, es solo para tener una idea',
@@ -61,7 +63,11 @@ const ESCENARIOS: Escenario[] = [
     canal: 'whatsapp',
     intencion:
       'Cambia cantidad y medidas varias veces. Cada cotización debe corresponder a los ' +
-      'últimos valores, sin arrastrar los viejos.',
+      'últimos valores, sin arrastrar los viejos. Además cruza los dos pisos: 300 cajas de ' +
+      '600x400x400 son 492 m² y NO se cotizan (el mínimo de 500 m² es excluyente, no se ' +
+      'negocia); 500 cajas son 820 m² y sí; la impresión pedida ahí NO está disponible porque ' +
+      'arranca en 1.000 m², y eso hay que decirlo, no cotizar callado sin ella; 200 cajas son ' +
+      '328 m² y vuelven a quedar abajo del mínimo.',
     turnos: [
       'hola, necesito cajas para mudanza',
       '600x400x400, 300 cajas',
@@ -75,8 +81,10 @@ const ESCENARIOS: Escenario[] = [
     id: 'web-fuera-de-rango',
     canal: 'web',
     intencion:
-      'Pide medidas imposibles y cantidades bajo el mínimo. Debe explicar el motivo real ' +
-      '(el ancho del rollo, el mínimo) y ofrecer una alternativa.',
+      '900x800x700 NO se fabrica a ninguna cantidad: ancho más alto dan 1.500 mm y el rollo ' +
+      'mide 1.200. Al preguntar "y si son 500?" NO debe cotizar —ese caso devolvía $2.587.500— ' +
+      'ni sugerir que con más cajas se puede. Debe explicar el ancho del rollo y pasar las ' +
+      'medidas de catálogo más parecidas con su cantidad y su precio, sin derivar a un humano.',
     turnos: [
       'quiero 50 cajas de 900x800x700',
       'y si son 500?',
@@ -87,8 +95,10 @@ const ESCENARIOS: Escenario[] = [
     id: 'wsp-impresion-sin-colores',
     canal: 'whatsapp',
     intencion:
-      'Pide impresión sin decir cuántos colores. Debe preguntar antes de cotizar. Y a 5000 ' +
-      'cajas la impresión ya viene incluida: no debe haber recargo, pero sí mención del polímero.',
+      'Pide impresión sin decir cuántos colores. Debe preguntar antes de cotizar. A 5.000 cajas ' +
+      'de 300x380x420 son 5.640 m²: la impresión ya viene incluida, no debe haber recargo, pero ' +
+      'sí mención del polímero. La impresión depende SOLO del volumen —desde 1.000 m²—, no de si ' +
+      'la medida está en el catálogo: decir que una medida estándar no se puede imprimir es un error.',
     turnos: [
       'hola, quiero cajas con mi logo',
       '5000 cajas de 300x380x420',
@@ -101,8 +111,10 @@ const ESCENARIOS: Escenario[] = [
     id: 'web-pregunta-condiciones',
     canal: 'web',
     intencion:
-      'Preguntas de condiciones sin cotizar. Envío gratis es solo mayorista desde 3.000 m²; ' +
-      'el horario es 8 a 17. No debe afirmar nada de memoria.',
+      'Preguntas de condiciones sin cotizar. Envío gratis desde 3.000 m² y hasta 60 km; el ' +
+      'horario es 8 a 17. No debe afirmar nada de memoria. En "y si compro poquito?" tiene que ' +
+      'decir que el mínimo son 500 m² de cartón y que es excluyente: no se negocian cantidades ' +
+      'por debajo, y no corresponde invitar a escribir para ver si se puede.',
     turnos: [
       'hacen envios gratis?',
       'y si compro poquito?',
@@ -117,7 +129,11 @@ const ESCENARIOS: Escenario[] = [
       'Llega con el handoff [COTIZADO-WEB] desde el sitio. No debe recotizar ni volver a ' +
       'pedir medidas: tiene que confirmar y avanzar al pedido.',
     turnos: [
-      '[COTIZADO-WEB] Hola! Ya tengo una cotizacion del sitio y quiero avanzar.\n\nPedido: 2.600 de 300x380x420 mm\nTotal cotizado: $2.639.520 + IVA (2.932,8 m²)\nProduccion a medida, 7 dias habiles.\n\n¿Me confirman disponibilidad y como seguimos?',
+      // Copiado tal cual de lo que arma hoy el motor. Antes decia
+      // "Total cotizado: $2.639.520 + IVA": ese era el precio de la escalera
+      // vieja y ademas etiquetaba mal el IVA, asi que el juez estaba midiendo
+      // al agente contra un numero que el sitio ya no da.
+      '[COTIZADO-WEB] Hola! Ya tengo una cotizacion del sitio y quiero avanzar.\n\nPedido: 2.600 de 300x380x420 mm\nSubtotal: $2.932.800 sin IVA (2.932,8 m²)\nTotal con IVA 21%: $3.548.688\nProduccion a medida, 7 dias habiles.\n\n¿Me confirman disponibilidad y como seguimos?',
       'soy Marcela, de Distribuidora Sur',
       'necesito factura A, somos responsable inscripto',
     ],
@@ -126,8 +142,11 @@ const ESCENARIOS: Escenario[] = [
     id: 'web-deja-datos',
     canal: 'web',
     intencion:
-      'Cotiza y deja los datos. El lead tiene que quedar guardado con la cotización, y el ' +
-      'precio tiene que estar en la respuesta igual, no reemplazado por "ya guardé tus datos".',
+      'Deja los datos. OJO: 400x300x250 no está en el catálogo y 1.000 cajas son 797,5 m², ' +
+      'debajo de los 1.000 m² de producción a medida, así que NO hay precio que dar. Debe ' +
+      'explicarlo y pasar las medidas de catálogo más parecidas con su cantidad y su precio ' +
+      '—400x300x300 desde 575 cajas es casi la misma caja—, no derivar a un humano. El lead ' +
+      'tiene que quedar guardado igual.',
     turnos: [
       'hola, 1000 cajas de 400x300x250',
       'me lo pueden mandar por mail? soy Juan Perez, juan@ferreteriasur.com.ar',

@@ -104,8 +104,21 @@ nada cambia.
 **2. Dale de alta el webhook en Meta.**
 developers.facebook.com → tu app → WhatsApp → Configuración → Webhooks → Editar:
 
-- **URL de devolución de llamada:** `https://quilmescorrugados.com.ar/api/whatsapp/webhook`
+- **URL de devolución de llamada:** `https://www.quilmescorrugados.com.ar/api/whatsapp/webhook`
 - **Token de verificación:** `2RswYnE4tbUhUXoN0KR8ofB63M2aY-vu`
+
+**Con `www`, no sin.** El dominio sin `www` contesta un redirect 308 hacia
+`www`, y la verificación de Meta no lo sigue: cargando la URL sin `www` el alta
+falla y el mensaje de error no dice que el problema es ese. Está comprobado
+contra producción:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}
+" "https://www.quilmescorrugados.com.ar/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=xxx&hub.challenge=123"
+```
+
+Con `www` y un token equivocado devuelve **403**, que es lo correcto: el
+endpoint está y rechaza el token que no es. Sin `www` devuelve **308**.
 
 Meta hace un GET a esa URL y espera que le devuelvan un desafío. Eso **contesta
 aunque el proveedor activo siga siendo Twilio**, justamente para que puedas dar

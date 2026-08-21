@@ -37,6 +37,7 @@ import { sendNotification } from '@/lib/notifications';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { SITE_URL } from '@/lib/site';
 import { transporte, responderAltaDeWebhook } from '@/lib/whatsapp-transporte';
+import { reclamarMensaje, marcarMensajeCompletado } from '@/lib/whatsapp-idempotencia';
 import { getActivePricingConfig } from '@/lib/utils/pricing';
 import { classifyIntent, isGroqEnabled } from '@/lib/groq';
 import type { PricingConfig } from '@/lib/types/database';
@@ -276,6 +277,35 @@ export async function POST(request: NextRequest) {
     telefonoParaAvisarDelError = phoneNumber;
     const bodyLower = body.toLowerCase();
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Un reintento del proveedor NO vuelve a correr todo esto.
+    //
+    // Meta reintenta si no le contestamos 200 a tiempo, y mas abajo hay una
+    // llamada a un modelo que tarda segundos. Sin esta marca, el reintento
+    // guardaba el mensaje de nuevo, creaba el lead de nuevo, avanzaba la
+    // maquina de estados de nuevo —lo que puede saltear un paso— y le
+    // contestaba al cliente dos veces.
+    //
+    // Va ANTES de cualquier efecto: guardar el entrante ya es uno.
+    // ─────────────────────────────────────────────────────────────────────
+    const reclamo = await reclamarMensaje(entrante.id, transporte.nombre, phoneNumber);
+    if (reclamo === 'duplicado') {
+      console.log('[WhatsApp] mensaje repetido (%s), ya se esta atendiendo:', entrante.id, phoneNumber);
+      return transporte.respuestaDeRecibido();
+    }
+
+    /**
+     * Contestarle al proveedor, dejando el mensaje como terminado.
+     *
+     * Se completa aca y no en un `finally` a proposito: si el proceso se muere
+     * de golpe el `finally` tampoco corre, y ese es justo el caso donde
+     * queremos que la marca quede sin completar para que el reintento sirva.
+     */
+    const recibido = async () => {
+      await marcarMensajeCompletado(entrante.id);
+      return transporte.respuestaDeRecibido();
+    };
+
     // Omnicanalidad: upsert contact_profile y matching con client
     const state = await getConversationState(phoneNumber);
     let clientId: string | null = null;
@@ -308,7 +338,7 @@ export async function POST(request: NextRequest) {
     // ─────────────────────────────────────────────────────────────────────
     if (await asistentePausado(phoneNumber)) {
       console.log('[WhatsApp] conversacion atendida por una persona, el asistente no responde:', phoneNumber);
-      return transporte.respuestaDeRecibido();
+      return await recibido();
     }
 
     let responseMessage: string | BoxTemplateResponse = '';
@@ -347,7 +377,7 @@ export async function POST(request: NextRequest) {
           // chequeo evita empezar; este evita terminar.
           if (await asistentePausado(phoneNumber)) {
             console.log('[WhatsApp] una persona tomo la conversacion mientras el agente pensaba, no se envia:', phoneNumber);
-            return transporte.respuestaDeRecibido();
+            return await recibido();
           }
 
           await enviarRespuestaDelAgente(from, phoneNumber, r.texto, clientId);
@@ -368,7 +398,7 @@ export async function POST(request: NextRequest) {
               },
             }).catch((e) => console.error('[WhatsApp] no se pudo avisar de la derivacion:', e));
           }
-          return transporte.respuestaDeRecibido();
+          return await recibido();
         }
         console.error('[WhatsApp] el agente devolvio vacio, pasando al respaldo');
       } catch (error) {
@@ -896,7 +926,7 @@ Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
     // una persona tomo la conversacion, no se envia nada.
     if (await asistentePausado(phoneNumber)) {
       console.log('[WhatsApp] una persona tomo la conversacion, el respaldo no envia:', phoneNumber);
-      return transporte.respuestaDeRecibido();
+      return await recibido();
     }
 
     if (boxTemplateDims) {
@@ -915,7 +945,7 @@ Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
     // Guardar mensaje saliente con client_id
     await saveCommunication(phoneNumber, 'outbound', textToSend, outboundMetadata, clientId);
 
-    return transporte.respuestaDeRecibido();
+    return await recibido();
 
   } catch (error) {
     console.error('[WhatsApp] Webhook error:', error);

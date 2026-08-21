@@ -113,8 +113,7 @@ falla y el mensaje de error no dice que el problema es ese. Está comprobado
 contra producción:
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}
-" "https://www.quilmescorrugados.com.ar/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=xxx&hub.challenge=123"
+curl -s -o /dev/null -w "%{http_code}" "https://www.quilmescorrugados.com.ar/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=xxx&hub.challenge=123"
 ```
 
 Con `www` y un token equivocado devuelve **403**, que es lo correcto: el

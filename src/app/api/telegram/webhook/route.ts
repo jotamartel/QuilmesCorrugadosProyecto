@@ -43,8 +43,45 @@ interface TelegramUpdate {
   };
 }
 
+/**
+ * Telegram manda esta cabecera con el valor que se le pasa como `secret_token`
+ * al registrar el webhook. Es el mecanismo que ofrece la API para saber que la
+ * llamada viene de ellos.
+ */
+const CABECERA_SECRETO = 'x-telegram-bot-api-secret-token';
+
 export async function POST(request: NextRequest) {
   try {
+    // ─────────────────────────────────────────────────────────────────────
+    // Que la llamada venga de Telegram.
+    //
+    // No se comprobaba nada, y la lista blanca de src/proxy.ts decia "webhook:
+    // valida secret token", que era falso. Sin esto, cualquiera con la URL puede
+    // mandar un `update` armado a mano: el bot le contesta a cualquier chat que
+    // le pongan, y de paso dispara las llamadas al modelo de handleTextMessage,
+    // que se facturan.
+    //
+    // Sin el secreto configurado NO bloquea, igual que en Meta, Resend y
+    // MercadoPago: un despliegue al que se le olvido una variable no deberia
+    // dejar sordo al bot. Pero queda dicho en el log.
+    //
+    // Para activarlo hay que registrar el webhook pasando secret_token:
+    //   https://api.telegram.org/bot<TOKEN>/setWebhook
+    //     ?url=<URL>&secret_token=<TELEGRAM_WEBHOOK_SECRET>
+    // ─────────────────────────────────────────────────────────────────────
+    const secreto = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (!secreto) {
+      console.error(
+        '[Telegram Webhook] TELEGRAM_WEBHOOK_SECRET no configurada: se estan ' +
+          'aceptando updates sin comprobar que vengan de Telegram',
+      );
+    } else if (request.headers.get(CABECERA_SECRETO) !== secreto) {
+      console.error('[Telegram Webhook] secret token invalido, se rechaza');
+      // 401 y no 200: acá sí conviene que Telegram lo note, porque si el que
+      // llama es Telegram de verdad significa que el secreto quedó mal.
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
     const update: TelegramUpdate = await request.json();
 
     // Handle callback queries (button taps)
@@ -232,8 +269,8 @@ async function handleTextMessage(message: {
     const conv = activeConversations.get(chatId);
 
     // Also try to extract quoteId from the replied-to message text
-    let quoteId = conv?.quoteId;
-    let lastMessage = conv?.lastMessage;
+    const quoteId = conv?.quoteId;
+    const lastMessage = conv?.lastMessage;
 
     if (!quoteId) {
       // Try to find quote ID from callback buttons in the original message

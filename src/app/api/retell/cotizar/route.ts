@@ -31,9 +31,15 @@ import {
   type BoxInput,
 } from '@/lib/cotizacion/motor';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { respuestaSiNoCorresponde } from '@/lib/retell-acceso';
 
 export async function POST(request: NextRequest) {
   try {
+    // La compuerta abre todo /api/retell/ para el agente de voz, asi que el
+    // control de quien llama tiene que estar aca. Ver src/lib/retell-acceso.ts.
+    const noCorresponde = respuestaSiNoCorresponde(request, '/api/retell/cotizar');
+    if (noCorresponde) return noCorresponde;
+
     const body = await request.json();
 
     // Retell manda los parametros dentro de `args`. Si alguien pega el body

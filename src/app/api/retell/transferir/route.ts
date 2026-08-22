@@ -7,11 +7,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { TransferirParams, TransferirResponse, TransferStatus } from '@/types/retell';
 import { RETELL_CONSTANTS } from '@/types/retell';
+import { respuestaSiNoCorresponde } from '@/lib/retell-acceso';
 
 const { TIMEZONE, HORARIO_LABORAL } = RETELL_CONSTANTS;
 
 export async function POST(request: NextRequest) {
   try {
+    // La compuerta abre todo /api/retell/ para el agente de voz, asi que el
+    // control de quien llama tiene que estar aca. Ver src/lib/retell-acceso.ts.
+    const noCorresponde = respuestaSiNoCorresponde(request, '/api/retell/transferir');
+    if (noCorresponde) return noCorresponde;
+
     const body = await request.json();
 
     // Extraer parámetros - Retell los envía en args

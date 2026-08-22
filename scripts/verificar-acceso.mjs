@@ -33,6 +33,30 @@ const ABIERTAS = [
   ['POST', '/api/marketing/evento', 'json roto: se espera 400, no 401'],
 ];
 
+/**
+ * Rutas que la compuerta abre a proposito PERO que comprueban por su cuenta.
+ *
+ * No entran en ABIERTAS —no tienen que contestar 200 a cualquiera— ni en
+ * CERRADAS —no contestan 401 de la compuerta—. Van aparte porque el resultado
+ * esperado depende de si el secreto esta configurado en ese entorno, y lo unico
+ * que se puede afirmar siempre es que NO son un 200 a cualquiera con el secreto
+ * puesto.
+ *
+ * Existen porque la lista blanca de src/proxy.ts decia "agente de voz, con su
+ * propia API key" y eso era cierto para UNA de las cuatro rutas de retell. Las
+ * otras tres contestaban 200 sin nada, y una escribe leads.
+ */
+const ABIERTAS_PERO_SE_CUIDAN_SOLAS = [
+  ['POST', '/api/retell/cotizar', 'cabecera compartida'],
+  ['POST', '/api/retell/registrar-lead', 'cabecera compartida — escribe leads'],
+  ['POST', '/api/retell/transferir', 'cabecera compartida'],
+  ['POST', '/api/retell/webhook', 'firma del SDK de Retell'],
+  ['POST', '/api/email/inbound', 'firma de Svix'],
+  ['POST', '/api/whatsapp/webhook', 'firma del proveedor'],
+  ['POST', '/api/webhooks/mercadopago', 'firma HMAC'],
+  ['POST', '/api/telegram/webhook', 'secret token'],
+];
+
 /** Rutas internas. Tienen que devolver 401 o 403 sin sesión. */
 const CERRADAS = [
   ['GET', '/api/retail-sales', 'datos personales de compradores'],
@@ -47,6 +71,7 @@ const CERRADAS = [
   ['GET', '/api/costs/supplies'],
   ['GET', '/api/public-quotes', 'cotizaciones web con datos de contacto'],
   ['GET', '/api/communications'],
+  ['GET', '/api/conocimiento', 'lo que el asistente le va a decir a los clientes'],
   ['GET', '/api/traffic/stats'],
   ['GET', '/api/vehicles'],
   ['GET', '/api/boxes'],
@@ -109,6 +134,30 @@ for (const [metodo, ruta, nota] of ABIERTAS) {
   const mal = status === 401 || status === 403 || status === 0;
   if (mal) fallos.push(`${metodo} ${ruta} devolvio ${error || status}: se cerro algo que el sitio necesita`);
   console.log(`  ${mal ? 'MAL ' : 'ok  '} ${pad(`${metodo} ${ruta}`, 62)} ${error || status}${nota ? `  (${nota})` : ''}`);
+}
+
+// ESTA SECCION INFORMA, NO DICTAMINA. A PROPOSITO.
+//
+// Estas rutas las abre la compuerta y cada una comprueba por su cuenta. Desde
+// afuera NO se puede saber si comprueban: todas degradan igual cuando les falta
+// el secreto —dejan pasar y lo registran en el log— porque un despliegue al que
+// se le olvido una variable no deberia dejar mudo un canal de atencion. O sea
+// que un 200 aca puede significar "no comprueba nada" o "todavia no le cargaron
+// el secreto", y no hay forma de distinguirlo con una request desde afuera.
+//
+// Se probo con un chequeo automatico de "200 = mal" y daba tres falsos
+// positivos de ocho: el de WhatsApp porque el proveedor activo es Twilio, que
+// esta en modo observacion a proposito, y el de MercadoPago porque con el cuerpo
+// roto corta antes de llegar a la firma.
+//
+// Lo que si prueba cada una es su propia QA:
+//   scripts/qa-acceso-retell.mts        las tres funciones del agente de voz
+//   scripts/qa-firma-email.mts          la firma de Svix de Resend
+//   scripts/qa-transporte-whatsapp.mts  la firma de Meta
+console.log('\nABIERTAS EN LA COMPUERTA, SE CUIDAN SOLAS — informativo\n');
+for (const [metodo, ruta, nota] of ABIERTAS_PERO_SE_CUIDAN_SOLAS) {
+  const { status, error } = await pedir(metodo, ruta);
+  console.log(`  ·    ${pad(`${metodo} ${ruta}`, 62)} ${error || status}${nota ? `  (${nota})` : ''}`);
 }
 
 console.log('\nINTERNO — tiene que pedir sesion\n');

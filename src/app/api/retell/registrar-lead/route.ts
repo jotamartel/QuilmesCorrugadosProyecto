@@ -8,9 +8,15 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import type { RegistrarLeadParams, RegistrarLeadResponse } from '@/types/retell';
 import { precioUnitarioARS } from '@/lib/cotizacion/motor';
 import { CONTACTO } from '@/lib/contacto';
+import { respuestaSiNoCorresponde } from '@/lib/retell-acceso';
 
 export async function POST(request: NextRequest) {
   try {
+    // La compuerta abre todo /api/retell/ para el agente de voz, asi que el
+    // control de quien llama tiene que estar aca. Ver src/lib/retell-acceso.ts.
+    const noCorresponde = respuestaSiNoCorresponde(request, '/api/retell/registrar-lead');
+    if (noCorresponde) return noCorresponde;
+
     const body = await request.json();
 
     // Extraer parámetros - Retell los envía en args

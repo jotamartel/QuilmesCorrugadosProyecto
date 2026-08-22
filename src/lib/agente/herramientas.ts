@@ -11,6 +11,8 @@ import {
 } from '@/lib/cotizacion/motor';
 import { RETAIL_CONFIG, MINIMOS, ENVIO, HORARIO, MATERIAL } from '@/lib/retail/config';
 import { MEDIDA_MINIMA, MEDIDA_MAXIMA } from '@/lib/utils/box-calculations';
+import { buscarConocimiento, anotarPreguntaSinRespuesta } from '@/lib/conocimiento';
+import { sendNotification } from '@/lib/notifications';
 import { CONTACTO } from '@/lib/contacto';
 import { upsertContactProfile } from '@/lib/contact-matching';
 import { SITE_URL } from '@/lib/site';
@@ -694,12 +696,135 @@ export function crearHerramientas(ctx: ContextoAgente) {
   },
 });
 
+  /**
+   * Lo que el asistente no sabe: primero se fija si el equipo ya lo respondio,
+   * y si no, lo anota y avisa.
+   *
+   * ES UNA SOLA HERRAMIENTA Y NO DOS A PROPOSITO. Si buscar y anotar fueran
+   * separadas, el modelo podria decidir que no sabe y anotarlo sin haber
+   * buscado, y le estariamos pidiendo al equipo que responda algo que ya
+   * respondio. Aca no hay forma de saltearse la busqueda: es el primer paso de
+   * la misma llamada.
+   */
+  const noSeLaRespuesta = betaTool({
+    name: 'no_se_la_respuesta',
+    description:
+      'Usala cuando te preguntan algo que no podes contestar con las otras ' +
+      'herramientas: formas de pago, si entregan un sabado, si hacen un tipo de ' +
+      'caja que no cotizamos, cualquier cosa que no este en condiciones ni en el ' +
+      'catalogo. Primero busca si el equipo ya respondio algo parecido, y si no, ' +
+      'anota la consulta y avisa para que una persona siga la conversacion. NO la ' +
+      'uses para lo que si podes averiguar: cotizar, el catalogo, las condiciones ' +
+      'o los limites de fabricacion.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pregunta: {
+          type: 'string',
+          description:
+            'Lo que preguntaron, TEXTUAL. Sin sinonimos, sin reformular, sin ' +
+            'corregirle la ortografia. Es lo que va a leer la persona del equipo ' +
+            'que responda, y necesita ver con que palabras se lo preguntaron.',
+        },
+        busqueda: {
+          type: 'string',
+          description:
+            'La misma pregunta MAS sinonimos y otras formas de decirla, para ' +
+            'buscar. La busqueda es por palabras y no por significado: "formas de ' +
+            'pago" no encuentra una respuesta que habla de "transferencia y ' +
+            'efectivo", pero "formas de pago tarjeta transferencia efectivo credito ' +
+            'debito" si. Agregar sinonimos no te cuesta nada y es lo unico que hace ' +
+            'que encuentre.',
+        },
+        contexto: {
+          type: 'string',
+          description:
+            'En que estaba la conversacion: si ya cotizo, que medida y cantidad, ' +
+            'que necesita. Lo lee la persona del equipo que va a responder, para ' +
+            'no tener que reconstruirlo.',
+        },
+        ya_revise_las_parecidas: {
+          type: 'boolean',
+          description:
+            'Dejalo en false la primera vez. Si esta herramienta ya te devolvio ' +
+            'respuestas parecidas y ninguna contestaba lo que preguntaron, volve a ' +
+            'llamarla con esto en true: ahi se anota la consulta y se avisa al equipo.',
+        },
+      },
+      required: ['pregunta', 'busqueda', 'contexto', 'ya_revise_las_parecidas'],
+      additionalProperties: false,
+    },
+    run: async ({ pregunta, busqueda, contexto, ya_revise_las_parecidas }) => {
+      // Se busca con los sinonimos y se GUARDA lo textual. Antes era un solo
+      // campo y el equipo terminaba leyendo "cajas con ventana de acetato
+      // transparente, ventana plastica, film" en vez de lo que el cliente habia
+      // escrito, que es lo unico que le sirve para entender que le preguntaron.
+      //
+      // Solo se busca la primera vez: un modelo que ya leyo las candidatas y
+      // decidio que ninguna sirve las recibiria de nuevo, y la consulta no se
+      // anotaria nunca.
+      const candidatas = ya_revise_las_parecidas
+        ? []
+        : await buscarConocimiento(busqueda || pregunta, 3);
+
+      if (candidatas.length > 0) {
+        return JSON.stringify({
+          hay_respuestas_parecidas: true,
+          respuestas: candidatas.map((c) => ({
+            la_pregunta_que_respondimos: c.pregunta,
+            respuesta: c.respuesta,
+          })),
+          instruccion:
+            'Estas son respuestas que YA dio el equipo a preguntas parecidas. La busqueda ' +
+            'es por palabras, no por significado, asi que puede traer algo que no viene al ' +
+            'caso: leelas y usa una SOLO si responde exactamente lo que te preguntaron. Si ' +
+            'ninguna responde, volve a llamar a esta herramienta con el mismo texto y ' +
+            '"ya_revise_las_parecidas" en true, y ahi se anota la consulta.',
+        });
+      }
+
+      const { esNueva, vecesPreguntada } = await anotarPreguntaSinRespuesta({
+        pregunta,
+        contexto,
+        canal: ctx.canal,
+        telefono: ctx.telefono || null,
+      });
+
+      // Se avisa solo la primera vez. La misma consulta repetida suma a la
+      // cuenta de la lista, que es lo que el equipo mira, pero no manda un mail
+      // por cada persona que la hace.
+      if (esNueva) {
+        await sendNotification({
+          type: 'consulta_sin_respuesta',
+          origin: ctx.canal === 'whatsapp' ? 'WhatsApp' : 'Chat del sitio',
+          pregunta,
+          contexto,
+          contact: { phone: ctx.telefono || undefined },
+        }).catch((e) => console.error('[Agente] no se pudo avisar de la consulta:', e));
+      }
+
+      return JSON.stringify({
+        hay_respuestas_parecidas: false,
+        anotada: true,
+        veces_preguntada: vecesPreguntada,
+        instruccion:
+          'No tenemos la respuesta. Decile que no lo sabes con certeza y que le vas a pedir ' +
+          'a alguien del equipo que le conteste por acá mismo, que ya quedo avisado. NO ' +
+          'inventes una respuesta ni digas "creo que si". NO lo mandes a escribir a otro ' +
+          'lado: la persona sigue esta conversacion. Y SEGUI ATENDIENDOLO normalmente para ' +
+          'todo lo demas —si necesita una cotizacion, cotizale— que esto no lo deja ' +
+          'esperando para el resto.',
+      });
+    },
+  });
+
   return [
     cotizarCajas,
     medidasDeCatalogo,
     condicionesYPrecios,
     plantillaDeImpresion,
     guardarLead,
+    noSeLaRespuesta,
     derivarAHumano,
   ];
 }

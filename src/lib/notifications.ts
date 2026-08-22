@@ -50,7 +50,32 @@ interface AdvisorRequestNotification {
   };
 }
 
-export type NotificationData = LeadNotification | HighValueNotification | VolumeAlertNotification | AdvisorRequestNotification;
+/**
+ * El asistente se topó con algo que no sabe contestar.
+ *
+ * Distinta de AdvisorRequestNotification: aquella es "el cliente pidió hablar
+ * con alguien", ésta es "el cliente preguntó algo que no tenemos respondido".
+ * La segunda además deja la pregunta anotada para que, una vez respondida, el
+ * asistente la sepa la próxima vez.
+ */
+interface ConsultaSinRespuestaNotification {
+  type: 'consulta_sin_respuesta';
+  origin: string;
+  pregunta: string;
+  contexto?: string;
+  contact: {
+    phone?: string;
+    email?: string;
+    name?: string;
+  };
+}
+
+export type NotificationData =
+  | LeadNotification
+  | HighValueNotification
+  | VolumeAlertNotification
+  | AdvisorRequestNotification
+  | ConsultaSinRespuestaNotification;
 
 /**
  * Envía una notificación por email al equipo de ventas
@@ -85,6 +110,11 @@ export async function sendNotification(data: NotificationData): Promise<boolean>
       case 'advisor_request':
         subject = `URGENTE: Cliente solicita hablar con asesor (${data.origin})`;
         html = buildAdvisorRequestEmail(data);
+        break;
+
+      case 'consulta_sin_respuesta':
+        subject = `Consulta sin responder: ${data.pregunta.slice(0, 60)}`;
+        html = buildConsultaSinRespuestaEmail(data);
         break;
     }
 
@@ -211,6 +241,49 @@ function buildVolumeAlertEmail(data: VolumeAlertNotification): string {
       <p style="color: #6b7280; font-size: 14px; margin-top: 16px;">
         Esta IP podria ser una empresa evaluando integrarse.
         Considera contactarlos para ofrecerles una API key y soporte.
+      </p>
+    </div>
+  `;
+}
+
+/**
+ * El mail de una consulta que el asistente no supo contestar.
+ *
+ * Lleva dos llamados a la accion distintos y conviene no mezclarlos: contestarle
+ * a la persona que está esperando, y escribir la respuesta general para que el
+ * asistente la sepa la próxima vez. Se puede hacer una sin la otra.
+ */
+function buildConsultaSinRespuestaEmail(data: ConsultaSinRespuestaNotification): string {
+  const { origin, pregunta, contexto, contact } = data;
+  const sitio = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.quilmescorrugados.com.ar';
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #b45309;">Alguien pregunto algo que el asistente no sabe</h2>
+
+      <div style="background: #fffbeb; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #b45309;">
+        <p style="margin: 0; color: #6b7280; font-size: 13px;">La pregunta, textual</p>
+        <p style="font-size: 17px; font-weight: bold; margin: 6px 0 0 0;">${pregunta}</p>
+        <p style="margin: 10px 0 0 0; color: #6b7280; font-size: 13px;">Origen: ${origin}</p>
+      </div>
+
+      ${contexto ? `<div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+        <h3 style="margin-top: 0; font-size: 14px;">En que estaba la conversacion</h3>
+        <p style="margin: 0;">${contexto}</p>
+      </div>` : ''}
+
+      ${contact.phone ? `<p><strong>Telefono:</strong> <a href="https://wa.me/${contact.phone.replace(/\D/g, '')}">${contact.phone}</a></p>` : ''}
+      ${contact.email ? `<p><strong>Email:</strong> <a href="mailto:${contact.email}">${contact.email}</a></p>` : ''}
+
+      <div style="background: #eff6ff; padding: 16px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 0 0 8px 0;"><strong>1.</strong> Contestale a la persona, que esta esperando:
+          <a href="${sitio}/whatsapp">abrir la conversacion</a></p>
+        <p style="margin: 0;"><strong>2.</strong> Si la respuesta sirve para futuras consultas, escribila en
+          <a href="${sitio}/conocimiento">preguntas sin responder</a> y el asistente la va a saber la proxima vez.</p>
+      </div>
+
+      <p style="color: #6b7280; font-size: 12px;">
+        El asistente le avisó que alguien del equipo le va a contestar, y sigue atendiendo el resto de la consulta.
       </p>
     </div>
   `;

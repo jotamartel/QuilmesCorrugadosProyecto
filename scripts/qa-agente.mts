@@ -12,6 +12,24 @@
 import * as dotenv from 'dotenv';
 import { writeFileSync, existsSync } from 'node:fs';
 
+/**
+ * Las huellas con las que la QA se limpia sola.
+ *
+ * Son deliberadamente imposibles: 11 0000-0000 no es un numero asignable y
+ * .test esta reservado por RFC 2606 para exactamente esto, asi que ninguna
+ * persona de verdad puede tenerlos.
+ *
+ * POR QUE IMPORTA QUE SEAN IMPOSIBLES: esta QA le deja leads al equipo en
+ * public_quotes, y una limpieza que filtre por nombre —"Marcela", "Juan
+ * Perez"— puede borrar el lead de una persona real que se llame igual. Ya se
+ * hizo asi una vez y salio bien de casualidad. Filtrando por estos dos valores
+ * no hay casualidad que valga.
+ */
+const HUELLAS_DE_PRUEBA = {
+  telefono: '5491100000000',
+  email: 'juan@ferreteriasur.test',
+};
+
 // La del harness de Claude Code se cuela y no es la del proyecto.
 delete process.env.ANTHROPIC_MODEL;
 for (const f of ['.env.qa.tmp', '.env.vercel.tmp', '.env.local']) {
@@ -112,7 +130,11 @@ const ESCENARIOS: Escenario[] = [
     canal: 'web',
     intencion:
       'Preguntas de condiciones sin cotizar. Envío gratis desde 3.000 m² y hasta 60 km; el ' +
-      'horario es 8 a 17. No debe afirmar nada de memoria. En "y si compro poquito?" tiene que ' +
+      // 7 a 16, confirmado por el dueño el 19/08/2026. Acá decía 8 a 17, que es
+      // lo que decía el sitio antes de unificarlo, y por eso una evaluación
+      // anterior marcó como error una respuesta que estaba bien.
+      'horario es 7 a 16, el que devuelve la herramienta. No debe afirmar nada de memoria. ' +
+      'En "y si compro poquito?" tiene que ' +
       'decir que el mínimo son 500 m² de cartón y que es excluyente: no se negocian cantidades ' +
       'por debajo, y no corresponde invitar a escribir para ver si se puede.',
     turnos: [
@@ -149,7 +171,7 @@ const ESCENARIOS: Escenario[] = [
       'tiene que quedar guardado igual.',
     turnos: [
       'hola, 1000 cajas de 400x300x250',
-      'me lo pueden mandar por mail? soy Juan Perez, juan@ferreteriasur.com.ar',
+      'me lo pueden mandar por mail? soy Juan Perez, juan@ferreteriasur.test',
       'perfecto, que me llamen mañana a la mañana',
     ],
   },
@@ -187,11 +209,54 @@ const ESCENARIOS: Escenario[] = [
   },
 ];
 
+/**
+ * Borra los leads y perfiles que crearon las conversaciones de prueba.
+ *
+ * Corre siempre al terminar. Sin esto, los pedidos de mentira quedan en la
+ * lista de pendientes del equipo y alguien los llama: quedaron cuarenta y tres
+ * dando vueltas tres dias hasta que se noto.
+ */
+async function limpiarLoQueDejo() {
+  try {
+    const { createAdminClient } = await import('../src/lib/supabase/admin.ts');
+    const db = createAdminClient();
+    let total = 0;
+    for (const [tabla, columnas] of [
+      ['public_quotes', ['requester_phone', 'requester_email']],
+      ['contact_profiles', ['phone_number', 'email']],
+    ] as const) {
+      for (const [columna, valor] of [
+        [columnas[0], HUELLAS_DE_PRUEBA.telefono],
+        [columnas[1], HUELLAS_DE_PRUEBA.email],
+      ] as const) {
+        const { data, error } = await db.from(tabla).delete().eq(columna, valor).select('id');
+        if (error) console.error(`  no se pudo limpiar ${tabla}.${columna}: ${error.message}`);
+        else total += data?.length ?? 0;
+      }
+    }
+    console.log(total ? `  limpieza: ${total} fila(s) de prueba borradas` : '  limpieza: nada que borrar');
+  } catch (e) {
+    console.error('  OJO: no se pudo limpiar, revisa public_quotes a mano:', (e as Error).message);
+  }
+}
+
 async function main() {
-  const soloId = process.argv.includes('--solo')
-    ? process.argv[process.argv.indexOf('--solo') + 1]
+  // --solo acepta varios ids separados por coma. Correr las 12 para verificar
+  // un arreglo que toca tres cuesta el triple y tarda el triple.
+  const soloIds = process.argv.includes('--solo')
+    ? (process.argv[process.argv.indexOf('--solo') + 1] || '').split(',').map((x) => x.trim()).filter(Boolean)
     : null;
-  const aCorrer = soloId ? ESCENARIOS.filter((e) => e.id === soloId) : ESCENARIOS;
+  const aCorrer = soloIds ? ESCENARIOS.filter((e) => soloIds.includes(e.id)) : ESCENARIOS;
+
+  if (soloIds) {
+    const noExisten = soloIds.filter((id) => !ESCENARIOS.some((e) => e.id === id));
+    if (noExisten.length) {
+      console.error(`No existe ningun escenario con id: ${noExisten.join(', ')}`);
+      process.exit(1);
+    }
+    // El archivo de salida va aparte para no pisar la corrida completa.
+    console.log(`Corriendo ${aCorrer.length} de ${ESCENARIOS.length} escenarios.`);
+  }
 
   const { responder } = await import('../src/lib/agente/index.ts');
 
@@ -229,8 +294,13 @@ async function main() {
     resultados.push(...hechas);
   }
 
-  writeFileSync('qa-transcriptos.json', JSON.stringify(resultados, null, 2), 'utf8');
-  console.log(`\n${resultados.length} conversaciones en qa-transcriptos.json`);
+  // Una corrida parcial NO pisa la completa: si no, verificar un arreglo sobre
+  // un escenario deja el archivo con un solo escenario y se pierde el resto.
+  await limpiarLoQueDejo();
+
+  const salida = soloIds ? 'qa-transcriptos-parcial.json' : 'qa-transcriptos.json';
+  writeFileSync(salida, JSON.stringify(resultados, null, 2), 'utf8');
+  console.log(`\n${resultados.length} conversaciones en ${salida}`);
 }
 
 main();

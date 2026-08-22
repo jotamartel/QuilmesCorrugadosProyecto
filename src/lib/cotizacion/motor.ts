@@ -190,12 +190,30 @@ export function mensajeDeImpedimento(imp: Impedimento): string {
  */
 export function instruccionDeImpedimento(imp: Impedimento): string {
   if (imp.tipo === 'no_fabricable') {
+    // El orden de estas frases no es cosmetico: se probo con la escape hatch
+    // ("si no le sirve, preguntale que va adentro") al final y el modelo se
+    // quedaba con eso, contestaba "contame que vas a guardar" y no pasaba
+    // ninguna de las tres alternativas que tenia en la mano. Lo obligatorio va
+    // primero y lo condicional despues, marcado como condicional.
+    const conAlternativas = imp.alternativas.length > 0;
     return (
-      'Esta medida NO se puede fabricar y NO hay cantidad que lo cambie. Explica el ' +
-      'motivo tal como viene y pasale las medidas de catalogo mas parecidas, que vienen ' +
-      'en alternativas con su cantidad y su precio. NO le pidas mas cajas, NO le hables ' +
-      'del minimo de compra y NO le ofrezcas recotizar la misma medida. Si no hay ' +
-      'alternativas o ninguna le sirve, preguntale que va adentro para ayudarlo a elegir.'
+      'Esta medida NO se puede fabricar y NO hay cantidad que lo cambie. ' +
+      (conAlternativas
+        ? 'El mensaje va en ESTE orden y lleva las dos partes. ' +
+          '(1) ARRANCA diciendo por que no se puede, con el motivo tal como viene: es lo ' +
+          'primero que la persona necesita entender, y sin eso las alternativas aparecen sin ' +
+          'explicacion. ' +
+          '(2) DESPUES lista LAS TRES medidas de alternativas_de_catalogo, cada una con su ' +
+          'medida, su cantidad y su precio. ' +
+          'Las dos partes, siempre, en ese orden. Ya paso de las dos formas: primero se ' +
+          'explicaba el motivo y se preguntaba que iba adentro sin pasar ninguna alternativa, ' +
+          'y despues se pasaban las tres alternativas sin decir por que no se podia la que ' +
+          'habia pedido. Recien al final, si queres, preguntale que va adentro para ayudarlo a ' +
+          'elegir entre esas tres. '
+        : 'Explica el motivo tal como viene y preguntale que va adentro para ayudarlo a ' +
+          'elegir una medida que si se pueda fabricar. ') +
+      'NO le pidas mas cajas, NO le hables del minimo de compra y NO le ofrezcas recotizar ' +
+      'la misma medida.'
     );
   }
   return (

@@ -7,8 +7,10 @@ import {
   urlPlantilla,
   notaImpresion,
   instruccionDeImpedimento,
+  mensajeDeImpedimento,
 } from '@/lib/cotizacion/motor';
 import { RETAIL_CONFIG, MINIMOS, ENVIO, HORARIO, MATERIAL } from '@/lib/retail/config';
+import { MEDIDA_MINIMA, MEDIDA_MAXIMA } from '@/lib/utils/box-calculations';
 import { CONTACTO } from '@/lib/contacto';
 import { upsertContactProfile } from '@/lib/contact-matching';
 import { SITE_URL } from '@/lib/site';
@@ -105,17 +107,22 @@ export function crearHerramientas(ctx: ContextoAgente) {
     if (cantidad < 1) {
       problemas.push('La cantidad tiene que ser al menos una caja.');
     }
-    if (ancho_mm + alto_mm > RETAIL_CONFIG.MAX_SHEET_WIDTH) {
-      problemas.push(
-        `No se puede fabricar: ancho + alto es ${ancho_mm + alto_mm} mm y el ancho ` +
-          `máximo de plancha es ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el límite del rollo.`,
-      );
-    }
-    if (largo_mm < RETAIL_CONFIG.MIN_LARGO || ancho_mm < RETAIL_CONFIG.MIN_ANCHO || alto_mm < RETAIL_CONFIG.MIN_ALTO) {
-      problemas.push(
-        `La medida mínima por caja es ${RETAIL_CONFIG.MIN_LARGO}x${RETAIL_CONFIG.MIN_ANCHO}x${RETAIL_CONFIG.MIN_ALTO} mm.`,
-      );
-    }
+    // LOS LIMITES DE FABRICACION NO SE CHEQUEAN ACA, A PROPOSITO.
+    //
+    // Estaban: ancho+alto y la medida minima. Y cortaban antes de llamar al
+    // motor, asi que para una caja que no entra en el rollo esta tool devolvia
+    // {se_puede_cotizar:false, motivos:[...]} y nada mas. Sin alternativas de
+    // catalogo, sin el texto ya redactado, sin nada que ofrecerle a la persona.
+    //
+    // Costo darse cuenta: se ajusto tres veces la instruccion del impedimento
+    // —que el modelo listara las alternativas, que arrancara por el motivo— y no
+    // cambiaba nada, porque este caso nunca llegaba a esa rama. Es el mismo
+    // atajo que tenia validarCajas() y que ya se saco por lo mismo.
+    //
+    // Ahora decide calcularCotizacion(), que para la misma caja devuelve el
+    // motivo, las tres medidas de catalogo mas parecidas ya cotizadas y el
+    // "no" completo redactado. Aca quedan solo los chequeos que el motor no
+    // hace, que son los de la entrada.
     if (colores_impresion > RETAIL_CONFIG.MAX_PRINTING_COLORS) {
       problemas.push(
         `Imprimimos hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores y pediste ${colores_impresion}.`,
@@ -165,6 +172,16 @@ export function crearHerramientas(ctx: ContextoAgente) {
         // esto le sigue diciendo de que clase de "no" se trata.
         motivo_tipo: imp.tipo,
         motivo: imp.motivo,
+        // El "no" ya redactado, con el motivo primero y las alternativas
+        // despues. Es el mismo texto que usan la web y el respaldo de WhatsApp.
+        //
+        // Va porque una instruccion pidiendo ese orden no alcanzo: se probo
+        // pidiendolo de dos formas distintas y el modelo, con un motivo por un
+        // lado y un array de alternativas por el otro, componia desde el array
+        // y arrancaba en "las mas cercanas son", sin decir nunca por que la
+        // medida que habia pedido no se podia hacer. Dandole el texto armado
+        // deja de tener que armarlo.
+        texto_para_el_cliente: mensajeDeImpedimento(imp),
         // Los numeros del minimo SOLO cuando el minimo es el problema. Para una
         // caja que no entra en el rollo, mandar "minimo_de_compra_m2: 500" y
         // "cajas_necesarias: null" es darle al modelo justo los ingredientes
@@ -175,6 +192,16 @@ export function crearHerramientas(ctx: ContextoAgente) {
           : {
               minimo_de_compra_m2: RETAIL_CONFIG.MIN_M2_PEDIDO,
               cajas_necesarias_de_esta_medida: imp.cajas_necesarias,
+              // Cuantas le FALTAN, calculado, para que no haya que restarlo.
+              //
+              // Con solo el total el agente escribio "faltarian unas 1.334
+              // cajas" sobre un pedido de 1.200, cuando faltaban 134. Quien lee
+              // eso pide 2.534. El campo con el nombre correcto al lado del otro
+              // es mas barato que una instruccion pidiendo que reste bien.
+              cajas_que_faltan:
+                imp.cajas_necesarias !== null
+                  ? Math.max(0, imp.cajas_necesarias - cantidad)
+                  : null,
               m2_faltantes: imp.m2_faltantes,
             }),
         // Las medidas de catalogo mas parecidas, YA COTIZADAS al minimo. No
@@ -196,6 +223,9 @@ export function crearHerramientas(ctx: ContextoAgente) {
         })),
         instruccion:
           'NO des ningun precio para la medida que pidió: no lo tenés y no existe. ' +
+          'ARRANCA tu respuesta con texto_para_el_cliente, que ya explica por que no se puede ' +
+          'y con que reemplazarlo; podes reformularlo pero NO te saltees la explicacion para ' +
+          'ir directo a las alternativas. ' +
           // El resto sale del motor, que es el que sabe de que clase de "no" se
           // trata. Antes esta instruccion decia "decí el mínimo y cuántas cajas
           // hacen falta" para los tres impedimentos, incluida la caja que no se
@@ -316,6 +346,21 @@ export function crearHerramientas(ctx: ContextoAgente) {
       return JSON.stringify({
         medidas,
         nota: `Estas medidas también se pueden imprimir, desde ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA.toLocaleString('es-AR')} m². Por debajo salen de stock, y lo que sale de stock va sin imprimir.`,
+        // La caja mas grande del catalogo no es la caja mas grande que se
+        // fabrica, y "cual es la mas grande que pueden hacer" se contesta con
+        // esta herramienta. Sin este dato el agente contesto que no habia una
+        // medida maxima puntual —la hay— y que la de catalogo era
+        // "aproximadamente la cota maxima", que tampoco.
+        tambien_a_medida: {
+          medida_maxima_mm: `${MEDIDA_MAXIMA.largo}x${MEDIDA_MAXIMA.ancho}x${MEDIDA_MAXIMA.alto}`,
+          ancho_mas_alto_max_mm: RETAIL_CONFIG.MAX_SHEET_WIDTH,
+          desde_m2: RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA,
+          nota:
+            'Fuera del catálogo se fabrica cualquier medida que cumpla LOS DOS límites a la ' +
+            'vez y llegue al volumen de producción a medida. Si preguntan cuál es la caja más ' +
+            'grande que se puede hacer, la respuesta son estos dos números, no la más grande ' +
+            'del catálogo.',
+        },
         instruccion:
           'Ofrecé las que se parezcan a lo que pidió, con su medida, su cantidad mínima y su ' +
           'precio. Si no pidió ninguna medida en particular, mostrá tres o cuatro repartidas ' +
@@ -362,9 +407,17 @@ export function crearHerramientas(ctx: ContextoAgente) {
           }
         : null,
       limites_de_fabricacion: {
-        medida_minima_mm: `${RETAIL_CONFIG.MIN_LARGO}x${RETAIL_CONFIG.MIN_ANCHO}x${RETAIL_CONFIG.MIN_ALTO}`,
+        medida_minima_mm: `${MEDIDA_MINIMA.largo}x${MEDIDA_MINIMA.ancho}x${MEDIDA_MINIMA.alto}`,
+        // Faltaba, y por eso ante "cual es la caja mas grande que pueden hacer"
+        // el agente contesto que no existe una medida maxima puntual. Existe, y
+        // el cliente que pregunta eso esta por decidir si nos sirve o no.
+        medida_maxima_mm: `${MEDIDA_MAXIMA.largo}x${MEDIDA_MAXIMA.ancho}x${MEDIDA_MAXIMA.alto}`,
         ancho_mas_alto_max_mm: RETAIL_CONFIG.MAX_SHEET_WIDTH,
-        motivo: 'Es el ancho del rollo de cartón.',
+        motivo:
+          `El ancho de plancha sale de sumar ancho y alto y no puede pasar de ` +
+          `${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho del rollo de cartón. El largo no ` +
+          `entra en esa cuenta, pero igual tiene el tope de la medida máxima. Los dos límites ` +
+          `valen a la vez: una caja tiene que cumplir los dos.`,
       },
       envio: ENVIO.largo,
       plazos: c
@@ -507,10 +560,48 @@ export function crearHerramientas(ctx: ContextoAgente) {
       const sePuedeContactar = !!telefono || !!args.email;
       if (sePuedeContactar && (hayCotizacion || !telefono)) {
         try {
+          // ─────────────────────────────────────────────────────────────
+          // Una consulta, un lead. No uno por vez que llamen a esta tool.
+          //
+          // La descripcion de la herramienta dice "llamala una sola vez", y el
+          // agente la llamo dos veces igual: primero cuando la persona dijo su
+          // nombre y despues cuando agrego la condicion frente al IVA. Las dos
+          // llamadas eran razonables —la segunda traia un dato nuevo— y aun asi
+          // el vendedor termina con dos filas identicas de la misma persona en
+          // la lista de pendientes, y llama dos veces o llama uno y el otro
+          // queda muerto.
+          //
+          // Se resuelve con datos y no con una instruccion: si ya hay una
+          // consulta pendiente de esta misma persona y es reciente, se actualiza
+          // en vez de crear otra. La ventana es de seis horas, que es mas que
+          // una conversacion y menos que dos consultas de verdad: alguien que
+          // vuelve a la semana es un lead nuevo y tiene que aparecer como tal.
+          // ─────────────────────────────────────────────────────────────
+          const VENTANA_MS = 6 * 60 * 60 * 1000;
+          const desde = new Date(Date.now() - VENTANA_MS).toISOString();
+          const db = createAdminClient();
+
+          let existente: string | null = null;
+          if (telefono || args.email) {
+            const q = db
+              .from('public_quotes')
+              .select('id')
+              .eq('status', 'pending')
+              .gte('created_at', desde)
+              .order('created_at', { ascending: false })
+              .limit(1);
+            // Por telefono si lo hay, y si no por mail. No por los dos a la vez:
+            // un `or` con un mail vacio matchea filas ajenas.
+            const { data } = telefono
+              ? await q.eq('requester_phone', telefono)
+              : await q.eq('requester_email', args.email!);
+            existente = data && data.length > 0 ? (data[0].id as string) : null;
+          }
+
           // Service role: no hay sesion de usuario en un endpoint publico, y con
           // el cliente SSR las policies de RLS rechazan el insert en silencio.
           // Ya paso con los leads de WhatsApp, que se perdieron todos.
-          const { error } = await createAdminClient().from('public_quotes').insert({
+          const fila = {
             requester_name:
               args.nombre || args.empresa ||
               (telefono ? 'WhatsApp ' + telefono.slice(-4) : 'Consulta del chat'),
@@ -534,9 +625,24 @@ export function crearHerramientas(ctx: ContextoAgente) {
             notes: 'Tomado por el asistente automatico',
             requested_contact: true,
             status: 'pending',
-          });
+          };
+
+          // Al actualizar NO se pisan campos con null: la segunda llamada suele
+          // traer un dato nuevo y ninguno de los viejos, y sobreescribir con
+          // null le borraria al vendedor las medidas que ya tenia.
+          const soloLoQueVino = Object.fromEntries(
+            Object.entries(fila).filter(([, v]) => v !== null && v !== undefined),
+          );
+
+          const { error } = existente
+            ? await db.from('public_quotes').update(soloLoQueVino).eq('id', existente)
+            : await db.from('public_quotes').insert(fila);
+
           if (error) console.error('[Agente] No se pudo guardar la consulta:', error);
-          else guardadoAlgo = true;
+          else {
+            guardadoAlgo = true;
+            if (existente) console.log('[Agente] consulta ya existente, se actualizo:', existente);
+          }
         } catch (e) {
           console.error('[Agente] No se pudo guardar la consulta:', e);
         }

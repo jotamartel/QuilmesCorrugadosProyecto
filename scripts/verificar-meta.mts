@@ -28,6 +28,12 @@ for (const f of ['.env.qa.tmp', '.env.vercel.tmp', '.env.local']) {
 }
 
 const { VERSION_DE_GRAPH: VERSION, VENCE_LA_VERSION } = await import('@/lib/whatsapp-transporte/meta');
+// La plantilla que espera el codigo, leida del modulo y no reescrita aca.
+// Tenia su propia copia del idioma por defecto —'es'— y cuando el modulo paso
+// a es_AR este script siguio comparando contra el viejo y reportaba que no
+// coincidian cuando coincidian perfecto. El mismo dato en dos lugares, en el
+// script escrito para detectar justamente eso.
+const { RETOMAR_CONVERSACION } = await import('@/lib/whatsapp-plantillas');
 const TOKEN = process.env.META_WA_TOKEN;
 const PHONE_ID = process.env.META_WA_PHONE_NUMBER_ID;
 const APP_SECRET = process.env.META_WA_APP_SECRET;
@@ -220,19 +226,20 @@ console.log('LAS PLANTILLAS');
       mal('no hay ninguna plantilla cargada',
           'Sin plantilla no se puede reabrir una conversación pasadas las 24 horas. Cargá "retomar_conversacion" como dice docs/WHATSAPP_API_META.md.');
     } else {
-      const nuestra = lista.find((t) => t.name === 'retomar_conversacion');
+      const nuestra = lista.find((t) => t.name === RETOMAR_CONVERSACION.nombre);
       if (!nuestra) {
-        mal(`hay ${lista.length} plantilla(s) pero ninguna se llama "retomar_conversacion"`,
-            `El nombre tiene que coincidir exacto con el de src/lib/whatsapp-plantillas.ts. Hay: ${lista.map((t) => t.name).join(', ')}`);
+        mal(`hay ${lista.length} plantilla(s) pero ninguna se llama "${RETOMAR_CONVERSACION.nombre}"`,
+            `Tiene que llamarse "${RETOMAR_CONVERSACION.nombre}", como dice src/lib/whatsapp-plantillas.ts. Hay: ${lista.map((t) => t.name).join(', ')}`);
       } else if (nuestra.status !== 'APPROVED') {
         mal(`"retomar_conversacion" está en ${nuestra.status}`,
             'Hasta que Meta la apruebe no se puede usar. Suele tardar minutos.');
       } else {
-        bien(`"retomar_conversacion" aprobada, idioma ${nuestra.language}`);
-        const idioma = process.env.META_WA_IDIOMA_PLANTILLAS || 'es';
-        if (nuestra.language !== idioma) {
-          mal(`el idioma no coincide: en Meta es "${nuestra.language}" y el código usa "${idioma}"`,
-              `Poné META_WA_IDIOMA_PLANTILLAS=${nuestra.language} en Vercel.`);
+        bien(`"${nuestra.name}" aprobada, idioma ${nuestra.language}`);
+        if (nuestra.language !== RETOMAR_CONVERSACION.idioma) {
+          mal(`el idioma no coincide: en Meta es "${nuestra.language}" y el código usa "${RETOMAR_CONVERSACION.idioma}"`,
+              `Poné META_WA_IDIOMA_PLANTILLAS=${nuestra.language} en Vercel, o cambiá el default en src/lib/whatsapp-plantillas.ts.`);
+        } else {
+          bien(`el idioma coincide con el que espera el código`);
         }
       }
     }

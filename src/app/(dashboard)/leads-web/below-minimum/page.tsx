@@ -9,6 +9,7 @@ import { AlertCircle, MessageCircle, Phone, Mail, Package } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { formatDate } from '@/lib/utils/dates';
 import type { PublicQuote } from '@/lib/types/database';
+import { CONTACTO } from '@/lib/contacto';
 
 interface PublicQuoteWithFormatted extends PublicQuote {
   quote_number_formatted: string;
@@ -19,7 +20,7 @@ interface QuotesResponse {
   total: number;
 }
 
-const WHATSAPP_NUMBER = '5491133411781';
+const WHATSAPP_NUMBER = CONTACTO.telefonoE164;
 
 export default function BelowMinimumLeadsPage() {
   const [data, setData] = useState<QuotesResponse | null>(null);

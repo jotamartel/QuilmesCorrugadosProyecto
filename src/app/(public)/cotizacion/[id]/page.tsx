@@ -10,6 +10,7 @@ import { LandingFooter } from '@/components/public/LandingFooter';
 import { BelowMinimumModal } from '@/components/public/BelowMinimumModal';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { precioUnitarioARS } from '@/lib/cotizacion/motor';
+import { CONTACTO } from '@/lib/contacto';
 
 // Importar BoxPreview3D dinámicamente
 const BoxPreview3D = dynamic(
@@ -50,7 +51,7 @@ interface PublicQuoteData {
   created_at: string;
 }
 
-const WHATSAPP_NUMBER = '5491133411781';
+const WHATSAPP_NUMBER = CONTACTO.telefonoE164;
 
 export default function QuoteConfirmationPage() {
   const params = useParams();

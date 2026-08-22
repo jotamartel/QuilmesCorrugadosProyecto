@@ -4,8 +4,9 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageCircle, Send, X, Download, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { trackEvent } from '@/lib/utils/tracking';
+import { CONTACTO } from '@/lib/contacto';
 
-const WHATSAPP_NUMBER = '5491133411781';
+const WHATSAPP_NUMBER = CONTACTO.telefonoE164;
 
 /** Parámetros de atribución para campaña SEM (UTM + página) */
 function getAttributionParams(): Record<string, string> {

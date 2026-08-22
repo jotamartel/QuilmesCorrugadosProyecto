@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { trackEvent } from '@/lib/utils/tracking';
+import { CONTACTO } from '@/lib/contacto';
 
-const WHATSAPP = '5491133411781';
+const WHATSAPP = CONTACTO.telefonoE164;
 
 /**
  * Barra de accion fija al pie, solo en movil.

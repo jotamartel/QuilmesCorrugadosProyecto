@@ -231,7 +231,7 @@ export default async function CotizarPage({ params }: Props) {
             ancho + alto no puede superar {RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho
             de la bobina de cartón. Si necesitás algo fuera de eso, escribinos por{' '}
             <a
-              href="https://wa.me/5491133411781"
+              href={CONTACTO.whatsapp}
               className="text-[#002E55] underline underline-offset-2"
             >
               WhatsApp

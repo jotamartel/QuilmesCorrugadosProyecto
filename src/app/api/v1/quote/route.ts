@@ -702,7 +702,7 @@ export async function GET(request: NextRequest) {
         // WhatsApp, que esta abajo.
         comprar_online: quote.can_buy_online ? `${BASE_URL}/cajas` : null,
         cotizador_web: `${BASE_URL}/#cotizador`,
-        whatsapp: 'https://wa.me/5491133411781',
+        whatsapp: CONTACTO.whatsapp,
       },
       rate_limit: {
         remaining: rateLimitCheck.remaining,

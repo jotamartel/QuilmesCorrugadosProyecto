@@ -11,7 +11,7 @@ import { BreadcrumbSchema } from '@/components/public/SchemaMarkup';
 import { Phone, Mail, MapPin, Clock, MessageCircle, ArrowRight } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
 
-const WHATSAPP_NUMBER = '5491133411781';
+const WHATSAPP_NUMBER = CONTACTO.telefonoE164;
 
 export default function ContactoPage() {
   const whatsappMessage = 'Hola, me interesa cotizar cajas de cartón corrugado.';
@@ -65,7 +65,7 @@ export default function ContactoPage() {
                   <div>
                     <h3 className="font-semibold text-gray-900">Teléfono</h3>
                     <a 
-                      href="tel:+5491133411781" 
+                      href={CONTACTO.tel} 
                       onClick={() => trackEvent('phone_click')}
                       className="text-gray-600 hover:text-[#002E55]"
                     >

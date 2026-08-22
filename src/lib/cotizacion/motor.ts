@@ -1030,7 +1030,7 @@ export function calcularCotizacion(
   const base = {
     summary,
     contact: {
-      whatsapp_url: `https://wa.me/5491133411781?text=${encodeURIComponent(whatsappMessage)}`,
+      whatsapp_url: CONTACTO.whatsappCon(whatsappMessage),
       whatsapp_message: whatsappMessage,
       email: 'ventas@quilmescorrugados.com.ar',
       email_subject: cotizable

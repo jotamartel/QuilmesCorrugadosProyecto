@@ -179,6 +179,24 @@ Lo único que eso NO puede probar es si el cuerpo que manda Meta de verdad
 coincide con el que documenta, y con qué forma llega el teléfono. Eso se ve con
 el primer mensaje real.
 
+**Si el registro del número falla con "Se produjo un error"**, esa es toda la
+explicación que da la consola. El mismo llamado contra la API dice el motivo:
+
+```bash
+npx tsx scripts/registrar-numero-meta.mts 123456
+```
+
+(con el PIN de 6 dígitos que elegiste, no un código que mande Meta). Es lo único
+del toolkit que modifica algo en Meta; el resto solo lee.
+
+Lo que apareció la primera vez y no era evidente: la cuenta estaba bloqueada por
+**el método de pago**, con el error 141006, y eso no se ve en ningún lado de la
+interfaz. Se comprueba con:
+
+```bash
+npx tsx scripts/verificar-meta.mts
+```
+
 **3. Cargá el número.**
 Administrador de WhatsApp → Agregar número de teléfono. Tiene que ser una línea
 que **no** tenga WhatsApp activo hoy: si el número que se quiere usar ya está en

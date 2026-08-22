@@ -120,6 +120,33 @@ cotiza('2600x 300x380x420', 300, 380, 420, 2600);
 cotiza('500x 600x400x400 (catálogo)', 600, 400, 400, 500);
 
 console.log('');
+console.log('El motivo de "no se compra online" dice la razón que es');
+{
+  // 400x300x300 ES del catálogo. Pedir más unidades de las que hay en depósito
+  // no la saca del catálogo: le decíamos al cliente "esta medida no está entre
+  // las estándar", que además contradice lo que la herramienta de catálogo le
+  // contesta dos mensajes después.
+  const enCatalogoSinStock = cotizar(400, 300, 300, 800);
+  if (!enCatalogoSinStock.cotizable) {
+    fallos++;
+    console.log('  FALLA 400x300x300 x800 debería cotizarse');
+  } else {
+    const nota = enCatalogoSinStock.channel_note;
+    if (/no está entre las estándar/.test(nota)) {
+      fallos++;
+      console.log('  FALLA dice que una medida de catálogo no es de catálogo:');
+      console.log(`        ${nota}`);
+    } else if (/no tenemos esa cantidad|se fabrica para tu pedido/.test(nota)) {
+      console.log('  ok   medida de catálogo sin stock: dice que falta stock, no que no exista');
+    } else {
+      fallos++;
+      console.log('  FALLA motivo inesperado:');
+      console.log(`        ${nota}`);
+    }
+  }
+}
+
+console.log('');
 console.log('Y sigue ofreciendo alternativas de catálogo en vez de derivar');
 {
   const r = cotizar(900, 800, 700, 500);

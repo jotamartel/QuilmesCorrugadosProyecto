@@ -334,7 +334,19 @@ interface QuoteBase {
     cajas_aproximadas: number | null;
     nuevo_precio_por_m2: number;
     nuevo_subtotal: number;
-    ahorro: number;
+    /**
+     * Los dos, y con el IVA en el nombre.
+     *
+     * Habia uno solo, `ahorro`, calculado sobre el subtotal. El asistente lo
+     * leia y escribia "pagas $232.368 menos" en el mismo mensaje donde el total
+     * que mostraba era CON IVA: quien restara los dos numeros se equivocaba por
+     * unos cincuenta mil pesos. Es la misma mezcla que ya hizo viajar un error
+     * de medio millon hasta una orden de compra, mas chica pero igual de
+     * evitable.
+     */
+    ahorro_sin_iva: number;
+    ahorro_con_iva: number;
+    nuevo_total_con_iva: number;
     que_gana: string;
   } | null;
   shipping: {
@@ -906,9 +918,26 @@ export function calcularCotizacion(
   // coordinamos por WhatsApp", que es justo la invitacion a negociar la
   // cantidad que el minimo excluyente existe para evitar. Ahora esa rama no
   // existe: si no llega al piso, no hay cotizacion.
-  const motivoNoOnline = !volumenDeStock || !hayCatalogo
+  // Estar en el catalogo y tener stock suficiente son DOS cosas.
+  //
+  // `todasEnStock` exige las dos juntas, y este mensaje daba por sentado que la
+  // que fallaba era la primera. Resultado: a alguien que pidio 800 cajas de
+  // 400x300x300 —que es una medida del catalogo, de las mas pedidas— se le
+  // contestaba "esta medida no esta entre las estandar que tenemos en stock".
+  // Es falso, y ademas contradice lo que la herramienta de catalogo le dice al
+  // mismo cliente dos mensajes despues. Lo que faltaba era stock: hay 100 en
+  // deposito y pidio 800.
+  const todasSonDeCatalogo = hayCatalogo && boxResults.every((b) =>
+    medidasEnStock.some((m) =>
+      m.length_mm === b.length_mm && m.width_mm === b.width_mm && m.height_mm === b.height_mm,
+    ),
+  );
+
+  const motivoNoOnline = !volumenDeStock || !hayCatalogo || sePuedeComprarOnline
     ? null
-    : `Esta medida no está entre las estándar que tenemos en stock, así que se fabrica a pedido. Escribinos y lo vemos.`;
+    : !todasSonDeCatalogo
+      ? `Esta medida no está entre las estándar que tenemos en stock, así que se fabrica a pedido. Escribinos y lo vemos.`
+      : `Es una medida estándar, pero no tenemos esa cantidad en depósito, así que se fabrica para tu pedido. Escribinos y lo coordinamos.`;
 
   const ars = (n: number) => '$' + Math.round(n).toLocaleString('es-AR');
   const b0 = boxResults[0];
@@ -1041,18 +1070,25 @@ export function calcularCotizacion(
 
         if (subtotalNuevo >= totalSubtotal) continue; // No le conviene: no se ofrece.
 
-        const ahorro = Math.round(totalSubtotal - subtotalNuevo);
+        const ahorroSinIva = Math.round(totalSubtotal - subtotalNuevo);
+        const nuevoTotalConIva = Math.round(subtotalNuevo * (1 + IVA));
+        const ahorroConIva = Math.round(totalSubtotal * (1 + IVA)) - nuevoTotalConIva;
         const gana =
           `Con ${cajasExtra} cajas más llega a ${umbral.toLocaleString('es-AR')} m² y el precio ` +
           `del pedido entero pasa de $${boxResults[0].price_per_m2} a $${precioNuevo} por m². ` +
-          `Se lleva ${cajasExtra} cajas más y paga $${ahorro.toLocaleString('es-AR')} menos.`;
+          `Se lleva ${cajasExtra} cajas más y el total con IVA baja a ` +
+          `$${nuevoTotalConIva.toLocaleString('es-AR')}: paga ` +
+          `$${ahorroConIva.toLocaleString('es-AR')} menos con IVA ` +
+          `($${ahorroSinIva.toLocaleString('es-AR')} sobre el subtotal).`;
 
         return {
           m2_faltantes: Math.round(faltan * 10) / 10,
           cajas_aproximadas: cajasExtra,
           nuevo_precio_por_m2: precioNuevo,
           nuevo_subtotal: subtotalNuevo,
-          ahorro,
+          ahorro_sin_iva: ahorroSinIva,
+          ahorro_con_iva: ahorroConIva,
+          nuevo_total_con_iva: nuevoTotalConIva,
           que_gana:
             umbral === config.free_shipping_min_m2
               ? `${gana} Y ademas entra en el envio gratis dentro de ${config.free_shipping_max_km} km.`

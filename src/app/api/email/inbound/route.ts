@@ -12,6 +12,7 @@ import { getPricePerM2, getProductionDays, getActivePricingConfig } from '@/lib/
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { PricingConfig } from '@/lib/types/database';
 import { calcularCotizacion, type Impedimento } from '@/lib/cotizacion/motor';
+import { leerCabecerasDeFirma, verificarFirmaResend } from '@/lib/email-firma';
 
 // Cliente Resend para enviar respuestas
 const resend = process.env.RESEND_API_KEY
@@ -92,10 +93,71 @@ async function calculateQuote(
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // El cuerpo se lee crudo UNA sola vez: la firma se calcula sobre los bytes
+    // exactos que llegaron. Parsear antes y volver a serializar cambia espacios
+    // y orden de claves, y la firma deja de cerrar. Mismo orden que el webhook
+    // de WhatsApp.
+    const cuerpoCrudo = await request.text();
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Verificar que la llamada la hizo Resend.
+    //
+    // Este endpoint es publico y escribe en `communications` con la service
+    // role, que saltea RLS. Sin esta comprobacion, cualquiera que descubra la
+    // URL mete mensajes en el historial de un cliente a nombre de esa persona,
+    // y de paso hace que la cuenta mande —y pague— la respuesta automatica a
+    // la direccion que se le antoje.
+    //
+    // Antes esto no se veia porque RLS se tragaba el insert en silencio. Al
+    // pasar a createAdminClient(), el mismo POST falso empezo a escribir.
+    // ─────────────────────────────────────────────────────────────────────
+    const veredicto = verificarFirmaResend(
+      process.env.RESEND_WEBHOOK_SECRET,
+      leerCabecerasDeFirma(request.headers),
+      cuerpoCrudo,
+    );
+
+    if (veredicto.estado === 'sin-con-que-comprobar') {
+      // Falta RESEND_WEBHOOK_SECRET. Se sigue atendiendo para no dejar de
+      // recibir mails por una variable que alguien olvido cargar, pero queda
+      // registrado: es una configuracion incompleta, no una decision.
+      //
+      // Mismo criterio que la firma de Meta — ver `rechazaFirmaInvalida` en
+      // src/lib/whatsapp-transporte/tipos.ts.
+      console.error(
+        '[Email Inbound][firma] no hay con que verificar el origen: falta ' +
+          'RESEND_WEBHOOK_SECRET. El webhook esta aceptando mails sin comprobar ' +
+          'quien los manda. Cargar la variable en Vercel (Resend -> Webhooks -> ' +
+          'el endpoint -> Signing Secret).',
+      );
+    } else if (veredicto.estado === 'invalida') {
+      // Con el secreto puesto, esto corta. La firma de Svix es un HMAC sobre el
+      // cuerpo crudo: no depende de reconstruir ninguna URL ni de que proxy haya
+      // en el medio. Si no cierra, o el secreto esta mal o el que llama no es
+      // Resend.
+      //
+      // SI DEJAN DE ENTRAR MAILS Y ESTE ES EL LOG QUE APARECE, mirar el motivo:
+      // 'no-cierra' o 'secreto-ilegible' es el secreto mal copiado;
+      // 'timestamp-fuera-de-ventana' es el reloj corrido. Sacando la variable
+      // se vuelve al modo de arriba mientras se arregla.
+      console.error('[Email Inbound][firma] NO VALIDA (%s) — RECHAZADA', veredicto.motivo);
+      return NextResponse.json({ error: 'Firma invalida' }, { status: 403 });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(cuerpoCrudo);
+    } catch {
+      return NextResponse.json({ error: 'Cuerpo invalido' }, { status: 400 });
+    }
 
     // Resend envia: from, to, subject, text, html
-    const { from, subject, text, html } = body;
+    const { from, subject, text, html } = body as {
+      from?: string;
+      subject?: string;
+      text?: string;
+      html?: string;
+    };
 
     if (!from) {
       return NextResponse.json({ error: 'Missing from field' }, { status: 400 });
@@ -154,6 +216,10 @@ export async function POST(request: NextRequest) {
     // chequeo de sesion. La tabla `communications` tiene RLS prendido y cero
     // policies: con el cliente de sesion el insert se traga en silencio
     // ("success: true" sin fila nueva), por eso escribimos con la service role.
+    //
+    // Lo que autoriza esta escritura es la firma de Svix comprobada arriba. Sin
+    // ella, y con la service role saltando RLS, cualquiera que sepa la URL
+    // escribe en el historial de un cliente.
     const supabase = createAdminClient();
     await supabase.from('communications').insert({
       channel: 'email',
@@ -239,6 +305,10 @@ export async function GET() {
     status: 'active',
     service: 'Email inbound webhook',
     resend_configured: !!resend,
+    // Para confirmar desde afuera que la variable quedo cargada, sin exponerla.
+    // En false, el endpoint acepta cualquier POST: ver el log [Email
+    // Inbound][firma].
+    firma_verificada: !!process.env.RESEND_WEBHOOK_SECRET,
     timestamp: new Date().toISOString(),
   });
 }

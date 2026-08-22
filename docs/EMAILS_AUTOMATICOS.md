@@ -115,6 +115,11 @@ else if (totalSubtotal >= HIGH_VALUE_THRESHOLD) // 500.000 ARS
 
 **Nota:** También envía notificación `lead_with_contact` si detecta datos válidos.
 
+**Origen verificado:** el POST tiene que venir firmado por Resend (Svix:
+`svix-id`, `svix-timestamp`, `svix-signature`). Si `RESEND_WEBHOOK_SECRET` está
+cargada y la firma no cierra, se responde 403 y no se escribe nada. Detalle en
+la sección de variables de entorno, más abajo.
+
 ---
 
 ## 6. 📞 Email de Cotización desde Retell AI
@@ -161,7 +166,53 @@ else if (totalSubtotal >= HIGH_VALUE_THRESHOLD) // 500.000 ARS
 RESEND_API_KEY=re_xxxxxxxxxxxxx
 NOTIFICATION_EMAIL=ventas@quilmescorrugados.com.ar
 FROM_EMAIL=notificaciones@quilmescorrugados.com.ar
+RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxx
 ```
+
+### `RESEND_WEBHOOK_SECRET`
+
+Es con lo que `/api/email/inbound` comprueba que el POST lo hizo Resend.
+
+**De dónde sale:** panel de Resend → **Webhooks** → el endpoint
+`/api/email/inbound` → **Signing Secret**. Empieza con `whsec_`.
+
+**Por qué hace falta:** el endpoint es público y escribe en `communications` con
+la service role, que saltea RLS. Sin la clave, cualquiera que descubra la URL
+inserta mensajes en el historial de un cliente **atribuidos a esa persona**, y
+además dispara la respuesta automática: la cuenta manda —y paga— un mail a la
+dirección que el que llama quiera. Antes esto no se notaba porque RLS se tragaba
+el insert en silencio; cuando el endpoint pasó a `createAdminClient()`, el mismo
+POST falso empezó a escribir de verdad.
+
+**Qué pasa si falta:** el webhook **no se cae**. Sigue recibiendo mails y deja
+este log en cada request:
+
+```
+[Email Inbound][firma] no hay con que verificar el origen: falta RESEND_WEBHOOK_SECRET...
+```
+
+Es a propósito, mismo criterio que la firma de Meta en WhatsApp (ver
+`rechazaFirmaInvalida` en `src/lib/whatsapp-transporte/tipos.ts`): un despliegue
+al que se le olvidó una variable no tiene que dejar de recibir consultas de
+clientes. Pero mientras esté así, **el endpoint acepta cualquier POST**.
+
+**Qué pasa si está y la firma no cierra:** 403, y no se escribe nada.
+
+**Cómo confirmar que quedó cargada**, sin exponer el valor:
+
+```bash
+curl -s https://quilmes-corrugados.vercel.app/api/email/inbound
+```
+
+Tiene que dar `"firma_verificada": true`.
+
+**Si dejan de entrar mails y el log dice `NO VALIDA`**, mirar el motivo:
+`no-cierra` o `secreto-ilegible` es el secreto mal copiado;
+`timestamp-fuera-de-ventana` es un reloj corrido. Sacando la variable se vuelve
+al modo permisivo mientras se arregla.
+
+La comprobación vive en `src/lib/email-firma.ts` y se prueba con
+`npx tsx scripts/qa-firma-email.mts`.
 
 ---
 

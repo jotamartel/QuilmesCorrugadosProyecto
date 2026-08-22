@@ -8,6 +8,7 @@
   - `RESEND_API_KEY`
   - `NOTIFICATION_EMAIL`
   - `FROM_EMAIL`
+  - `RESEND_WEBHOOK_SECRET` (solo para el Test 3; ver la nota ahí)
 - [ ] Servidor en ejecución (`npm run dev`)
 - [ ] Acceso a la bandeja de `NOTIFICATION_EMAIL`
 
@@ -82,6 +83,13 @@ curl -X POST http://localhost:3000/api/v1/quote \
 
 **Objetivo:** Verificar respuesta automática a emails.
 
+> ⚠️ **El curl de abajo va sin firmar.** Desde que el webhook valida el origen,
+> solo pasa si `RESEND_WEBHOOK_SECRET` **no** está cargada en el entorno donde
+> corre — que es el caso normal en local. Con la variable puesta, este mismo
+> curl tiene que dar **403**, y eso es lo correcto: probar la lógica de
+> cotización y probar la validación de firma son dos tests distintos (el segundo
+> es el Test 3b).
+
 **Pasos:**
 1. Simular webhook de Resend:
 ```bash
@@ -94,11 +102,59 @@ curl -X POST http://localhost:3000/api/email/inbound \
   }'
 ```
 
-**Resultado Esperado:**
+**Resultado Esperado (sin `RESEND_WEBHOOK_SECRET`):**
 - ✅ HTTP 200
+- ✅ En los logs: `[Email Inbound][firma] no hay con que verificar el origen...`
 - ✅ Email automático enviado al remitente
 - ✅ Contiene cotización calculada (si detecta dimensiones)
 - ✅ Notificación interna si detecta datos de contacto
+
+---
+
+### Test 3b: Validación de Firma del Webhook
+
+**Objetivo:** Verificar que nadie que no sea Resend puede escribir en
+`communications`.
+
+Importa porque el endpoint escribe con la service role, que saltea RLS: sin esta
+validación, cualquiera que descubra la URL inserta mensajes en el historial de
+un cliente atribuidos a esa persona.
+
+**Pasos:**
+```bash
+npx tsx scripts/qa-firma-email.mts
+```
+
+Cubre, sin tocar la red ni levantar el servidor:
+
+| Caso | Esperado |
+|---|---|
+| Firma buena | acepta |
+| Firma calculada sobre otro cuerpo | rechaza |
+| Sin cabecera y con secreto configurado | rechaza (no "no puedo comprobar") |
+| Sin secreto configurado | "no hay con qué comprobar" → deja pasar |
+| Mensaje viejo reenviado, con firma auténtica | rechaza (replay) |
+| Rotación de clave: dos firmas, cierra una | acepta |
+
+Además contrasta el algoritmo contra un HMAC calculado aparte y contra el
+paquete `svix`, así que si alguien "simplifica" la firma se cae acá y no en
+producción.
+
+**Resultado Esperado:**
+- ✅ `Todo bien.` y exit 0
+
+**Prueba en caliente contra el endpoint** (con la variable cargada):
+```bash
+curl -X POST http://localhost:3000/api/email/inbound \
+  -H "Content-Type: application/json" \
+  -H "svix-id: msg_falso" \
+  -H "svix-timestamp: 1770000000" \
+  -H "svix-signature: v1,firmainventada" \
+  -d '{"from":"atacante@example.com","text":"inyectado"}'
+```
+- ✅ HTTP 403
+- ✅ En los logs: `[Email Inbound][firma] NO VALIDA (...) — RECHAZADA`
+- ✅ **No** aparece ninguna fila nueva en `communications`
 
 ---
 
@@ -171,9 +227,39 @@ npm run dev | grep -i "notification\|email\|resend"
 - `[Email Inbound] Respuesta enviada a: ...`
 - `[Retell RegistrarLead] Email enviado a: ...`
 
+**Logs que hay que mirar:**
+- `[Email Inbound][firma] no hay con que verificar el origen...` — falta
+  `RESEND_WEBHOOK_SECRET`. El endpoint está aceptando cualquier POST.
+- `[Email Inbound][firma] NO VALIDA (...) — RECHAZADA` — se rechazó un POST.
+  Si son mails de clientes reales, ver abajo.
+
 ---
 
 ## ⚠️ Errores Comunes
+
+### Dejaron de entrar mails y el log dice `NO VALIDA`
+
+**Causas posibles, según el motivo del log:**
+1. `no-cierra` / `secreto-ilegible` → `RESEND_WEBHOOK_SECRET` mal copiada. Tiene
+   que ser el **Signing Secret** del endpoint en Resend → Webhooks, entero,
+   arrancando con `whsec_`.
+2. `timestamp-fuera-de-ventana` → reloj corrido más de 5 minutos, de un lado o
+   del otro.
+3. `faltan-cabeceras` → el POST no lo hizo Resend (o hay un proxy comiéndose las
+   cabeceras `svix-*`).
+
+**Solución:**
+```bash
+# Confirmar si la variable está cargada (no expone el valor)
+curl -s https://quilmes-corrugados.vercel.app/api/email/inbound
+
+# Confirmar que la validación en sí está bien
+npx tsx scripts/qa-firma-email.mts
+```
+
+Para destrabar mientras se arregla: sacar `RESEND_WEBHOOK_SECRET` de Vercel y
+redesplegar. Vuelve al modo permisivo —recibe todo y avisa en los logs—, que es
+como estaba antes. Es una salida de emergencia, no un estado para dejar.
 
 ### Email no se envía
 

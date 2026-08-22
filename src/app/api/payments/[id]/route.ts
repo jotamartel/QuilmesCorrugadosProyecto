@@ -1,15 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+/**
+ * `payments` y `checks` tienen RLS prendido y cero policies: con el cliente de
+ * sesión el GET devolvía 404 fantasma y el PATCH/DELETE contestaban ok sin
+ * haber tocado una fila. Chequeamos sesión con `createClient` y operamos con la
+ * service role, que saltea RLS.
+ */
+async function sesion() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
+
 // GET /api/payments/[id] - Obtener pago por ID
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
     const { id } = await params;
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data, error } = await supabase
       .from('payments')
@@ -41,8 +57,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 // PATCH /api/payments/[id] - Actualizar pago
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
+    // Antes no chequeaba sesión. No se notó porque RLS bloqueaba el update
+    // igual: contestaba con el pago actualizado... que nunca se actualizó.
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
     const { id } = await params;
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const body = await request.json();
 
     const { data, error } = await supabase
@@ -76,8 +97,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 // DELETE /api/payments/[id] - Cancelar pago
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
+    // Antes no chequeaba sesión y encima el "borrado" no borraba nada por RLS.
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
     const { id } = await params;
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Soft delete: marcar como cancelado
     const { error } = await supabase

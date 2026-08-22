@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+
+/**
+ * El cliente de sesión no ve estas tablas: contact_profiles, clients,
+ * communications, orders, quotes y public_quotes tienen RLS prendido y CERO
+ * policies, así que devuelven listas vacías sin tirar error. El perfil
+ * unificado quedaba en blanco aunque hubiera datos. Se comprueba la sesión
+ * con el cliente normal y se lee con la service role, igual que en
+ * /api/whatsapp/conversations.
+ */
+async function sesion() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
 
 /**
  * GET /api/contacts/profile?phone=+549...
@@ -7,7 +22,12 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    // Antes no se validaba sesión. No se notaba porque RLS bloqueaba las
+    // lecturas igual, pero dejaba de ser seguro el día que alguien arreglara RLS.
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+    const supabase = createAdminClient();
     const { searchParams } = new URL(request.url);
     const phone = searchParams.get('phone');
 

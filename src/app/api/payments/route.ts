@@ -1,12 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { DATA_START_DATE } from '@/lib/utils/constants';
 import type { CreatePaymentRequest } from '@/lib/types/database';
+
+/**
+ * `payments`, `orders` y `checks` tienen RLS prendido y CERO policies: con el
+ * cliente de sesión devuelven listas vacías y las inserciones silenciosamente
+ * no escriben nada. Comprobamos quién pregunta con `createClient` y después
+ * leemos/escribimos con la service role, que saltea RLS. Mismo patrón que
+ * /api/whatsapp/conversations.
+ */
+async function sesion() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
 
 // GET /api/payments - Listar pagos
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+    const supabase = createAdminClient();
     const { searchParams } = new URL(request.url);
 
     const orderId = searchParams.get('order_id');
@@ -52,7 +69,12 @@ export async function GET(request: NextRequest) {
 // POST /api/payments - Crear pago
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    // Antes no chequeaba sesión. No se notaba porque RLS bloqueaba el insert
+    // igual: contestaba 201 sin haber grabado nada.
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+    const supabase = createAdminClient();
     const body: CreatePaymentRequest = await request.json();
 
     if (!body.order_id || !body.type || !body.amount || !body.method) {

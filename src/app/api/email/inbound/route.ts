@@ -9,7 +9,7 @@ import {
 import { sendNotification } from '@/lib/notifications';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { getPricePerM2, getProductionDays, getActivePricingConfig } from '@/lib/utils/pricing';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { PricingConfig } from '@/lib/types/database';
 import { calcularCotizacion, type Impedimento } from '@/lib/cotizacion/motor';
 
@@ -148,8 +148,13 @@ export async function POST(request: NextRequest) {
       impedimento,
     );
 
-    // Guardar en communications
-    const supabase = await createClient();
+    // Guardar en communications.
+    //
+    // Webhook publico: lo llama Resend, no un usuario logueado, asi que NO va
+    // chequeo de sesion. La tabla `communications` tiene RLS prendido y cero
+    // policies: con el cliente de sesion el insert se traga en silencio
+    // ("success: true" sin fila nueva), por eso escribimos con la service role.
+    const supabase = createAdminClient();
     await supabase.from('communications').insert({
       channel: 'email',
       direction: 'inbound',

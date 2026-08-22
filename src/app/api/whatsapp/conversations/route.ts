@@ -1,5 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+
+/**
+ * Quién pregunta, y con qué se lee.
+ *
+ * SON DOS CLIENTES DISTINTOS Y HACE FALTA QUE LO SEAN.
+ *
+ * El de la sesión (`createClient`) sirve para saber si hay alguien logueado, y
+ * para nada más: `whatsapp_conversations` y `communications` tienen RLS prendido
+ * y CERO policies, así que con ese cliente devuelven cero filas y ningún error.
+ *
+ * Ese silencio es lo peor del asunto. El panel mostraba "No hay conversaciones"
+ * con dos conversaciones en la base, una de ellas de un cliente real del 19 de
+ * agosto, y no había forma de notarlo sin ir a mirar la base a mano. Lo mismo le
+ * pasaba al PATCH: marcaba como atendida y no marcaba nada.
+ *
+ * Los datos se leen con la service role, que saltea RLS, DESPUÉS de comprobar la
+ * sesión. Es el mismo patrón que ya usan /api/whatsapp/reply y /reabrir.
+ */
+async function sesion() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
 
 /**
  * GET /api/whatsapp/conversations
@@ -7,7 +31,10 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+    const supabase = createAdminClient();
     const { searchParams } = new URL(request.url);
 
     // Filtros
@@ -122,7 +149,12 @@ export async function GET(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    // Antes no comprobaba nada. No se notó porque RLS le bloqueaba la escritura
+    // igual: el endpoint contestaba "success: true" sin haber cambiado una fila.
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+    const supabase = createAdminClient();
     const body = await request.json();
     const { phoneNumber, attended, notes } = body;
 

@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+
+/**
+ * `checks` tiene RLS prendido y cero policies: con el cliente de sesión el
+ * SELECT devolvía "cheque no encontrado" aunque existiera, y el UPDATE
+ * contestaba ok sin escribir. Se comprueba quién pide y se opera con la service
+ * role.
+ */
+async function sesion() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -8,8 +21,12 @@ interface RouteParams {
 // POST /api/checks/[id]/cash - Cobrar cheque en efectivo
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    // Antes no chequeaba sesión: no se notaba porque RLS bloqueaba la escritura.
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
     const { id } = await params;
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const body = await request.json();
 
     const { notes } = body;

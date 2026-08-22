@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { isXubioEnabled, isArbaCotEnabled } from '@/lib/config/system';
 import { createBalanceInvoice, createRemito, previewInvoice, previewRemito } from '@/lib/xubio';
 import { generateCot, previewCot } from '@/lib/arba';
@@ -9,11 +10,30 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+/**
+ * `orders` y `order_items` tienen RLS prendido y CERO policies: con el cliente
+ * de sesión devuelven cero filas y ningún error, y las updates se pierden en
+ * silencio (contestábamos "shipped" sin haber cambiado el estado). Por eso se
+ * comprueba quién pregunta con el cliente de sesión y después se lee/escribe
+ * con la service role. Mismo patrón que /api/whatsapp/conversations.
+ *
+ * Antes ninguno de los dos handlers chequeaba sesión: no se notó porque RLS
+ * bloqueaba todo igual. Ahora que leemos como admin, el chequeo es obligatorio.
+ */
+async function sesion() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
+
 // GET /api/orders/[id]/dispatch - Preview de despacho
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
     const { id: orderId } = await params;
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Obtener orden
     const { data: order, error } = await supabase
@@ -114,8 +134,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 // POST /api/orders/[id]/dispatch - Ejecutar despacho
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
     const { id: orderId } = await params;
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const body: DispatchOrderRequest = await request.json();
 
     // Verificar orden

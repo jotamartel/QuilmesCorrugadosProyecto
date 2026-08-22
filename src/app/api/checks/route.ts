@@ -1,11 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { CreateCheckRequest } from '@/lib/types/database';
+
+/**
+ * `checks` tiene RLS prendido y cero policies: con el cliente de sesión el
+ * listado devolvía cero filas sin error y los inserts contestaban ok sin
+ * escribir nada. Se comprueba quién pregunta con la sesión y se lee/escribe con
+ * la service role, que saltea RLS.
+ */
+async function sesion() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
 
 // GET /api/checks - Listar cheques
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+    const supabase = createAdminClient();
     const { searchParams } = new URL(request.url);
 
     const status = searchParams.get('status');
@@ -66,7 +82,13 @@ export async function GET(request: NextRequest) {
 // POST /api/checks - Crear cheque manualmente
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    // Antes no chequeaba sesión y no se notó porque RLS bloqueaba la escritura
+    // igual: quedaba seguro por accidente. Ahora que se escribe con service
+    // role, el chequeo es lo único que queda entre el endpoint y cualquiera.
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+    const supabase = createAdminClient();
     const body: CreateCheckRequest = await request.json();
 
     if (!body.client_id || !body.bank || !body.number || !body.amount || !body.due_date) {

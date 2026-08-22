@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+
+// El cliente de sesión no ve `communications`: la tabla tiene RLS prendido y
+// cero policies, así que devuelve una lista vacía y ningún error. Por eso se
+// comprueba quién pregunta con el cliente de sesión y se lee con la service
+// role, que saltea RLS. Antes este handler ni chequeaba sesión: no se notó
+// porque RLS igual lo dejaba sin ver nada.
+async function sesion() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    if (!(await sesion())) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+    const supabase = createAdminClient();
     const { searchParams } = new URL(request.url);
     const channel = searchParams.get('channel');
     const phone = searchParams.get('phone');

@@ -246,7 +246,7 @@ Administrador de WhatsApp → Herramientas → Plantillas de mensajes → Crear:
 |---|---|
 | Nombre | `retomar_conversacion` |
 | Categoría | **Utilidad** (no Marketing: es más barata, se aprueba sin vueltas y es la que corresponde porque hay una consulta previa) |
-| Idioma | **Español** (`es`) |
+| Idioma | **Español (ARG)** — es `es_AR`, y es como está cargada |
 | Encabezado | *ninguno* |
 | Pie | *ninguno* |
 | Botones | *ninguno* |
@@ -260,9 +260,15 @@ Tenemos la respuesta lista. Respondé este mensaje y seguimos por acá.
 ```
 
 El nombre y el idioma tienen que coincidir **exacto** con lo que dice
-`src/lib/whatsapp-plantillas.ts`. Si allá se carga como `es_AR` y acá dice `es`,
-Meta rechaza el envío con un error que no explica nada. Si hace falta cargarla
-como `es_AR`, se ajusta con la variable `META_WA_IDIOMA_PLANTILLAS`.
+`src/lib/whatsapp-plantillas.ts`, que ya está en `es_AR`. Si Meta rechaza un
+envío con un error que no explica nada, esto es lo primero a mirar; se ajusta con
+`META_WA_IDIOMA_PLANTILLAS` sin tocar código, y el verificador compara los dos y
+avisa si no coinciden.
+
+**Las plantillas son de la cuenta, no de la app.** La que cargues en la cuenta de
+prueba no existe en la cuenta real: cuando registres el número definitivo hay que
+volver a crearla ahí. Es un formulario de dos minutos, pero si no se hace, el
+botón de reabrir conversaciones falla el día que lo necesiten.
 
 Aprobada la plantilla, en el panel de WhatsApp aparece el botón **"Pedirle que
 responda"** en las conversaciones vencidas. El botón **no** aparece si esa

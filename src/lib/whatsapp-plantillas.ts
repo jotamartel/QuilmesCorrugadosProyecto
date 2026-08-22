@@ -26,7 +26,12 @@
  * En el Administrador de WhatsApp de Meta → Herramientas → Plantillas de
  * mensajes → Crear plantilla. El `nombre` de acá tiene que coincidir EXACTO con
  * el de allá, y el `idioma` también: si el texto se carga como "es_AR" y acá
- * dice "es", Meta rechaza el envío con un error que no explica nada.
+ * dice "es", Meta rechaza el envío con un error que no explica nada. Paso: se
+ * cargó como "Spanish (ARG)", que es es_AR, y el default acá decía es.
+ *
+ * OJO CON LA CUENTA: las plantillas pertenecen a una WhatsApp Business Account,
+ * no a la app. La que se cargue en la cuenta de prueba no existe en la cuenta
+ * real: cuando se registre el número definitivo hay que volver a crearla ahí.
  *
  * La categoría importa. UTILITY (Utilidad / Servicio) es la que corresponde
  * —hay una consulta previa del cliente y esto es su seguimiento— y además es
@@ -62,7 +67,11 @@ export interface Plantilla {
  */
 export const RETOMAR_CONVERSACION: Plantilla = {
   nombre: 'retomar_conversacion',
-  idioma: process.env.META_WA_IDIOMA_PLANTILLAS || 'es',
+  // es_AR y no es: asi quedo cargada en Meta, como "Spanish (ARG)". El codigo
+  // de idioma tiene que coincidir EXACTO con el de la plantilla o el envio
+  // falla con un error que no dice cual es el problema. Se deja la variable
+  // por si algun dia se carga distinto, pero el default es lo que hay.
+  idioma: process.env.META_WA_IDIOMA_PLANTILLAS || 'es_AR',
   variables: 0,
   categoria: 'UTILITY',
   cuerpo:

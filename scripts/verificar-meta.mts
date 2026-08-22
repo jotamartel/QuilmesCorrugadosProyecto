@@ -27,7 +27,7 @@ for (const f of ['.env.qa.tmp', '.env.vercel.tmp', '.env.local']) {
   if (existsSync(f)) { dotenv.config({ path: f, override: true }); break; }
 }
 
-const VERSION = 'v21.0';
+const { VERSION_DE_GRAPH: VERSION, VENCE_LA_VERSION } = await import('@/lib/whatsapp-transporte/meta');
 const TOKEN = process.env.META_WA_TOKEN;
 const PHONE_ID = process.env.META_WA_PHONE_NUMBER_ID;
 const APP_SECRET = process.env.META_WA_APP_SECRET;
@@ -69,6 +69,26 @@ for (const [nombre, valor] of [
 ] as const) {
   if (valor) bien(`${nombre} (${String(valor).length} caracteres)`);
   else mal(`${nombre} falta`, 'Cargala en Vercel → Settings → Environment Variables y bajá de nuevo con `npx vercel env pull .env.qa.tmp`.');
+}
+
+console.log('');
+console.log('LA VERSIÓN DE LA API NO ESTÁ POR VENCER');
+{
+  // Cada version de la Graph API tiene fecha de muerte, y cuando llega las
+  // llamadas dejan de funcionar. La anterior fijada acá, v21.0, vencía en enero
+  // de 2027: se descubrió de casualidad mirando un ejemplo de la consola de
+  // Meta. Que lo avise el verificador es mas barato que volver a tener suerte.
+  const faltanDias = Math.round((new Date(VENCE_LA_VERSION).getTime() - Date.now()) / 86_400_000);
+  const meses = Math.round(faltanDias / 30);
+  if (faltanDias < 0) {
+    mal(`${VERSION} venció hace ${-meses} meses`,
+        'Subí VERSION_DE_GRAPH en src/lib/whatsapp-transporte/meta.ts. Las llamadas ya deben estar fallando.');
+  } else if (faltanDias < 365) {
+    mal(`${VERSION} vence en ${meses} meses (${VENCE_LA_VERSION})`,
+        'Conviene subirla ahora y no cuando el canal se caiga. La lista esta en developers.facebook.com/docs/graph-api/changelog/versions');
+  } else {
+    bien(`${VERSION}, vence el ${VENCE_LA_VERSION} (faltan ${meses} meses)`);
+  }
 }
 
 if (!TOKEN || !PHONE_ID) {

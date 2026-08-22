@@ -40,8 +40,28 @@ const PHONE_NUMBER_ID = process.env.META_WA_PHONE_NUMBER_ID;
 const APP_SECRET = process.env.META_WA_APP_SECRET;
 const VERIFY_TOKEN = process.env.META_WA_VERIFY_TOKEN;
 
-/** Versión de la Graph API. Se fija a propósito: que Meta saque una nueva no debe cambiar el comportamiento sin que lo decidamos. */
-const VERSION = 'v21.0';
+/**
+ * Versión de la Graph API.
+ *
+ * Se fija a propósito: que Meta saque una nueva no debería cambiar el
+ * comportamiento sin que lo decidamos. Pero fijarla no es gratis — cada versión
+ * tiene fecha de vencimiento, y cuando llega, las llamadas dejan de funcionar.
+ *
+ * Estaba en v21.0, que vence el 21/01/2027. Se movió a v25.0 antes de salir a
+ * producción: descubrir esto en enero, con el canal de ventas andando, es
+ * bastante peor que cambiarlo ahora.
+ *
+ * v25.0 salió en febrero de 2026 y vence el 29/07/2028. No se eligió v26.0, que
+ * es más nueva, porque salió hace tres semanas: no hay motivo para estrenar la
+ * última en el canal por el que entra la mayoría de las consultas.
+ *
+ * SI ESTÁS LEYENDO ESTO DESPUÉS DE MEDIADOS DE 2028: hay que subirla.
+ * scripts/verificar-meta.mts avisa cuando falta menos de un año.
+ */
+export const VERSION_DE_GRAPH = 'v25.0';
+const VERSION = VERSION_DE_GRAPH;
+/** Cuándo deja de funcionar la versión de arriba. Lo mira el verificador. */
+export const VENCE_LA_VERSION = '2028-07-29';
 
 function urlDeEnvio(): string {
   return `https://graph.facebook.com/${VERSION}/${PHONE_NUMBER_ID}/messages`;

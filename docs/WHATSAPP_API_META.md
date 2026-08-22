@@ -148,6 +148,27 @@ de alta el webhook sin apagar el canal que funciona.
 Después, en **Campos del webhook**, suscribí `messages`. Sin eso el webhook
 queda dado de alta pero no llega ningún mensaje.
 
+**Si el número de prueba no aparece, no te bloquea.**
+Meta viene restringiendo el número de prueba gratuito: en la práctica no lo
+asigna hasta que se completa la verificación de negocio, y el botón no da error,
+simplemente no pasa nada. No hace falta para seguir: el `META_WA_APP_SECRET` y el
+verify token están disponibles desde el minuto cero, alcanzan para dar de alta el
+webhook, y con ellos se puede probar el camino entero:
+
+```bash
+npx tsx scripts/simular-mensaje-meta.mts
+```
+
+Arma un POST con la forma que manda Meta, lo firma con la clave real de la app y
+lo mete por el webhook de verdad. Comprueba que la firma se acepte, que el
+mensaje se guarde, que el asistente conteste con el precio correcto, que un
+reintento no conteste dos veces, y que una firma que no cierra se rechace con 403
+sin dejar rastro. Corre en proceso, sin servidor, y borra lo que deja.
+
+Lo único que eso NO puede probar es si el cuerpo que manda Meta de verdad
+coincide con el que documenta, y con qué forma llega el teléfono. Eso se ve con
+el primer mensaje real.
+
 **3. Cargá el número.**
 Administrador de WhatsApp → Agregar número de teléfono. Tiene que ser una línea
 que **no** tenga WhatsApp activo hoy: si el número que se quiere usar ya está en

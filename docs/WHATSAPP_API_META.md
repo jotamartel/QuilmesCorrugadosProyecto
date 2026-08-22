@@ -150,10 +150,24 @@ tiene que aparecer:
 [whatsapp][firma] valida (meta)
 ```
 
-Si aparece `NO VALIDA`, el `META_WA_APP_SECRET` está mal. Hoy eso **no bloquea**
-—se deja pasar y se registra— justamente para no cortar el canal mientras se
-confirma que la validación funciona con tráfico real. Una vez confirmado, hay
-que cambiarlo por un rechazo.
+Si aparece `NO VALIDA`, el `META_WA_APP_SECRET` está mal, y **con Meta eso
+bloquea**: el mensaje se rechaza con un 403 y el cliente no recibe respuesta.
+
+Es a propósito. La firma de Meta es un HMAC sobre el cuerpo del mensaje: no
+depende de reconstruir ninguna URL ni de qué proxy haya en el medio, así que si
+no cierra, o la clave está mal o quien golpea no es Meta. Sin eso, cualquiera que
+descubra la URL del webhook puede hacer que la cuenta mande —y pague— WhatsApps a
+donde quiera, y que Meta termine marcando el número por spam.
+
+**Si el canal se queda mudo y ese es el log que aparece**, corregí el secreto. Y
+si necesitás destrabarlo en el momento mientras lo buscás, poné
+`WHATSAPP_FIRMA_ESTRICTA=0` en Vercel y redesplegá: vuelve a dejar pasar y
+registrar. Acordate de sacarla después.
+
+Si **falta** `META_WA_APP_SECRET` no bloquea nada: no hay con qué comprobar, así
+que se atiende igual y queda un error en el log. Eso también es a propósito —un
+despliegue al que se le olvidó una variable no debería dejar la fábrica sin
+WhatsApp— pero es una configuración incompleta, no un estado válido.
 
 ---
 
@@ -217,9 +231,10 @@ canal de ventas.
 
 ## Qué queda pendiente después de todo esto
 
-- **Cerrar la validación de firma.** Hoy registra y deja pasar. Cuando los
-  registros confirmen que valida bien con tráfico real, cambiarlo por un
-  rechazo. Está marcado en el código como `MODO OBSERVACION`.
-- **Hacer el webhook idempotente.** Si Meta reintenta un mensaje —lo hace ante
-  un error o una demora— el flujo puede avanzar dos veces. El id del mensaje ya
-  se lee y queda expuesto en `MensajeEntrante.id`; falta usarlo.
+- **Cerrar la validación de firma del lado de Twilio.** La de Meta ya bloquea.
+  La de Twilio sigue en modo observación porque firma la URL que tiene cargada en
+  su panel, que detrás de un proxy puede no ser la que ve el servidor: ahí un
+  rechazo puede ser culpa nuestra. Como Twilio está de salida, lo más probable es
+  que esto se resuelva borrándolo.
+- **Confirmar con qué forma llega el teléfono**, arriba. Es lo primero a mirar
+  cuando entre un mensaje de verdad.

@@ -222,9 +222,16 @@ export interface PostCallAnalysisData {
 
 export const RETELL_CONSTANTS = {
   TIMEZONE: 'America/Argentina/Buenos_Aires',
-  PRECIO_BASE_M2: 700, // ARS por m²
-  ANCHO_LAMINA_MAX_MM: 1200,
-  SOLAPA_MM: 50, // 5cm de solapa
+  // PRECIO_BASE_M2, ANCHO_LAMINA_MAX_MM y SOLAPA_MM se borraron el 22/08/2026,
+  // junto con TIEMPOS_PRODUCCION y MEDIDAS. Los usaba /api/retell/cotizar, que
+  // ahora cotiza con el motor como todos los demas canales.
+  //
+  // PRECIO_BASE_M2 valia 700, un precio que la fabrica no cobra en ningun tramo
+  // —la escalera real va de 800 a 1.200 por m²— y MEDIDAS decia 5 a 500 cm, o
+  // sea que aceptaba cajas de 50 mm y de 5 metros. Que no los leyera nadie no
+  // los hacia inofensivos: eran la version equivocada esperando que alguien la
+  // importara por tenerla a mano. Es el mismo motivo por el que se borro
+  // DESCUENTOS.
   // Sale de HORARIO y no escrito a mano: esta constante decide si una llamada
   // se transfiere a una persona. Con 8 a 17 en duro, a las 7 no transferia
   // estando la fabrica abierta, y a las 16:30 transferia a un telefono que ya
@@ -238,15 +245,4 @@ export const RETELL_CONSTANTS = {
   // como un porcentaje de descuento sobre una base que no existe: la escalera
   // real son cuatro precios por m² en pricing_config, no descuentos. Tenerlo
   // escrito acá era una segunda version de los precios esperando divergir.
-  
-  TIEMPOS_PRODUCCION: [
-    { maxM2: 1000, tiempo: '2 a 3 días hábiles' },
-    { maxM2: 3000, tiempo: '3 a 5 días hábiles' },
-    { maxM2: 5000, tiempo: '5 a 7 días hábiles' },
-    { maxM2: Infinity, tiempo: '7 a 10 días hábiles' },
-  ],
-  MEDIDAS: {
-    MIN_CM: 5,
-    MAX_CM: 500,
-  },
 } as const;

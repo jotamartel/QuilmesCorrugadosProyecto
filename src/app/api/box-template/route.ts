@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateBoxTemplate } from '@/lib/box-template-generator';
+import { porQueNoSeFabrica } from '@/lib/cotizacion/motor';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -8,16 +9,23 @@ export async function GET(request: NextRequest) {
   const width = parseInt(searchParams.get('width') || '300');
   const height = parseInt(searchParams.get('height') || '300');
 
-  // Validar dimensiones (alineado con whatsapp: ancho+alto ≤1200, mínimos 200x200x100)
-  if (length < 200 || width < 200 || height < 100) {
+  // Los limites salen del motor, no escritos aca.
+  //
+  // Estaban en duro —200x200x100 y 1200— y hoy coincidian con las constantes,
+  // que es como empieza siempre: coinciden hasta que uno de los dos cambia. En
+  // este repo eso ya paso con los colores de impresion (13 paginas decian 3 y la
+  // API validaba 4) y con la medida minima (200x200x100 en un lado, 100x100x50
+  // en otro). Esta plantilla se la lleva el cliente al disenador, asi que una
+  // medida que la fabrica no hace termina en un arte que no se puede imprimir.
+  const noSeFabrica = porQueNoSeFabrica({
+    length_mm: length,
+    width_mm: width,
+    height_mm: height,
+    quantity: 1,
+  });
+  if (noSeFabrica.length > 0) {
     return NextResponse.json(
-      { error: 'Dimensiones mínimas: 200×200×100 mm' },
-      { status: 400 }
-    );
-  }
-  if (width + height > 1200) {
-    return NextResponse.json(
-      { error: 'Ancho + Alto no puede superar 1200 mm (límite de plancha)' },
+      { error: `Esa caja no se puede fabricar: ${noSeFabrica.join('; y ')}.` },
       { status: 400 }
     );
   }

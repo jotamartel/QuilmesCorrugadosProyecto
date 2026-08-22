@@ -91,6 +91,16 @@ carácter, el alta falla y Meta no dice por qué.
 
 Esta va **al final**, cuando lo demás esté probado. Ver más abajo.
 
+### `META_WA_WABA_ID` (para el verificador)
+
+El identificador de la cuenta de WhatsApp Business —no el del número—. Figura en
+el Administrador de WhatsApp arriba del número, y en la app en *Paso 2*.
+
+No lo usa el sitio: lo usa `scripts/verificar-meta.mts` para listar las
+plantillas. NO se puede deducir del id del número: ese campo no existe en la
+Graph API, y `/me/businesses` pide un permiso que el token de la integración no
+tiene ni conviene darle.
+
 ### Las dos opcionales
 
 `META_WA_IDIOMA_PLANTILLAS` — solo si la plantilla quedó cargada en Meta con otro

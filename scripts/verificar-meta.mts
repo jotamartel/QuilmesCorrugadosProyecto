@@ -162,7 +162,7 @@ console.log('EL ID DEL NÚMERO ES UN ID Y ES DE ESTA CUENTA');
     console.log('     (ojo: parece un número de teléfono, no un id)');
   }
   const { ok, datos } = await graph(
-    `${PHONE_ID}?fields=display_phone_number,verified_name,quality_rating,code_verification_status`,
+    `${PHONE_ID}?fields=display_phone_number,verified_name,quality_rating,code_verification_status,status,name_status,platform_type`,
   );
   if (!ok) {
     const e = (datos.error as Record<string, unknown>) || {};
@@ -170,11 +170,31 @@ console.log('EL ID DEL NÚMERO ES UN ID Y ES DE ESTA CUENTA');
         'META_WA_PHONE_NUMBER_ID es el "Identificador del número de teléfono" que aparece en Administrador de WhatsApp → API de WhatsApp → Configuración de la API. NO es el número.');
   } else {
     bien(`${datos.display_phone_number} — ${datos.verified_name || 'sin nombre verificado'}`);
-    if (datos.quality_rating && datos.quality_rating !== 'GREEN') {
+
+    // UNKNOWN no es una falla: es lo que dice un numero que todavia no mando
+    // suficientes mensajes como para que Meta lo puntue. Marcarlo en rojo hacia
+    // que un numero recien registrado —el caso normal— pareciera roto.
+    if (datos.quality_rating === 'UNKNOWN' || !datos.quality_rating) {
+      console.log('     calidad: todavia sin puntuar (normal en un numero nuevo)');
+    } else if (datos.quality_rating !== 'GREEN') {
       mal(`la calidad del número está en ${datos.quality_rating}`,
-          'Meta baja la calidad cuando la gente bloquea o reporta. Con la calidad en rojo limita cuántos mensajes se pueden mandar por día.');
-    } else if (datos.quality_rating) {
-      bien(`calidad ${datos.quality_rating}`);
+          'Meta la baja cuando la gente bloquea o reporta. En rojo limita cuántos mensajes se pueden mandar por día.');
+    } else {
+      bien('calidad GREEN');
+    }
+
+    // Lo que de verdad decide si el numero puede atender.
+    if (datos.status === 'CONNECTED') {
+      bien('el numero esta REGISTRADO y conectado');
+    } else {
+      mal(`el numero esta en ${datos.status || 'estado desconocido'}, no CONNECTED`,
+          datos.code_verification_status === 'VERIFIED'
+            ? 'La verificacion por SMS ya paso; falta el paso "Registrar" con el PIN de 6 digitos. Si ese paso da error, casi siempre es que el numero todavia tiene WhatsApp activo en un celular: hay que ELIMINAR la cuenta desde la app (no cerrar sesion) y esperar la propagacion.'
+            : 'Falta verificar el numero con el codigo que manda Meta por SMS o llamada.');
+    }
+
+    if (datos.name_status && datos.name_status !== 'APPROVED') {
+      console.log(`     nombre visible: ${datos.name_status} — se aprueba despues de registrar el numero`);
     }
   }
 }
@@ -183,10 +203,14 @@ console.log('EL ID DEL NÚMERO ES UN ID Y ES DE ESTA CUENTA');
 console.log('');
 console.log('LAS PLANTILLAS');
 {
-  const { ok, datos } = await graph(`${PHONE_ID}?fields=whatsapp_business_account{id}`);
-  const waba = ((datos.whatsapp_business_account as Record<string, unknown>) || {}).id as string | undefined;
-  if (!ok || !waba) {
-    console.log('     (no se pudo averiguar la cuenta de WhatsApp para listar las plantillas)');
+  // El id de la cuenta NO se puede sacar del numero: ese campo no existe en la
+  // Graph API, y /me/businesses pide un permiso que este token no tiene. Se
+  // pasa por variable. Sale del Administrador de WhatsApp, arriba del numero,
+  // como "Identificador de la cuenta de WhatsApp Business".
+  const waba = process.env.META_WA_WABA_ID;
+  if (!waba) {
+    console.log('     META_WA_WABA_ID no configurada: no se pueden listar las plantillas.');
+    console.log('     Sale del Administrador de WhatsApp, arriba del numero.');
   } else {
     const { ok: okP, datos: p } = await graph(`${waba}/message_templates?fields=name,status,language&limit=50`);
     const lista = (p.data as Array<Record<string, unknown>>) || [];
@@ -221,14 +245,33 @@ console.log('EL WEBHOOK CONTESTA EL ALTA');
 if (!VERIFY_TOKEN) {
   mal('no se puede probar sin META_WA_VERIFY_TOKEN', 'Cargalo en Vercel con el mismo valor que vas a poner en el formulario de Meta.');
 } else {
-  const url = `${SITIO}/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=${encodeURIComponent(VERIFY_TOKEN)}&hub.challenge=probando123`;
+  // Se prueban las dos formas del dominio. NEXT_PUBLIC_SITE_URL puede estar
+  // cargada sin www —lo estaba— y entonces esto reportaba un 308 como si el
+  // webhook estuviera mal, cuando lo que estaba mal era la URL que yo armaba.
+  const base = new URL(SITIO);
+  const candidatas = [
+    `https://${base.host.startsWith('www.') ? base.host : 'www.' + base.host}`,
+    `https://${base.host.replace(/^www\./, '')}`,
+  ];
+
+  let url = '';
+  let r: Response | null = null;
+  let cuerpo = '';
+  for (const c of candidatas) {
+    url = `${c}/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=${encodeURIComponent(VERIFY_TOKEN)}&hub.challenge=probando123`;
+    r = await fetch(url, { redirect: 'manual' });
+    cuerpo = await r.text().catch(() => '');
+    if (cuerpo.trim() === 'probando123') break;
+  }
+
   try {
-    const r = await fetch(url, { redirect: 'manual' });
-    const cuerpo = await r.text().catch(() => '');
-    if (r.status === 308 || r.status === 301 || r.status === 302) {
-      mal(`la URL redirige (${r.status})`,
-          `Meta no sigue redirects. Usá la URL con www: ${SITIO}/api/whatsapp/webhook`);
+    if (!r) {
+      mal('no se pudo probar el webhook', 'revisá la conexión');
+    } else if (r.status === 308 || r.status === 301 || r.status === 302) {
+      mal(`ninguna de las dos formas del dominio contesta el desafío`,
+          `Probá a mano: ${url}`);
     } else if (r.ok && cuerpo.trim() === 'probando123') {
+      console.log(`     la URL que hay que darle a Meta es ${url.split('?')[0]}`);
       bien('devuelve el desafío tal cual: el alta va a pasar');
     } else if (r.status === 403) {
       mal('el webhook rechaza el token',

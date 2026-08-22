@@ -91,6 +91,28 @@ carácter, el alta falla y Meta no dice por qué.
 
 Esta va **al final**, cuando lo demás esté probado. Ver más abajo.
 
+### Las dos opcionales
+
+`META_WA_IDIOMA_PLANTILLAS` — solo si la plantilla quedó cargada en Meta con otro
+código de idioma (`es_AR` en vez de `es`). Tiene que coincidir exacto o el envío
+falla sin explicación. El verificador te avisa si no coinciden.
+
+`WHATSAPP_FIRMA_ESTRICTA` — normalmente vacía: lo decide el proveedor (Meta
+bloquea, Twilio no). En `0` destraba de urgencia si la validación se está
+llevando puestos mensajes reales; en `1` cierra de urgencia.
+
+### Antes de cargar nada, y después de cada una
+
+```bash
+npx vercel env pull .env.qa.tmp && npx tsx scripts/verificar-meta.mts
+```
+
+Prueba los cuatro contra la API de Meta, de a uno, y para cada falla dice dónde
+se arregla. Comprueba que el token **no venza**, que el app secret sea el de esa
+misma app, que el id del número sea un id y no el número, que la plantilla esté
+aprobada y con el idioma correcto, y que el webhook devuelva el desafío. Solo
+hace lecturas.
+
 ---
 
 ## El orden importa

@@ -51,6 +51,7 @@ tmpclaude-*
 
 # Transcriptos del QA del agente: se regeneran con scripts/qa-agente.mts
 qa-transcriptos.json
+qa-transcriptos-parcial.json
 _qa/
 .env.qa.tmp
 .env.vercel.tmp

@@ -378,6 +378,28 @@ export async function POST(request: NextRequest) {
     await saveCommunication(phoneNumber, 'inbound', body, {
       hasMedia: entrante.tieneMedia,
     }, clientId);
+
+    // ─────────────────────────────────────────────────────────────────────
+    // La conversacion tiene que EXISTIR, la atienda quien la atienda.
+    //
+    // getConversationState() solo lee: si no hay fila, devuelve un estado
+    // inicial en memoria y no crea nada. La fila la creaba unicamente
+    // updateConversationState(), que vive en la maquina de estados de mas
+    // abajo. Y el agente contesta y sale por `return` mucho antes de llegar
+    // ahi.
+    //
+    // O sea que desde que el agente atiende —que es siempre— las
+    // conversaciones dejaron de aparecer en el panel. Los mensajes quedaban
+    // guardados en communications, pero la lista del panel se arma con
+    // whatsapp_conversations, asi que no habia forma de verlas ni de tomarlas.
+    // Se descubrio con el dueño del otro lado, escribiendo en vivo.
+    //
+    // Va aca, despues de guardar el entrante y antes de cualquier respuesta,
+    // para que la conversacion exista aunque el asistente este en pausa o
+    // aunque la respuesta falle. El upsert deja last_interaction al dia, que es
+    // por lo que ordena el panel.
+    // ─────────────────────────────────────────────────────────────────────
+    await updateConversationState(phoneNumber, {});
     // ─────────────────────────────────────────────────────────────────────
     // Si una persona esta atendiendo esta conversacion, el asistente se calla.
     //

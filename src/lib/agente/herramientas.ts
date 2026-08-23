@@ -686,12 +686,51 @@ export function crearHerramientas(ctx: ContextoAgente) {
     additionalProperties: false,
   },
   run: async ({ contexto }) => {
+    // ─────────────────────────────────────────────────────────────────────
+    // POR WHATSAPP NO SE PASA NINGUN LINK.
+    //
+    // Esta herramienta se escribio pensando en el chat del sitio, donde mandar a
+    // la persona a WhatsApp con el mensaje ya redactado es lo mejor que se le
+    // puede ofrecer. Por WhatsApp es un absurdo: se le daba un wa.me/ del numero
+    // desde el que estaba escribiendo. Paso en la primera prueba real —"quiero
+    // hablar con un asesor" y el asistente contesto con un link a la misma
+    // conversacion— y no hay forma de que eso no se lea como un error.
+    //
+    // Ahi lo correcto es decirle que ya avisamos y que le contestan por el mismo
+    // lugar. De avisar y de callar al asistente se ocupa el webhook, que ademas
+    // tiene el nombre y el mail de la conversacion.
+    // ─────────────────────────────────────────────────────────────────────
+    if (ctx.canal === 'whatsapp') {
+      return JSON.stringify({
+        avisado: true,
+        horario: HORARIO.texto,
+        instruccion:
+          'Decile que ya avisaste al equipo y que una persona le va a contestar por acá ' +
+          'mismo, sin que tenga que escribir a otro lado ni repetir nada. Si esta fuera del ' +
+          'horario de atencion, aclaraselo. NO le pases ningun link de WhatsApp: ya esta en ' +
+          'WhatsApp, y darle un link al numero desde el que escribe no tiene sentido. NO le ' +
+          'pases el telefono por el mismo motivo.',
+      });
+    }
+
+    // Por el chat del sitio si, y ademas se avisa: si la persona no hace clic en
+    // el link, el pedido se evapora y nadie se entera de que existio. Lo hace la
+    // herramienta y no el webhook porque el chat del sitio no pasa por ningun
+    // webhook. Por WhatsApp NO se avisa aca, para no mandar dos mails.
+    await sendNotification({
+      type: 'advisor_request',
+      origin: 'Chat del sitio',
+      contact: { phone: ctx.telefono || undefined },
+    }).catch((e) => console.error('[Agente] no se pudo avisar de la derivacion:', e));
+
     return JSON.stringify({
       whatsapp: CONTACTO.whatsappCon(contexto),
       telefono: CONTACTO.telefonoVisible,
       email: CONTACTO.email,
       horario: HORARIO.texto,
-      instruccion: 'Pasale el link tal cual: ya lleva el mensaje escrito.',
+      instruccion:
+        'Pasale el link tal cual: ya lleva el mensaje escrito con todo el contexto, asi no ' +
+        'tiene que repetir nada. Del otro lado ya quedo avisado el equipo.',
     });
   },
 });

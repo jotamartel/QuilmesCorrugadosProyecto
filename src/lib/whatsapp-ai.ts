@@ -238,17 +238,39 @@ function bloqueDePrecios(pricing: ContextoDePrecios | PricingConfig): string {
 /**
  * Obtiene el historial reciente de la conversación para contexto
  */
+/**
+ * Hasta cuándo un mensaje viejo sigue siendo "esta conversación".
+ *
+ * No había límite: se tomaban los últimos N mensajes sin mirar de cuándo eran.
+ * Se vio en el primer mensaje real por Meta, donde el asistente saludó por un
+ * nombre que la persona había escrito cuatro días antes, en una prueba.
+ *
+ * Eso fue simpático. Lo que no lo es: alguien que cotizó en marzo vuelve a
+ * escribir y el asistente arranca leyendo esa cotización como si fuera de ahora
+ * —con los precios de marzo— y le confirma un total que ya no existe. La
+ * escalera de precios cambió dos veces este año.
+ *
+ * Siete días es un juicio, no una verdad: es bastante más que una conversación
+ * de compra, que se resuelve en horas o en un par de días, y bastante menos que
+ * el tiempo en que cambian los precios. La identidad no se pierde por esto: el
+ * nombre y la empresa viven en el estado de la conversación y en el perfil de
+ * contacto, no en el texto de los mensajes viejos.
+ */
+const HISTORIAL_VIGENTE_DIAS = 7;
+
 export async function getRecentConversationHistory(
   phoneNumber: string,
   limit: number = 6
 ): Promise<ConversationTurn[]> {
   try {
     const supabase = createAdminClient();
+    const desde = new Date(Date.now() - HISTORIAL_VIGENTE_DIAS * 24 * 60 * 60 * 1000).toISOString();
     const { data } = await supabase
       .from('communications')
       .select('direction, content')
       .eq('channel', 'whatsapp')
       .eq('metadata->>phone', phoneNumber)
+      .gte('created_at', desde)
       .order('created_at', { ascending: false })
       .limit(limit);
 

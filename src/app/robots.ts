@@ -24,6 +24,22 @@ const API_PRIVADA = [
 
 const PRIVADO = [...API_PRIVADA, '/dashboard/', '/admin/', '/_next/', '/static/', '/login', '/auth/']
 
+/**
+ * Lo que se abre DENTRO de una carpeta bloqueada.
+ *
+ * /_next/ esta cerrado entero, y eso se llevaba puestos el CSS, el JavaScript y
+ * las imagenes optimizadas. Googlebot renderiza la pagina como un navegador
+ * antes de decidir que indexa: sin la hoja de estilos y sin el JS ve otra
+ * pagina que la que ve una persona. En Search Console aparecia como seis URLs
+ * "bloqueadas por robots.txt" que parecian ruido —chunks y una tipografia— y
+ * eran los archivos con los que se dibuja el sitio.
+ *
+ * Google resuelve reglas que se pisan por la mas especifica, asi que este Allow
+ * le gana al Disallow de arriba sin tener que abrir /_next/ entero: lo que no
+ * sea /static/ ni /image sigue cerrado.
+ */
+const EXCEPCIONES = ['/_next/static/', '/_next/image']
+
 // Lo que sí queremos que un asistente de IA lea y use.
 const PUBLICO = [
   '/',
@@ -89,12 +105,12 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: PUBLICO,
+        allow: [...PUBLICO, ...EXCEPCIONES],
         disallow: PRIVADO,
       },
       {
         userAgent: AGENTES_IA,
-        allow: PUBLICO,
+        allow: [...PUBLICO, ...EXCEPCIONES],
         disallow: PRIVADO,
       },
     ],

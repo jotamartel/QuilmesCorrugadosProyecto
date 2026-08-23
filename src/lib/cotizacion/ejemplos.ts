@@ -38,11 +38,14 @@ export interface EjemploCotizacion {
 
 export const EJEMPLOS: EjemploCotizacion[] = [
   {
+    // 600 y no 500: con esta medida 500 cajas son 435 m² y el minimo del pedido
+    // es 500. La pagina quedaba diciendo "no llega al minimo" en el <title>, que
+    // es lo unico que ve el que busca.
     medidas: '400x300x300',
-    cantidad: '500',
-    titulo: 'Caja de mudanza mediana, 500 unidades',
+    cantidad: '600',
+    titulo: 'Caja de mudanza mediana, 600 unidades',
     mm: { largo: 400, ancho: 300, alto: 300 },
-    unidades: 500,
+    unidades: 600,
     colores: 0,
   },
   {
@@ -54,11 +57,12 @@ export const EJEMPLOS: EjemploCotizacion[] = [
     colores: 0,
   },
   {
+    // 1.400 y no 1.000: 1.000 de esta medida son 367,5 m², por debajo del minimo.
     medidas: '300x200x150',
-    cantidad: '1000',
-    titulo: 'Caja chica de e-commerce, 1.000 unidades',
+    cantidad: '1400',
+    titulo: 'Caja chica de e-commerce, 1.400 unidades',
     mm: { largo: 300, ancho: 200, alto: 150 },
-    unidades: 1000,
+    unidades: 1400,
     colores: 0,
   },
   {
@@ -70,14 +74,6 @@ export const EJEMPLOS: EjemploCotizacion[] = [
     colores: 0,
   },
   {
-    medidas: '400x300x200',
-    cantidad: '2000-2',
-    titulo: 'Caja de envíos mediana con 2 colores, 2.000 unidades',
-    mm: { largo: 400, ancho: 300, alto: 200 },
-    unidades: 2000,
-    colores: 2,
-  },
-  {
     medidas: '400x600x600',
     cantidad: '3000',
     titulo: 'Caja grande por volumen, 3.000 unidades',
@@ -86,14 +82,19 @@ export const EJEMPLOS: EjemploCotizacion[] = [
     colores: 0,
   },
   {
-    // 50 mm, no 40: el alto minimo de fabricacion es 50 y con 40 esta pagina
-    // caia en el cartel de "no la podemos fabricar". Un ejemplo del sitemap
-    // que devuelve un error es peor que no tenerlo: se indexa una pagina que
-    // le dice al que busca que no podemos hacer lo que pidio.
-    medidas: '320x320x50',
+    // Era 320x320x50, "tipo pizza". Ya no se fabrica: el alto minimo paso a 100
+    // mm y la pagina quedo mostrando el cartel de "no la podemos hacer" —justo
+    // lo que advertia el comentario anterior, que hablaba de un minimo de 50 que
+    // dejo de ser cierto. Una caja de pizza de verdad son 40 mm de alto: con el
+    // minimo actual no hay ejemplo posible, asi que el caso de uso cambio.
+    //
+    // La leccion no es la medida, es que un ejemplo se pudre solo cuando cambia
+    // la configuracion. Por eso ahora el sitemap los verifica antes de
+    // publicarlos y qa-sitemap.mts falla si alguno deja de cotizar.
+    medidas: '320x320x100',
     cantidad: '5000',
-    titulo: 'Caja chata tipo pizza, 5.000 unidades',
-    mm: { largo: 320, ancho: 320, alto: 50 },
+    titulo: 'Caja chata para bandejas, 5.000 unidades',
+    mm: { largo: 320, ancho: 320, alto: 100 },
     unidades: 5000,
     colores: 0,
   },

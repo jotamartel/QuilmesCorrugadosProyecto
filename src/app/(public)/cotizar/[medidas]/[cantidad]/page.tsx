@@ -175,10 +175,30 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { caja } = r;
 
   // Sin precio no hay nada que indexar ni que mostrar en un resultado de
-  // busqueda: esta URL existe solo para explicarle el minimo a quien llego.
+  // busqueda: esta URL existe solo para explicarle a quien llego por que no, y
+  // por donde si.
+  //
+  // EL TITULO DECIA "no llega al minimo" PARA CUALQUIER "no".
+  //
+  // Tambien para una caja que directamente no se fabrica, que no tiene nada que
+  // ver con el volumen: /cotizar/320x320x50/5000 son 2.442 m², de sobra, y el
+  // titulo igual decia que no llegaba al minimo. El cuerpo de la pagina explicaba
+  // lo correcto —que el alto minimo es 100 mm— y el titulo lo contradecia. Es
+  // exactamente la superficie para la que Impedimento se hizo union discriminada.
   if (!q.cotizable) {
+    const cuantas = caja.quantity.toLocaleString('es-AR');
+    const medida = `${caja.length_mm}x${caja.width_mm}x${caja.height_mm} mm`;
+    const imp = q.impedimento;
     return {
-      title: `${caja.quantity.toLocaleString('es-AR')} cajas de ${caja.length_mm}x${caja.width_mm}x${caja.height_mm} mm: no llega al mínimo`,
+      // El titulo es lo unico que se ve en un resultado de busqueda, asi que
+      // dice por donde sigue y no solo que no. "El minimo son 575 cajas" es una
+      // respuesta; "no llega al minimo" es una puerta cerrada.
+      title:
+        imp.tipo === 'no_fabricable'
+          ? `${cuantas} cajas de ${medida}: esa medida no la fabricamos`
+          : imp.cajas_necesarias
+            ? `${cuantas} cajas de ${medida}: el mínimo son ${imp.cajas_necesarias.toLocaleString('es-AR')}`
+            : `${cuantas} cajas de ${medida}: no llega al mínimo`,
       description: q.summary,
       robots: { index: false },
       alternates: { canonical: url },

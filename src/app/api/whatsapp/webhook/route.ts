@@ -34,6 +34,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { HORARIO, RETAIL_CONFIG } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
 import { sendNotification } from '@/lib/notifications';
+import { notificarRespuestaEnConversacionTomada } from '@/lib/telegram/notifications';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { SITE_URL } from '@/lib/site';
 import {
@@ -412,6 +413,27 @@ export async function POST(request: NextRequest) {
     // ─────────────────────────────────────────────────────────────────────
     if (await asistentePausado(phoneNumber)) {
       console.log('[WhatsApp] conversacion atendida por una persona, el asistente no responde:', phoneNumber);
+
+      // Y se avisa por Telegram, que es el unico caso donde alguien queda
+      // esperando: el asistente esta callado porque una persona tomo la
+      // conversacion, asi que si esa persona no esta mirando el panel, el
+      // mensaje no lo lee nadie. Por mail llegaria tarde.
+      // Quien la tomo, para que el aviso diga a quien le corresponde contestar
+      // cuando hay mas de una persona atendiendo.
+      const { data: quien } = await createAdminClient()
+        .from('whatsapp_conversations')
+        .select('attended_by')
+        .eq('phone_number', phoneNumber)
+        .maybeSingle();
+
+      await notificarRespuestaEnConversacionTomada({
+        telefono: phoneNumber,
+        nombre: state.clientName || state.companyName,
+        mensaje: body,
+        tomadaPor: quien?.attended_by ?? null,
+        urlDelPanel: `${SITE_URL}/whatsapp`,
+      }).catch((e) => console.error('[WhatsApp] no se pudo avisar por Telegram:', e));
+
       return await recibido();
     }
 

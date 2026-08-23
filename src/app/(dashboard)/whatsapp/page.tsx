@@ -22,6 +22,7 @@ import {
   ExternalLink,
   FileText,
   ShoppingCart,
+  Bell,
 } from 'lucide-react';
 
 interface WhatsAppConversation {
@@ -105,8 +106,11 @@ export default function WhatsAppPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const fetchConversations = useCallback(async () => {
-    setLoading(true);
+  const fetchConversations = useCallback(async (silencioso = false) => {
+    // El refresco automatico no prende el spinner: la pantalla parpadeando cada
+    // veinte segundos mientras alguien lee una conversacion es peor que no
+    // refrescar.
+    if (!silencioso) setLoading(true);
     try {
       const params = new URLSearchParams();
       if (filter !== 'all') params.append('filter', filter);
@@ -300,6 +304,60 @@ export default function WhatsAppPage() {
     }
   }, [selectedConversation]);
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // El panel se actualiza solo.
+  //
+  // Antes hacia un fetch al cargar y nada mas: si alguien escribia mientras
+  // mirabas la pantalla, no aparecia hasta apretar Actualizar. Para atender eso
+  // no sirve — del otro lado hay una persona esperando.
+  //
+  // No corre con la pestaña oculta: no tiene sentido consultar cada diez
+  // segundos una pantalla que nadie esta mirando, y cuando volves se refresca de
+  // inmediato con el listener de visibilitychange.
+  //
+  // Esto NO reemplaza al aviso por Telegram. Sirve mientras el panel esta
+  // abierto; el aviso al telefono es el que te encuentra cuando no lo esta.
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const refrescar = () => {
+      if (document.hidden) return;
+      fetchConversations(true);
+      if (selectedConversation) fetchMessages(selectedConversation);
+    };
+
+    const cada = setInterval(refrescar, 15000);
+    document.addEventListener('visibilitychange', refrescar);
+    return () => {
+      clearInterval(cada);
+      document.removeEventListener('visibilitychange', refrescar);
+    };
+  }, [fetchConversations, selectedConversation]);
+
+  // Un aviso del navegador cuando entra un mensaje nuevo en la conversacion
+  // abierta. Solo si la persona lo pidio: pedir permiso de notificaciones al
+  // cargar la pagina es lo que hace que todo el mundo lo rechace para siempre.
+  const [ultimoVisto, setUltimoVisto] = useState<string | null>(null);
+  const [avisos, setAvisos] = useState<NotificationPermission | 'no-soportado'>('default');
+  useEffect(() => {
+    setAvisos(typeof Notification === 'undefined' ? 'no-soportado' : Notification.permission);
+  }, []);
+  useEffect(() => {
+    const ultimo = messages[messages.length - 1];
+    if (!ultimo) return;
+    if (ultimoVisto === null) { setUltimoVisto(ultimo.id); return; }
+    if (ultimo.id === ultimoVisto) return;
+    setUltimoVisto(ultimo.id);
+
+    if (ultimo.direction !== 'inbound') return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    if (!document.hidden) return;
+
+    new Notification('Mensaje nuevo en WhatsApp', {
+      body: `${selectedConversation}: ${String(ultimo.content).slice(0, 120)}`,
+      tag: 'whatsapp-quilmes',
+    });
+  }, [messages, ultimoVisto, selectedConversation]);
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -349,8 +407,21 @@ export default function WhatsAppPage() {
             <Download className="w-4 h-4" />
             Exportar CSV
           </button>
+          {/* El permiso se pide con un clic explicito y no al cargar: pedirlo de
+              entrada es lo que hace que la gente lo rechace para siempre, y
+              despues no hay forma de volver a preguntarlo. */}
+          {avisos === 'default' && (
+            <button
+              onClick={async () => setAvisos(await Notification.requestPermission())}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              title="Avisar en esta computadora cuando entre un mensaje, aunque estés en otra pestaña"
+            >
+              <Bell className="h-4 w-4" />
+              Activar avisos
+            </button>
+          )}
           <button
-            onClick={fetchConversations}
+            onClick={() => fetchConversations()}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />

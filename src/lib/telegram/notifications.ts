@@ -140,3 +140,56 @@ export async function notifyNewRetailLead(data: RetailLeadData): Promise<boolean
     return false;
   }
 }
+
+/**
+ * Alguien escribió en una conversación que está atendiendo una persona.
+ *
+ * POR QUÉ ESTE AVISO Y NO OTRO
+ *
+ * Cuando el asistente atiende, no hace falta avisar nada: contesta él. El caso
+ * que deja a alguien esperando es el otro — un vendedor tomó la conversación,
+ * el asistente quedó en pausa, y el cliente responde. Ahí no contesta nadie
+ * hasta que a esa persona se le ocurra volver a mirar el panel.
+ *
+ * Va por Telegram y no por mail a propósito: llega al teléfono, suena, y no se
+ * pierde entre cotizaciones. Un mail para esto se lee cuando ya no sirve.
+ *
+ * NO tiene control de frecuencia: si el cliente manda cinco mensajes, llegan
+ * cinco avisos. Es deliberado mientras el volumen sea el de hoy —cada mensaje
+ * es alguien esperando una respuesta— y si algún día molesta, lo que
+ * corresponde es agrupar por conversación, no bajar el detalle.
+ */
+export async function notificarRespuestaEnConversacionTomada(datos: {
+  telefono: string;
+  nombre?: string | null;
+  mensaje: string;
+  tomadaPor?: string | null;
+  urlDelPanel: string;
+}): Promise<boolean> {
+  if (!isTelegramEnabled()) return false;
+
+  // El texto del cliente va escapado: viene de afuera y el parse_mode es HTML.
+  // Un "<" en un mensaje —"cajas <500"— rompe el mensaje entero y Telegram lo
+  // rechaza sin decir por qué.
+  const escapar = (t: string) =>
+    t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const quien = datos.nombre ? `${escapar(datos.nombre)} (${datos.telefono})` : datos.telefono;
+  const recorte = datos.mensaje.length > 600 ? datos.mensaje.slice(0, 600) + '…' : datos.mensaje;
+
+  const texto =
+    `💬 <b>Te respondieron</b>\n\n` +
+    `<b>${quien}</b>\n` +
+    `${escapar(recorte)}\n\n` +
+    (datos.tomadaPor ? `Esta conversación la tomó ${escapar(datos.tomadaPor)}.\n` : '') +
+    `El asistente está en pausa, así que no le va a contestar nadie hasta que entres.\n\n` +
+    `${datos.urlDelPanel}`;
+
+  try {
+    const r = await sendMessage({ text: texto });
+    return !!r.ok;
+  } catch (error) {
+    console.error('[Telegram] no se pudo avisar de la respuesta:', error);
+    return false;
+  }
+}

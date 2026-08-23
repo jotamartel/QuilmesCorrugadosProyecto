@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { crearHerramientas, type ContextoAgente } from './herramientas';
 import { SITE_URL } from '@/lib/site';
+import { urlPlantilla } from '@/lib/cotizacion/motor';
 
 /**
  * El agente de ventas del sitio.
@@ -145,6 +146,10 @@ Y si con una lectura la caja no se puede fabricar y con la otra sí, es la otra,
 
 Si mencionó impresión pero no dijo cuántos colores, preguntáselo antes de cotizar. Preguntalo neutro, sin anticipar un recargo: desde los m² en que la impresión viene incluida no hay recargo ninguno, y prometerlo obliga a desdecirse en el turno siguiente. Si no habló de impresión, cotizá lisa.
 
+Y si no habló de impresión, PREGUNTALE SI VA IMPRESA. La respuesta de cotizar_cajas trae "impresion" ya resuelta para ese pedido: si dice se_puede en true, la pregunta va sí o sí, en el mismo mensaje del precio, al final y en una sola frase —"¿va lisa o con impresión?"—, no en un mensaje aparte ni en el turno siguiente. La mitad de los que preguntan no sabe que imprimimos, y lo que no se ofrece no se vende. Si dice se_puede en false, no la menciones: el pedido no llega al volumen desde el que se imprime y ofrecer algo que después hay que negar es peor que no ofrecerlo.
+
+Cuando confirma que va impresa, preguntale cuántos colores, volvé a cotizar con ese número y llamá a plantilla_impresion con esas medidas, aunque no te la haya pedido: la plantilla es lo primero que le van a pedir del otro lado, cuando se siente a que le armen el arte. Contale en una línea qué es —la caja abierta en plano, con las líneas de corte, las de plegado y las áreas donde va el diseño— y que se la pase a quien se lo diseñe.
+
 Al dar un precio decí siempre las cuatro cosas que vienen en la respuesta: que es en pesos, que el subtotal va sin IVA y el total lo incluye, el plazo de entrega y hasta cuándo vale.
 
 La palabra "total" es solo para el número CON IVA. El otro se llama subtotal, siempre, aunque lo estés repitiendo de un turno anterior. Decir "el total es 2.639.520 más IVA" es mezclar las dos cosas, y quien arma la orden de compra con ese número se equivoca por medio millón. Y pasale el link de la cotización, que puede compartir con su equipo.
@@ -196,7 +201,9 @@ Una cotización son seis o siete números seguidos y en un párrafo corrido se p
 Cuando ofrezcas varias medidas, una por renglón, cada una arrancando con un guion. Un párrafo con tres opciones adentro no se puede comparar.
 
 Así se ve una alternativa bien escrita:
-- **300x200x200 mm** — 1.191 cajas — $504 por caja — total con IVA **$726.319**`,
+- **300x200x200 mm** — 1.191 cajas — $504 por caja — total con IVA **$726.319**
+
+Acá la plantilla de impresión va como link: pasale la URL que devuelve plantilla_impresion para que se la baje y se la mande al diseñador.`,
   whatsapp: `
 ESTE CANAL
 Estás en WhatsApp. Mensajes más cortos todavía: dos o tres líneas.
@@ -206,6 +213,8 @@ Para negrita usá UN asterisco a cada lado, que es lo que WhatsApp entiende: *as
 Cuando ofrezcas varias medidas van una por renglón, cada una empezando con un guion: es la única forma de comparar tres opciones en un teléfono. Para el resto, frases separadas por punto y aparte en vez de listas numeradas.
 
 Ya tenemos el número de quien escribe, así que no se lo pidas. Si deja el nombre o la empresa, guardalo.
+
+Acá la plantilla de impresión NO va como link: cuando llamás a plantilla_impresion el PDF le llega adjunto al chat, solo. No pegues la URL ni le digas que la descargue de ningún lado —ya la tiene—, contale nada más qué es y que se la reenvíe a quien le arme el arte.
 
 Si el mensaje empieza con [COTIZADO-WEB], la persona ya cotizó en el sitio y viene a cerrar: el precio que trae es el nuestro. No vuelvas a cotizar ni preguntes las medidas otra vez. Confirmá y avanzá con lo que falta para el pedido: nombre, empresa, condición frente al IVA, dirección de entrega y si lleva impresión.
 
@@ -221,6 +230,20 @@ export interface RespuestaAgente {
   texto: string;
   /** Cuántas herramientas se usaron. Sirve para medir si el agente cotiza de verdad. */
   herramientasUsadas: string[];
+  /**
+   * Los PDF de desplegado que hay que adjuntar, ya como URL.
+   *
+   * POR QUE NO SE SACAN DEL TEXTO
+   *
+   * El webhook los detectaba con una expresion regular sobre la respuesta: si
+   * el agente pegaba la URL, salia el adjunto; si contaba lo mismo con
+   * palabras —que es lo que hace cuando la instruccion le pide que no mande
+   * links— no salia nada. O sea que el adjunto dependia de una torpeza de
+   * redaccion. Aca sale de las llamadas a plantilla_impresion, que es lo que el
+   * agente decidio de verdad, y el texto queda libre de escribirse como se lea
+   * mejor.
+   */
+  plantillas: string[];
 }
 
 /**
@@ -262,9 +285,22 @@ export async function responder(
   });
 
   const herramientasUsadas: string[] = [];
+  const plantillas: string[] = [];
   for await (const m of runner) {
     for (const bloque of m.content) {
-      if (bloque.type === 'tool_use') herramientasUsadas.push(bloque.name);
+      if (bloque.type !== 'tool_use') continue;
+      herramientasUsadas.push(bloque.name);
+      if (bloque.name !== 'plantilla_impresion') continue;
+      // Las medidas se leen de la llamada y la URL se arma con la misma
+      // funcion que usa el motor, en vez de concatenarla a mano en un tercer
+      // lugar. El input viene del modelo, asi que puede traer cualquier cosa:
+      // si no son tres numeros no se adjunta nada.
+      const m2 = bloque.input as { largo_mm?: unknown; ancho_mm?: unknown; alto_mm?: unknown };
+      const medidas = [m2.largo_mm, m2.ancho_mm, m2.alto_mm];
+      if (medidas.every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0)) {
+        const url = urlPlantilla(...(medidas as [number, number, number]));
+        if (!plantillas.includes(url)) plantillas.push(url);
+      }
     }
   }
 
@@ -275,5 +311,5 @@ export async function responder(
     .join('\n')
     .trim();
 
-  return { texto, herramientasUsadas };
+  return { texto, herramientasUsadas, plantillas };
 }

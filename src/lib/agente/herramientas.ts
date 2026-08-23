@@ -273,15 +273,55 @@ export function crearHerramientas(ctx: ContextoAgente) {
       // agente no tiene que deducir nada, solo contarlo si existe.
       conviene_agregar_cajas: q.next_tier,
       envio_gratis_por_volumen: q.shipping.meets_free_shipping_volume,
-      como_se_cobra_la_impresion: caja.printing_colors > 0 ? q.printing.price_note : undefined,
+      // LA IMPRESION SE RESUELVE ACA, Y SIEMPRE. NO ES UN CAMPO OPCIONAL.
+      //
+      // Antes esto aparecia solo cuando la persona YA habia pedido impresion.
+      // O sea: se enteraba de que se puede imprimir quien ya sabia que se puede
+      // imprimir. El resto —la mayoria— cotizaba liso sin que nadie se lo
+      // mencionara nunca, y el PDF del desplegado no salia jamas. Un servicio
+      // que no se ofrece no existe.
+      //
+      // Los tres estados van escritos para que el agente no compare metros
+      // contra ningun umbral: lee "que_hacer" y lo hace. Cual de los tres es
+      // lo decide el motor, que es el unico que conoce los m² del pedido.
+      impresion:
+        caja.printing_colors > 0
+          ? {
+              lleva: true,
+              como_se_cobra: q.printing.price_note,
+              plantilla_pdf: caja.template_pdf,
+              que_hacer:
+                'Este pedido lleva impresión: avisá que el polímero se cotiza aparte y va a ' +
+                'cargo del comprador, así el total no parece cerrado cuando todavía falta ese ' +
+                'ítem. Y llamá a plantilla_impresion con estas medidas: el PDF del desplegado ' +
+                'se manda adjunto y es lo que el diseñador necesita para armar el arte sobre ' +
+                'la medida real.',
+            }
+          : q.printing.available
+            ? {
+                lleva: false,
+                se_puede: true,
+                que_hacer:
+                  'La persona no dijo nada de impresión y este pedido puede llevarla. ' +
+                  'PREGUNTASELO, en el mismo mensaje del precio, al final y en una sola ' +
+                  'frase. Si no se lo preguntás no se entera de que existe. El precio de ' +
+                  'arriba es sin impresión y sigue valiendo; no anticipes ningún recargo. Si ' +
+                  'dice que sí, preguntale cuántos colores y volvé a cotizar con ese número.',
+              }
+            : {
+                lleva: false,
+                se_puede: false,
+                por_que: q.printing.price_note,
+                que_hacer:
+                  'Este pedido no llega al volumen desde el que se imprime. No lo ofrezcas ni ' +
+                  'lo menciones: ofrecer algo que después hay que negar es peor que no ' +
+                  'ofrecerlo. Si pregunta la persona, contale lo que dice por_que.',
+              },
       link_para_compartir: `${SITE_URL}/cotizar/${largo_mm}x${ancho_mm}x${alto_mm}/${cantidad}`,
       instruccion:
         'Al dar el precio decí siempre que es en pesos, que el subtotal va sin IVA y ' +
         'el total con IVA incluido, el plazo y hasta cuándo vale. Pasale el link. ' +
-        (caja.printing_colors > 0
-          ? 'Este pedido lleva impresión: avisá que el polímero se cotiza aparte y va a ' +
-            'cargo del comprador, así el total no parece cerrado cuando todavía falta ese ítem.'
-          : ''),
+        'Y hacé lo que diga impresion.que_hacer, que ya viene resuelto para este pedido.',
     });
   },
 });
@@ -447,7 +487,9 @@ export function crearHerramientas(ctx: ContextoAgente) {
     'Devuelve el link al PDF del desplegado de la caja, con las líneas de corte y ' +
     'plegado y las áreas donde va el diseño. Es lo que el diseñador necesita para ' +
     'armar el arte sobre la medida real. Usala cuando pidan la plantilla, el ' +
-    'desplegado, el troquel o cómo mandar el diseño.',
+    'desplegado, el troquel o cómo mandar el diseño, Y TAMBIÉN apenas confirmen que ' +
+    'el pedido va con impresión, aunque no la pidan: por WhatsApp el PDF sale ' +
+    'adjunto solo, y es lo primero que el diseñador va a necesitar.',
   inputSchema: {
     type: 'object',
     properties: {

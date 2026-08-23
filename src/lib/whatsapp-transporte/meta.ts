@@ -157,6 +157,27 @@ function comoMensajeEntrante(mensaje: Record<string, unknown>): MensajeEntrante 
   return entrante.telefono ? entrante : null;
 }
 
+/**
+ * Con que nombre le llega el PDF al cliente.
+ *
+ * Era 'plantilla-quilmes-corrugados.pdf' para todas. Quien pide dos medidas
+ * recibe dos archivos con el mismo nombre: al guardarlos uno pisa al otro, y
+ * cuando se los reenvia al disenador no hay forma de saber cual es cual. La
+ * medida va en el nombre.
+ */
+function nombreDelArchivo(url: string): string {
+  try {
+    const p = new URL(url).searchParams;
+    const medidas = ['length', 'width', 'height'].map((k) => p.get(k));
+    if (medidas.every((v) => v && /^\d+$/.test(v))) {
+      return 'plantilla-caja-' + medidas.join('x') + '.pdf';
+    }
+  } catch {
+    // Una URL que no parsea no justifica quedarse sin mandar el archivo.
+  }
+  return 'plantilla-quilmes-corrugados.pdf';
+}
+
 export const transporteMeta: Transporte = {
   nombre: 'meta',
 
@@ -219,7 +240,7 @@ export const transporteMeta: Transporte = {
       type: 'document',
       document: {
         link: urlDelArchivo,
-        filename: 'plantilla-quilmes-corrugados.pdf',
+        filename: nombreDelArchivo(urlDelArchivo),
       },
     });
   },

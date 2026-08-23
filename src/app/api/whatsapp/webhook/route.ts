@@ -199,23 +199,49 @@ async function createWhatsAppLead(data: {
   }
 }
 
+/** Como mucho tres adjuntos por turno. Cuatro PDF seguidos no los abre nadie. */
+const MAX_PLANTILLAS = 3;
+
 /**
- * Manda la respuesta del agente y, si menciona la plantilla, tambien el PDF.
+ * Manda la respuesta del agente y, si corresponde, el PDF del desplegado.
  *
- * En WhatsApp un archivo adjunto es mejor que un link: se abre sin salir de la
- * conversacion. El agente devuelve la URL en el texto, asi que se detecta y se
- * manda tambien como documento. WhatsApp no permite texto junto con un
- * adjunto, por eso van en dos mensajes.
+ * En WhatsApp un adjunto es mejor que un link: se abre sin salir de la
+ * conversacion, y del otro lado se reenvia al disenador tal cual. WhatsApp no
+ * permite texto junto con un adjunto, por eso van en mensajes separados.
+ *
+ * DE DONDE SALEN LAS PLANTILLAS
+ *
+ * De las llamadas a plantilla_impresion, que es donde el agente decidio que
+ * hacia falta. Antes salian de buscar la URL en el texto, y eso ataba el
+ * adjunto a que el agente pegara un link: si contaba lo mismo con palabras
+ * —que es justo lo que le pide la instruccion— no se mandaba nada.
+ *
+ * Buscar en el texto quedo igual, como segunda fuente: cotizar_cajas tambien
+ * devuelve la URL y a veces el agente la copia sin llamar a la herramienta.
+ * Las dos se unen y se sacan los repetidos.
  */
 async function enviarRespuestaDelAgente(
   from: string,
   phoneNumber: string,
   texto: string,
   clientId: string | null,
+  plantillas: string[] = [],
 ) {
-  const plantilla = texto.match(/https?:\/\/\S*\/api\/box-template\?\S+/);
-  if (plantilla) {
-    await sendWhatsAppDocument({ to: from, mediaUrl: plantilla[0] });
+  // El \S+ se come el punto final de la oracion cuando la URL cierra la frase,
+  // y esa URL con punto pegado devuelve 404 cuando Meta va a buscarla.
+  const enElTexto = (texto.match(/https?:\/\/\S*\/api\/box-template\?\S+/g) ?? []).map((u) =>
+    u.replace(/[.,;:)\]]+$/, ''),
+  );
+  const todas = [...new Set([...plantillas, ...enElTexto])];
+  if (todas.length > MAX_PLANTILLAS) {
+    console.log(
+      '[WhatsApp] %d plantillas en un turno, se mandan las primeras %d',
+      todas.length,
+      MAX_PLANTILLAS,
+    );
+  }
+  for (const url of todas.slice(0, MAX_PLANTILLAS)) {
+    await sendWhatsAppDocument({ to: from, mediaUrl: url });
   }
   await sendWhatsAppMessage({ to: from, body: texto });
   await saveCommunication(phoneNumber, 'outbound', texto, { agente: true }, clientId);
@@ -476,7 +502,7 @@ export async function POST(request: NextRequest) {
             return await recibido();
           }
 
-          await enviarRespuestaDelAgente(from, phoneNumber, r.texto, clientId);
+          await enviarRespuestaDelAgente(from, phoneNumber, r.texto, clientId, r.plantillas);
 
           // Pidio hablar con una persona. Hasta ahora esto no avisaba a nadie:
           // la notificacion existia solo en la maquina de estados de abajo, y

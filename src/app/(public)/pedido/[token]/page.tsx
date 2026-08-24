@@ -22,6 +22,8 @@ import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { esTokenPedidoValido } from '@/lib/orders/token-publico';
+import { getBankDataForClient } from '@/lib/config/system';
+import { CopiarDato } from '@/components/public/CopiarDato';
 import { ORDER_STATUS_LABELS } from '@/lib/utils/format';
 import { CONTACTO } from '@/lib/contacto';
 import type { OrderStatus } from '@/lib/types/database';
@@ -55,6 +57,8 @@ interface PedidoPublico {
   cancelled_at: string | null;
   estimated_delivery: string | null;
   quantities_confirmed: boolean;
+  deposit_status: string;
+  balance_status: string;
   items: ItemPublico[];
 }
 
@@ -72,7 +76,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
       `
       order_number, status, created_at, confirmed_at, production_started_at,
       ready_at, shipped_at, delivered_at, cancelled_at, estimated_delivery,
-      quantities_confirmed,
+      quantities_confirmed, deposit_status, balance_status,
       items:order_items(length_mm, width_mm, height_mm, quantity, quantity_delivered)
     `,
     )
@@ -97,6 +101,14 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
   ];
 
   const cancelado = pedido.status === 'cancelled';
+
+  // Los datos para transferir aparecen SOLO mientras hay algo por pagar y la
+  // configuracion bancaria esta completa. Montos nunca: el link se reenvia, y
+  // un monto a la vista es municion para el "te falta pagar X, transferi aca"
+  // de un tercero. El alias y el CBU son publicos por naturaleza — existen
+  // para darselos a cualquiera que vaya a transferir.
+  const debeAlgo = pedido.deposit_status !== 'paid' || pedido.balance_status !== 'paid';
+  const banco = !cancelado && debeAlgo ? await getBankDataForClient() : null;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -172,6 +184,30 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
             ))}
           </ul>
         </div>
+
+        {banco && (
+          <div className="mt-4 bg-white border border-gray-200 rounded-xl p-6">
+            <h2 className="text-sm font-semibold text-gray-900">Datos para transferir</h2>
+            <dl className="mt-3 space-y-2.5">
+              <CopiarDato
+                etiqueta="Alias"
+                valor={banco.alias}
+                nota={banco.alias.endsWith('.') ? 'El punto final es parte del alias — mejor usá Copiar.' : undefined}
+              />
+              <CopiarDato etiqueta="CBU" valor={banco.cbu} />
+              <div className="flex items-center gap-2 text-sm">
+                <dt className="text-gray-500 w-16 shrink-0">Titular:</dt>
+                <dd className="font-medium">
+                  {banco.holder} (CUIT {banco.cuit})
+                  {banco.bank && <span className="text-gray-500 font-normal"> · {banco.bank}</span>}
+                </dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-xs text-gray-500">
+              Cuando transfieras, mandanos el comprobante por WhatsApp.
+            </p>
+          </div>
+        )}
 
         <a
           href={linkWhatsApp}

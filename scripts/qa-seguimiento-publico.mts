@@ -97,6 +97,31 @@ console.log(`Contra el sitio publicado — ${BASE}`);
     const paginaUuid = await fetch(`${BASE}/pedido/${muestra.id}`);
     ok('la pagina con el UUID devuelve 404', paginaUuid.status === 404);
 
+    // Los datos para transferir: solo con la config bancaria COMPLETA y solo
+    // mientras se debe algo. La asercion es condicional porque depende de lo
+    // que Fernando haya cargado al momento de correr.
+    const { getBankDataForClient } = await import('@/lib/config/system');
+    const banco = await getBankDataForClient();
+    const { data: deudora } = await db.from('orders')
+      .select('public_token')
+      .or('deposit_status.neq.paid,balance_status.neq.paid')
+      .neq('status', 'cancelled')
+      .limit(1).maybeSingle();
+    if (!deudora) {
+      console.log('  ·    no hay ordenes con saldo pendiente para probar el bloque de transferencia');
+    } else {
+      const htmlDeudora = await fetch(`${BASE}/pedido/${deudora.public_token}`).then((r) => r.text());
+      if (banco) {
+        ok('con config completa, la orden que debe muestra el alias con Copiar',
+           htmlDeudora.includes(banco.alias) && /Copiar/.test(htmlDeudora));
+      } else {
+        ok('con config incompleta, NADA de datos bancarios en la pagina',
+           !/Datos para transferir/.test(htmlDeudora));
+      }
+      ok('y aun asi, sin montos', !/\$\s?\d{1,3}(\.\d{3})+/.test(
+        htmlDeudora.replace(/<script[\s\S]*?<\/script>/g, '')));
+    }
+
     const robots = await fetch(`${BASE}/robots.txt`).then((r) => r.text());
     ok('robots cierra /pedido/', /Disallow:\s*\/pedido\//.test(robots));
   }

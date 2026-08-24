@@ -308,7 +308,14 @@ export default function QuoteConfirmationPage() {
                       ] as [string, string][]).map(([etiqueta, valor]) => (
                         <div key={etiqueta} className="flex items-center gap-2">
                           <dt className="text-amber-700 w-16 shrink-0">{etiqueta}:</dt>
-                          <dd className="font-medium break-all">{valor}</dd>
+                          <dd className="font-medium break-all">
+                            {valor}
+                            {etiqueta === 'Alias' && valor.endsWith('.') && (
+                              <span className="block text-xs font-normal text-amber-700">
+                                El punto final es parte del alias — mejor usá Copiar.
+                              </span>
+                            )}
+                          </dd>
                           {(etiqueta === 'Alias' || etiqueta === 'CBU') && (
                             <button
                               type="button"

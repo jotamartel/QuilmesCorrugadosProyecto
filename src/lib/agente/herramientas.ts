@@ -941,7 +941,12 @@ export function crearHerramientas(ctx: ContextoAgente) {
         instruccion:
           'Pasale los cuatro datos juntos (alias, CBU, titular con CUIT), no en varios ' +
           'mensajes. Cuando confirme que transfirió, pedile el comprobante por acá y ' +
-          'avisale que una persona lo valida antes de dar por confirmado el pedido.',
+          'avisale que una persona lo valida antes de dar por confirmado el pedido.' +
+          (datos.alias.endsWith('.')
+            ? ' OJO: el alias termina en punto y ese punto es PARTE del alias. Escribilo ' +
+              'completo y aclaralo en una frase, porque tipeado sin el punto la ' +
+              'transferencia no llega.'
+            : ''),
       });
     },
   });

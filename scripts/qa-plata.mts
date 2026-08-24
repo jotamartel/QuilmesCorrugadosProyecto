@@ -83,6 +83,12 @@ try {
     ok('con pedido: numero y saldo formateado', /^Pedido OC-2026-0004/.test(conPedido) && /\$1\.268\.750/.test(conPedido), conPedido);
     ok('saldo 0 no imprime "Saldo a pagar"',
        !/Saldo/.test(formatearAliasParaWhatsApp(d, { orderNumber: 'OC-X', balanceAmount: 0 })));
+
+    // El alias real termina en punto, y el punto es parte del dato. En un
+    // mensaje se lee como puntuacion: la aclaracion tiene que aparecer sola.
+    const conPunto = formatearAliasParaWhatsApp({ ...d, alias: 'quilmes.corrugados.' });
+    ok('alias con punto final: el mensaje lo aclara', /punto final es parte del alias/.test(conPunto), conPunto);
+    ok('sin punto no hay aclaracion de mas', !/punto final/.test(formatearAliasParaWhatsApp(d)));
   }
 
   console.log('');
@@ -96,6 +102,13 @@ try {
     const r = JSON.parse(await tool.run({}));
     ok('con config cargada da los 4 datos', r.disponible === true && r.alias === 'quilmes.qa' && r.cbu && r.titular && r.cuit, JSON.stringify(r));
     ok('con instruccion de comprobante', /comprobante/.test(r.instruccion || ''));
+    ok('alias sin punto: la instruccion no habla del punto', !/punto/.test(r.instruccion || ''));
+
+    await setConfigValues({ payment_bank_alias: 'quilmes.qa.' });
+    invalidateConfigCache();
+    const rPunto = JSON.parse(await tool.run({}));
+    ok('alias con punto: la instruccion le avisa al modelo',
+       /PARTE del alias/.test(rPunto.instruccion || ''), rPunto.instruccion);
 
     await setConfigValues({ payment_bank_alias: '' });
     invalidateConfigCache();

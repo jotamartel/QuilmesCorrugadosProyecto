@@ -30,6 +30,12 @@ export function formatearAliasParaWhatsApp(
   lineas.push('Para transferirnos:');
   lineas.push('');
   lineas.push(`Alias: ${datos.alias}`);
+  // El alias real termina en punto y es PARTE del dato: sin esta linea, en un
+  // mensaje se lee como puntuacion y el que lo tipea sin el punto va a una
+  // transferencia fallida. Dinamico: si el alias cambia, desaparece sola.
+  if (datos.alias.endsWith('.')) {
+    lineas.push('(ojo: el punto final es parte del alias)');
+  }
   lineas.push(`CBU: ${datos.cbu}`);
   lineas.push(`Titular: ${datos.holder} (CUIT ${datos.cuit})`);
   if (datos.bank) lineas.push(`Banco: ${datos.bank}`);

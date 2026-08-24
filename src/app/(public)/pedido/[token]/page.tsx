@@ -102,13 +102,67 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
 
   const cancelado = pedido.status === 'cancelled';
 
-  // Los datos para transferir aparecen SOLO mientras hay algo por pagar y la
-  // configuracion bancaria esta completa. Montos nunca: el link se reenvia, y
-  // un monto a la vista es municion para el "te falta pagar X, transferi aca"
-  // de un tercero. El alias y el CBU son publicos por naturaleza — existen
-  // para darselos a cualquiera que vaya a transferir.
-  const debeAlgo = pedido.deposit_status !== 'paid' || pedido.balance_status !== 'paid';
-  const banco = !cancelado && debeAlgo ? await getBankDataForClient() : null;
+  // LOS DATOS PARA TRANSFERIR, Y DONDE VAN.
+  //
+  // Aparecen solo mientras hay algo por pagar y la configuracion bancaria esta
+  // completa. Montos nunca: el link se reenvia, y un monto a la vista es
+  // municion para el "te falta pagar X, transferi aca" de un tercero. El alias
+  // y el CBU son publicos por naturaleza — existen para darselos a cualquiera
+  // que vaya a transferir.
+  //
+  // La POSICION depende de si toca pagar AHORA, porque de eso depende a que
+  // vino la persona:
+  //
+  //   - Falta la seña: el pedido no arranca hasta que se pague. Urgente.
+  //   - Falta el saldo y el pedido ya esta listo: es el momento exacto del
+  //     aviso "confirmamos cantidades, este es el saldo". Urgente.
+  //   - Falta el saldo pero todavia se esta fabricando: se debe, pero no toca.
+  //     Empujar a pagar algo que no corresponde todavia confunde.
+  //
+  // Cuando toca, el bloque va PRIMERO —antes del timeline— porque es a lo que
+  // vino; cuando no, queda abajo como referencia.
+  const debeSenia = pedido.deposit_status !== 'paid';
+  const debeSaldo = pedido.balance_status !== 'paid';
+  const pedidoTerminado = ['ready', 'shipped', 'delivered'].includes(pedido.status);
+  const tocaPagarAhora = !cancelado && (debeSenia || (debeSaldo && pedidoTerminado));
+
+  const banco = !cancelado && (debeSenia || debeSaldo) ? await getBankDataForClient() : null;
+
+  const bloqueTransferencia = banco ? (
+    <div
+      className={
+        tocaPagarAhora
+          ? 'mt-6 bg-amber-50 border-2 border-amber-300 rounded-xl p-6'
+          : 'mt-4 bg-white border border-gray-200 rounded-xl p-6'
+      }
+    >
+      <h2 className={tocaPagarAhora ? 'font-semibold text-amber-900' : 'text-sm font-semibold text-gray-900'}>
+        {tocaPagarAhora
+          ? debeSenia
+            ? 'Para pagar la seña y arrancar'
+            : 'Para pagar el saldo y coordinar la entrega'
+          : 'Datos para transferir'}
+      </h2>
+      <dl className="mt-3 space-y-2.5">
+        <CopiarDato
+          etiqueta="Alias"
+          valor={banco.alias}
+          nota={banco.alias.endsWith('.') ? 'El punto final es parte del alias — mejor usá Copiar.' : undefined}
+        />
+        <CopiarDato etiqueta="CBU" valor={banco.cbu} />
+        <div className="flex items-center gap-2 text-sm">
+          <dt className="text-gray-500 w-16 shrink-0">Titular:</dt>
+          <dd className="font-medium">
+            {banco.holder} (CUIT {banco.cuit})
+            {banco.bank && <span className="text-gray-500 font-normal"> · {banco.bank}</span>}
+          </dd>
+        </div>
+      </dl>
+      <p className={`mt-3 text-xs ${tocaPagarAhora ? 'text-amber-800' : 'text-gray-500'}`}>
+        Cuando transfieras, mandanos el comprobante por WhatsApp.
+      </p>
+    </div>
+  ) : null;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -125,6 +179,8 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
             {ORDER_STATUS_LABELS[pedido.status]}
           </span>
         </div>
+
+        {tocaPagarAhora && bloqueTransferencia}
 
         {cancelado ? (
           <div className="mt-6 bg-white border border-gray-200 rounded-xl p-6 text-center">
@@ -185,29 +241,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
           </ul>
         </div>
 
-        {banco && (
-          <div className="mt-4 bg-white border border-gray-200 rounded-xl p-6">
-            <h2 className="text-sm font-semibold text-gray-900">Datos para transferir</h2>
-            <dl className="mt-3 space-y-2.5">
-              <CopiarDato
-                etiqueta="Alias"
-                valor={banco.alias}
-                nota={banco.alias.endsWith('.') ? 'El punto final es parte del alias — mejor usá Copiar.' : undefined}
-              />
-              <CopiarDato etiqueta="CBU" valor={banco.cbu} />
-              <div className="flex items-center gap-2 text-sm">
-                <dt className="text-gray-500 w-16 shrink-0">Titular:</dt>
-                <dd className="font-medium">
-                  {banco.holder} (CUIT {banco.cuit})
-                  {banco.bank && <span className="text-gray-500 font-normal"> · {banco.bank}</span>}
-                </dd>
-              </div>
-            </dl>
-            <p className="mt-3 text-xs text-gray-500">
-              Cuando transfieras, mandanos el comprobante por WhatsApp.
-            </p>
-          </div>
-        )}
+        {!tocaPagarAhora && bloqueTransferencia}
 
         <a
           href={linkWhatsApp}

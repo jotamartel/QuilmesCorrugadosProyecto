@@ -126,11 +126,21 @@ export const RETOMAR_CONVERSACION: Plantilla = {
 // algún día no coinciden, el que está mal es el código.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** El botón que llevan los seis avisos. Mismo texto en todos, a propósito. */
-const BOTON_SEGUIMIENTO = {
-  texto: 'Ver mi pedido',
-  base: 'https://www.quilmescorrugados.com.ar/pedido/',
-} as const;
+/** La página es siempre la misma; lo que cambia es a qué se va. */
+const URL_SEGUIMIENTO = 'https://www.quilmescorrugados.com.ar/pedido/';
+
+/** Los cinco avisos informativos: se va a mirar cómo viene el pedido. */
+const BOTON_SEGUIMIENTO = { texto: 'Ver mi pedido', base: URL_SEGUIMIENTO } as const;
+
+/**
+ * El aviso del saldo: no se va a mirar, se va a PAGAR.
+ *
+ * El botón dice a dónde lleva de verdad —a los datos— y no "copiar el alias",
+ * que sería mentira: el botón navega, el que copia es el de la página. Y la
+ * página, cuando hay algo por pagar, pone esos datos primero, antes del
+ * timeline, porque es a lo que vino la persona.
+ */
+const BOTON_PARA_PAGAR = { texto: 'Datos para transferir', base: URL_SEGUIMIENTO } as const;
 
 const IDIOMA = process.env.META_WA_IDIOMA_PLANTILLAS || 'es_AR';
 
@@ -183,11 +193,16 @@ export const PEDIDO_SALDO_ACTUALIZADO: Plantilla = {
   idioma: IDIOMA,
   variables: 3,
   categoria: 'UTILITY',
-  botonUrl: BOTON_SEGUIMIENTO,
+  botonUrl: BOTON_PARA_PAGAR,
   cuerpo:
     'Hola, te escribimos de Quilmes Corrugados.\n\n' +
-    'El pedido {{1}} está listo. Confirmamos las cantidades finales: el saldo a pagar es $ {{2}}.\n' +
-    'Alias para transferir: {{3}}\n\n' +
+    'El pedido {{1}} está listo. Confirmamos las cantidades finales: el saldo a pagar es $ {{2}}.\n\n' +
+    'Alias para transferir: {{3}}\n' +
+    // El alias de la fábrica termina en punto, y en una línea de texto ese
+    // punto se lee como puntuación. En vez de aclararlo —que obligaría a saber
+    // de antemano cómo es el alias— se empuja al botón, donde se copia el
+    // valor exacto de un toque. Resuelve el problema sea cual sea el alias.
+    'Tocá el botón de abajo para copiarlo sin errores.\n\n' +
     'Cuando confirmes la transferencia por acá, coordinamos la entrega.',
 };
 

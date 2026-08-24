@@ -92,6 +92,16 @@ const delPedido = PLANTILLAS.filter((p) => p.nombre.startsWith('pedido_'));
   // todos los avisos ya aprobados dejan de coincidir con lo que se envía.
   const paths = new Set(delPedido.map((p) => p.botonUrl?.base));
   ok('las seis apuntan al mismo path', paths.size === 1, [...paths].join(' | '));
+
+  // El aviso del saldo no es informativo: la persona va a PAGAR. El botón
+  // tiene que decir eso, no "ver mi pedido".
+  const saldo = delPedido.find((p) => p.nombre === 'pedido_saldo_actualizado')!;
+  ok('el aviso del saldo lleva su propio botón, no el genérico',
+     saldo.botonUrl?.texto === 'Datos para transferir', saldo.botonUrl?.texto);
+  ok('y el cuerpo manda al botón para copiar el alias',
+     /botón de abajo para copiarlo/.test(saldo.cuerpo), saldo.cuerpo);
+  ok('el botón no promete copiar, porque navega y no copia',
+     !/copiar/i.test(saldo.botonUrl?.texto ?? ''), saldo.botonUrl?.texto);
 }
 
 console.log('');

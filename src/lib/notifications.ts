@@ -276,14 +276,22 @@ function buildConsultaSinRespuestaEmail(data: ConsultaSinRespuestaNotification):
       ${contact.email ? `<p><strong>Email:</strong> <a href="mailto:${contact.email}">${contact.email}</a></p>` : ''}
 
       <div style="background: #eff6ff; padding: 16px; border-radius: 8px; margin: 20px 0;">
-        <p style="margin: 0 0 8px 0;"><strong>1.</strong> Contestale a la persona, que esta esperando:
-          <a href="${sitio}/whatsapp">abrir la conversacion</a></p>
-        <p style="margin: 0;"><strong>2.</strong> Si la respuesta sirve para futuras consultas, escribila en
-          <a href="${sitio}/conocimiento">preguntas sin responder</a> y el asistente la va a saber la proxima vez.</p>
+        ${contact.phone
+          ? `<p style="margin: 0 0 8px 0;"><strong>1.</strong> Contestale a la persona, que esta esperando:
+              <a href="${sitio}/whatsapp">abrir la conversacion</a></p>`
+          : `<p style="margin: 0 0 8px 0;"><strong>1.</strong> <strong>Esta no se puede contestar:</strong> entro por
+              el chat del sitio, que no guarda la conversacion ni pide datos de contacto. El asistente le paso
+              el WhatsApp de la fabrica; si escribe, aparece en <a href="${sitio}/whatsapp">Cotizaciones WhatsApp</a>.</p>`
+        }
+        <p style="margin: 0;"><strong>2.</strong> Escribi la respuesta en
+          <a href="${sitio}/conocimiento">preguntas sin responder</a>: el asistente la va a saber la proxima vez,
+          que es lo que evita que esto se repita.</p>
       </div>
 
       <p style="color: #6b7280; font-size: 12px;">
-        El asistente le avisó que alguien del equipo le va a contestar, y sigue atendiendo el resto de la consulta.
+        ${contact.phone
+          ? `El asistente le avisó que alguien del equipo le va a contestar, y sigue atendiendo el resto de la consulta.`
+          : `El asistente le dijo que no lo sabía y lo invitó a seguir por WhatsApp, que es la unica via por la que puede llegarle la respuesta.`}
       </p>
     </div>
   `;

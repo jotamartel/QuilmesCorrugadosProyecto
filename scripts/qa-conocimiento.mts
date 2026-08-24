@@ -132,6 +132,37 @@ try {
 }
 
 console.log('');
+console.log('La promesa depende del canal: solo se ofrece lo que se puede cumplir');
+{
+  // Una consulta real por el chat del sitio —"Cajas Navideñas, trabajan?"—
+  // termino con el asistente prometiendo que un asesor iba a contestar "por
+  // aca". El chat del sitio no guarda la conversacion y el visitante es
+  // anonimo: no habia a quien contestarle, y la persona se perdio.
+  const { crearHerramientas } = await import("@/lib/agente/herramientas");
+  type Tool = { name: string; run: (a: Record<string, unknown>) => Promise<string> };
+  const herramienta = (canal: "web" | "whatsapp") =>
+    (crearHerramientas(canal === "web" ? { canal } : { canal, telefono: "+5491100000000" }) as unknown as Tool[])
+      .find((t) => t.name === "no_se_la_respuesta")!;
+
+  const args = {
+    pregunta: "Hacen cajas con ventana troquelada de acetato?",
+    busqueda: "ventana acetato troquel film transparente visor",
+    contexto: "QA: prueba de canal",
+    ya_revise_las_parecidas: true,
+  };
+
+  const web = JSON.parse(await herramienta("web").run(args));
+  ok("en el sitio devuelve por donde seguir", typeof web.como_seguir === "string" && /wa.me/.test(web.como_seguir), web.como_seguir);
+  ok("con la pregunta ya escrita en el link", /ventana/i.test(decodeURIComponent(web.como_seguir ?? "")));
+  ok("y le prohibe prometer respuesta por el chat", /NO le prometas/.test(web.instruccion ?? ""), (web.instruccion ?? "").slice(0, 80));
+
+  const wa = JSON.parse(await herramienta("whatsapp").run(args));
+  ok("por WhatsApp NO lo manda a otro lado", wa.como_seguir === undefined);
+  ok("y ahi si promete respuesta en la misma conversacion", /por acá mismo/.test(wa.instruccion ?? ""), (wa.instruccion ?? "").slice(0, 80));
+
+  await createAdminClient().from("base_de_conocimiento").delete().eq("pregunta", args.pregunta);
+}
+console.log('');
 console.log(fallos === 0 ? 'Todo bien.' : `${fallos} fallas.`);
 console.log('');
 process.exit(fallos === 0 ? 0 : 1);

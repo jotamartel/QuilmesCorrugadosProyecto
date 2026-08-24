@@ -893,17 +893,44 @@ export function crearHerramientas(ctx: ContextoAgente) {
         }).catch((e) => console.error('[Agente] no se pudo avisar de la consulta:', e));
       }
 
+      // LA PROMESA DEPENDE DEL CANAL, PORQUE LO QUE SE PUEDE CUMPLIR TAMBIEN.
+      //
+      // Por WhatsApp la conversacion existe: queda guardada, el equipo la abre
+      // en el panel y contesta ahi mismo. "Te contesta alguien por aca" es
+      // verdad.
+      //
+      // En el chat del sitio NO. No se persiste la conversacion y el visitante
+      // es anonimo: no hay telefono, no hay mail, no hay a quien contestarle.
+      // Se descubrio con una consulta real —"Cajas Navideñas, trabajan?"— donde
+      // el asistente prometio que un asesor iba a responder y del otro lado no
+      // habia forma de hacerlo. La persona cerro la pestaña y se perdio.
+      //
+      // Prometer una respuesta que no puede llegar es peor que decir "no se":
+      // el que pregunta se queda esperando en vez de buscar en otro lado.
+      const puedeSeguirLaConversacion = ctx.canal === 'whatsapp';
+
       return JSON.stringify({
         hay_respuestas_parecidas: false,
         anotada: true,
         veces_preguntada: vecesPreguntada,
-        instruccion:
-          'No tenemos la respuesta. Decile que no lo sabes con certeza y que le vas a pedir ' +
-          'a alguien del equipo que le conteste por acá mismo, que ya quedo avisado. NO ' +
-          'inventes una respuesta ni digas "creo que si". NO lo mandes a escribir a otro ' +
-          'lado: la persona sigue esta conversacion. Y SEGUI ATENDIENDOLO normalmente para ' +
-          'todo lo demas —si necesita una cotizacion, cotizale— que esto no lo deja ' +
-          'esperando para el resto.',
+        ...(puedeSeguirLaConversacion
+          ? {}
+          : { como_seguir: CONTACTO.whatsappCon(`Hola, consulta: ${pregunta}`) }),
+        instruccion: puedeSeguirLaConversacion
+          ? 'No tenemos la respuesta. Decile que no lo sabes con certeza y que le vas a pedir ' +
+            'a alguien del equipo que le conteste por acá mismo, que ya quedo avisado. NO ' +
+            'inventes una respuesta ni digas "creo que si". NO lo mandes a escribir a otro ' +
+            'lado: la persona sigue esta conversacion. Y SEGUI ATENDIENDOLO normalmente para ' +
+            'todo lo demas —si necesita una cotizacion, cotizale— que esto no lo deja ' +
+            'esperando para el resto.'
+          : 'No tenemos la respuesta. Decile que no lo sabes con certeza. NO inventes una ' +
+            'respuesta ni digas "creo que si". Y NO le prometas que alguien le contesta por ' +
+            'acá: este chat no guarda la conversacion y no tenemos como ubicarlo despues. ' +
+            'Pasale el link de "como_seguir", que abre WhatsApp con la pregunta ya escrita, ' +
+            'y decile que por ahi le responde una persona del equipo. Es la unica forma de ' +
+            'que la respuesta le llegue. Y SEGUI ATENDIENDOLO normalmente para todo lo ' +
+            'demas —si necesita una cotizacion, cotizale— que esto no lo deja esperando ' +
+            'para el resto.',
       });
     },
   });

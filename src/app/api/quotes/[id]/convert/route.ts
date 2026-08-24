@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { calculateDeliveryDate, toISODateString } from '@/lib/utils/dates';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -91,7 +92,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         delivery_address: body.delivery_address || quote.client?.address || null,
         delivery_city: body.delivery_city || quote.client?.city || null,
         delivery_notes: body.delivery_notes || null,
-        estimated_delivery: quote.estimated_delivery,
+        // Fallback para las quotes que quedaron sin fecha: el convert de las
+        // cotizaciones web copiaba production_days pero nunca calculaba el dia,
+        // y por eso 3 de las 7 ordenes vivas nacieron con esto en null. Un
+        // pedido sin fecha comprometida es un pedido que nadie puede priorizar.
+        estimated_delivery:
+          quote.estimated_delivery ??
+          toISODateString(calculateDeliveryDate(quote.production_days ?? 7)),
       })
       .select()
       .single();

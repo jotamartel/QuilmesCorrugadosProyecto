@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   FileText,
   ShoppingCart,
+  Factory,
   ShoppingBag,
   Users,
   Box,
@@ -38,6 +39,9 @@ const navigation = [
   { name: 'Cot. Wpp', href: '/whatsapp', icon: MessageCircle },
   { name: 'Sin responder', href: '/conocimiento', icon: MessageCircleQuestion },
   { name: 'Ordenes', href: '/ordenes', icon: ShoppingCart },
+  // Va pegada a Ordenes pero es otra pregunta: /ordenes es la gestion del
+  // pedido, /produccion es que fabricar hoy y en que orden.
+  { name: 'Produccion', href: '/produccion', icon: Factory },
   { name: 'Ventas Retail', href: '/ventas-retail', icon: ShoppingBag },
   { name: 'Clientes', href: '/clientes', icon: Users },
   { name: 'Pagos', href: '/pagos', icon: Receipt },

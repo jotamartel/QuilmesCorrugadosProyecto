@@ -80,18 +80,59 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     // Campos permitidos para actualizar (no status, eso tiene su propio endpoint)
-    const allowedFields = [
+    const camposDeTexto = [
       'delivery_address',
       'delivery_city',
       'delivery_notes',
+      // La franja horaria va en texto libre porque asi se acuerda por
+      // WhatsApp: "manana", "15 a 17hs", "antes del mediodia". Imponer un enum
+      // obligaria a mapear cada frase que dice un cliente.
+      'delivery_time_window',
     ];
+
+    // LA FECHA DE ENTREGA AHORA SE EDITA, Y ESO ERA MEDIA ETAPA.
+    //
+    // La calculaba el cotizador al crear la orden y despues no la tocaba
+    // nadie: si el cliente pedia otra fecha, o la maquina se atrasaba, el
+    // sistema seguia mostrando la primera. Tres de las siete ordenes vivas la
+    // tenian directamente en null.
+    //
+    // Son DOS fechas distintas y por eso son dos columnas:
+    //   estimated_delivery      la promesa al cliente, se fija al confirmar
+    //   scheduled_delivery_date el dia acordado para el flete, cuando ya esta
+    //                           lista y cobrada
+    const camposDeFecha = ['estimated_delivery', 'scheduled_delivery_date'];
 
     const updateData: Record<string, unknown> = {};
 
-    for (const field of allowedFields) {
+    for (const field of camposDeTexto) {
       if (body[field] !== undefined) {
         updateData[field] = body[field]?.trim() || null;
       }
+    }
+
+    for (const field of camposDeFecha) {
+      if (body[field] === undefined) continue;
+      const valor = String(body[field] ?? '').trim();
+      if (!valor) {
+        updateData[field] = null;
+        continue;
+      }
+      // Una fecha invalida guardada es peor que un 400: se muestra rota en el
+      // panel y se le anuncia rota al cliente. No se valida el RANGO a
+      // proposito —una fecha pasada sirve para regularizar un pedido viejo.
+      const fecha = new Date(valor);
+      if (Number.isNaN(fecha.getTime())) {
+        return NextResponse.json(
+          { error: `La fecha "${valor}" no es valida` },
+          { status: 400 },
+        );
+      }
+      updateData[field] = valor;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No hay nada para actualizar' }, { status: 400 });
     }
 
     const { data: order, error } = await supabase

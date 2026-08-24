@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { notificarEventoDePedido, type ResultadoAviso } from '@/lib/notificaciones-pedido';
+import { aplicarTransicion, TransicionInvalida } from '@/lib/orders/transiciones';
 import { isXubioEnabled, isArbaCotEnabled } from '@/lib/config/system';
 import { createBalanceInvoice, createRemito, previewInvoice, previewRemito } from '@/lib/xubio';
 import { generateCot, previewCot } from '@/lib/arba';
@@ -237,25 +238,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    // Actualizar estado de la orden a "shipped"
+    // El estado lo mueve el motor, no este handler.
     //
-    // EL ERROR SE CHEQUEA. Antes no: si este update fallaba, el aviso de
-    // "despachamos tu pedido" salia igual y el operador seguia viendo la orden
-    // en "Lista". El cliente enterandose de algo que en el sistema no paso.
-    const { error: errorDespacho } = await supabase
-      .from('orders')
-      .update({
-        status: 'shipped',
-        shipped_at: new Date().toISOString(),
-      })
-      .eq('id', orderId);
-
-    if (errorDespacho) {
-      console.error('[dispatch] no se pudo marcar la orden como despachada:', errorDespacho.message);
-      return NextResponse.json(
-        { error: 'La orden no se pudo marcar como despachada', results },
-        { status: 500 },
-      );
+    // Antes escribia status='shipped' con un update crudo: ninguna regla lo
+    // miraba, y si el update fallaba el aviso al cliente salia igual. Con
+    // fuente 'dispatch' el motor ademas exige que las cantidades esten
+    // confirmadas, que es la regla propia del despacho formal — el que emite
+    // factura y remito.
+    try {
+      await aplicarTransicion(supabase, orderId, 'shipped', { fuente: 'dispatch' });
+    } catch (e) {
+      if (e instanceof TransicionInvalida) {
+        return NextResponse.json({ error: e.message, results }, { status: e.http });
+      }
+      throw e;
     }
 
     // Este endpoint escribe el estado por su cuenta, salteando PATCH /status

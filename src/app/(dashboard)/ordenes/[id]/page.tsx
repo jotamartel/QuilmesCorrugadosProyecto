@@ -66,6 +66,8 @@ interface OrderWithRelations {
   delivery_city: string | null;
   delivery_notes: string | null;
   estimated_delivery: string | null;
+  scheduled_delivery_date: string | null;
+  delivery_time_window: string | null;
   production_started_at: string | null;
   ready_at: string | null;
   shipped_at: string | null;
@@ -122,6 +124,10 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
   const [linkCopiado, setLinkCopiado] = useState(false);
   // El estado que se está por aplicar, esperando confirmación. null = sin diálogo.
   const [estadoAConfirmar, setEstadoAConfirmar] = useState<OrderStatus | null>(null);
+  const [editandoFechas, setEditandoFechas] = useState(false);
+  const [fechaEntrega, setFechaEntrega] = useState('');
+  const [diaAcordado, setDiaAcordado] = useState('');
+  const [franja, setFranja] = useState('');
   const [notificar, setNotificar] = useState(true);
   const [checkHolder, setCheckHolder] = useState('');
   const [checkCuit, setCheckCuit] = useState('');
@@ -147,6 +153,29 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  async function guardarFechas() {
+    setActionLoading('fechas');
+    try {
+      const res = await fetch(`/api/orders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          estimated_delivery: fechaEntrega || null,
+          scheduled_delivery_date: diaAcordado || null,
+          delivery_time_window: franja || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'No se pudieron guardar las fechas');
+        return;
+      }
+      setEditandoFechas(false);
+      await fetchOrder();
+    } finally {
+      setActionLoading(null);
+    }
+  }
   // El botón ya no cambia el estado: abre el diálogo. El cambio ahora le
   // escribe al cliente, y un WhatsApp no se puede desenviar.
   function pedirConfirmacion(newStatus: OrderStatus) {
@@ -711,12 +740,82 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
                   <p className="font-medium">{formatDateTime(order.delivered_at)}</p>
                 </div>
               )}
-              {order.estimated_delivery && (
-                <div className="border-t pt-3">
-                  <p className="text-gray-600">Entrega estimada:</p>
-                  <p className="font-medium">{formatDate(order.estimated_delivery)}</p>
-                </div>
-              )}
+              {/* LA FECHA DE ENTREGA, EDITABLE.
+                  La calculaba el cotizador al crear la orden y no la tocaba
+                  nadie: si el cliente pedía otra o la máquina se atrasaba, el
+                  sistema seguía mostrando la primera. Y sin fecha, un pedido no
+                  se puede priorizar en la vista de producción. */}
+              <div className="border-t pt-3">
+                {editandoFechas ? (
+                  <div className="space-y-3">
+                    <Input
+                      label="Entrega comprometida"
+                      type="date"
+                      value={fechaEntrega}
+                      onChange={(e) => setFechaEntrega(e.target.value)}
+                    />
+                    {/* El día acordado es OTRA fecha: la de arriba se promete
+                        al confirmar el pedido, esta se pacta cuando ya está
+                        lista y cobrada. Solo aparece cuando corresponde. */}
+                    {['ready', 'shipped', 'delivered'].includes(order.status) && (
+                      <>
+                        <Input
+                          label="Día acordado para la entrega"
+                          type="datetime-local"
+                          value={diaAcordado}
+                          onChange={(e) => setDiaAcordado(e.target.value)}
+                        />
+                        <Input
+                          label="Franja horaria"
+                          placeholder="15 a 17hs"
+                          value={franja}
+                          onChange={(e) => setFranja(e.target.value)}
+                        />
+                      </>
+                    )}
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={guardarFechas} disabled={!!actionLoading}>
+                        {actionLoading === 'fechas' ? <LoadingSpinner size="sm" /> : 'Guardar'}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditandoFechas(false)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-gray-600">Entrega comprometida:</p>
+                        <p className="font-medium">
+                          {order.estimated_delivery ? formatDate(order.estimated_delivery) : 'sin fijar'}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setFechaEntrega(order.estimated_delivery?.slice(0, 10) ?? '');
+                          setDiaAcordado(order.scheduled_delivery_date?.slice(0, 16) ?? '');
+                          setFranja(order.delivery_time_window ?? '');
+                          setEditandoFechas(true);
+                        }}
+                      >
+                        Cambiar
+                      </Button>
+                    </div>
+                    {order.scheduled_delivery_date && (
+                      <div className="mt-2">
+                        <p className="text-gray-600">Entrega coordinada:</p>
+                        <p className="font-medium">
+                          {formatDateTime(order.scheduled_delivery_date)}
+                          {order.delivery_time_window ? ` · ${order.delivery_time_window}` : ''}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </CardContent>
           </Card>
 

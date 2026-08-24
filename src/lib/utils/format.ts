@@ -80,15 +80,13 @@ export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
 /**
  * Flujo de estados de orden (para validación de transiciones)
  */
-export const ORDER_STATUS_FLOW: Record<OrderStatus, OrderStatus[]> = {
-  pending_deposit: ['confirmed', 'cancelled'],
-  confirmed: ['in_production', 'cancelled'],
-  in_production: ['ready', 'cancelled'],
-  ready: ['shipped', 'cancelled'],
-  shipped: ['delivered'],
-  delivered: [],
-  cancelled: [],
-};
+/**
+ * El grafo de transiciones se mudó a src/lib/orders/transiciones.ts, junto con
+ * las reglas que lo acompañan. Acá queda el re-export para no romper a quien
+ * ya lo importaba desde este archivo — que es el que la UI usa para saber qué
+ * botones dibujar.
+ */
+export { TRANSICIONES as ORDER_STATUS_FLOW } from '@/lib/orders/transiciones';
 
 /**
  * Traducciones de métodos de pago
@@ -200,11 +198,10 @@ export function isValidCUIT(cuit: string): boolean {
 }
 
 /**
- * Verifica si una transición de estado de orden es válida
+ * Aca vivia isValidOrderStatusTransition, que devolvia un booleano.
+ *
+ * Se saco porque un "no se puede" sin motivo obliga a que cada llamador
+ * reconstruya la explicacion por su cuenta —y el handler de /status lo hacia
+ * con una copia del grafo—. puedeTransicionar() en src/lib/orders/transiciones
+ * devuelve el motivo escrito, que es lo que el operador necesita leer.
  */
-export function isValidOrderStatusTransition(
-  currentStatus: OrderStatus,
-  newStatus: OrderStatus
-): boolean {
-  return ORDER_STATUS_FLOW[currentStatus].includes(newStatus);
-}

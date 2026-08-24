@@ -15,6 +15,19 @@ import { AvisoDeCambioDeEstado } from '@/components/orders/AvisoDeCambioDeEstado
 import { explicarResultado, type ResultadoAviso } from '@/lib/avisos/eventos';
 import type { Order, OrderStatus } from '@/lib/types/database';
 
+/**
+ * Vencida: la fecha ya pasó y el pedido todavía está en la fábrica.
+ *
+ * Una orden entregada o cancelada con fecha vieja no es un problema, es
+ * historia. Marcarlas todas en rojo haría que el rojo dejara de significar
+ * algo.
+ */
+function vencida(order: Order): boolean {
+  if (!order.estimated_delivery) return false;
+  if (['shipped', 'delivered', 'cancelled'].includes(order.status)) return false;
+  return new Date(`${order.estimated_delivery.slice(0, 10)}T23:59:59`) < new Date();
+}
+
 const statusOptions = [
   { value: '', label: 'Todos los estados' },
   { value: 'pending_deposit', label: 'Pendiente seña' },
@@ -273,6 +286,7 @@ export default function OrdenesPage() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Origen</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">m2</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entrega</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Seña</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
@@ -302,6 +316,18 @@ export default function OrdenesPage() {
                         </td>
                         <td className="px-4 py-3 text-sm">{formatM2(order.total_m2)}</td>
                         <td className="px-4 py-3 text-sm font-medium">{formatCurrency(order.total)}</td>
+                        {/* La fecha comprometida al lado del estado: es lo que
+                            define qué es urgente, y estaba solo adentro del
+                            detalle. */}
+                        <td className="px-4 py-3 text-sm">
+                          {order.estimated_delivery ? (
+                            <span className={vencida(order) ? 'text-red-700 font-medium' : ''}>
+                              {formatDate(order.estimated_delivery)}
+                            </span>
+                          ) : (
+                            <span className="text-purple-700">sin fecha</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           <Badge className={ORDER_STATUS_COLORS[order.status as OrderStatus]}>
                             {ORDER_STATUS_LABELS[order.status as OrderStatus]}

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { calculateDeliveryDate, toISODateString } from '@/lib/utils/dates';
 import type { ConvertPublicQuoteRequest } from '@/lib/types/database';
 
 interface RouteParams {
@@ -158,6 +159,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           shipping_cost: 0,
           total: publicQuote.subtotal,
           production_days: publicQuote.estimated_days,
+          // La causa de raiz de las ordenes sin fecha: aca se copiaban los dias
+          // de produccion pero no se calculaba el dia concreto, asi que la
+          // orden derivada nacia sin fecha comprometida.
+          estimated_delivery: toISODateString(
+            calculateDeliveryDate(publicQuote.estimated_days ?? 7),
+          ),
           notes: publicQuote.message,
           internal_notes: `Convertido desde cotización web QW-${String(publicQuote.quote_number).padStart(4, '0')}`,
           valid_until: validUntil.toISOString(),

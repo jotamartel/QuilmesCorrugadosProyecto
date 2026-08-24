@@ -235,13 +235,18 @@ export const PEDIDO_ENTREGADO: Plantilla = {
  *
  * Existe para que el cliente no se entere preguntando. Cierra invitando a
  * retomar: una cancelación no siempre es el final de la operación.
+ *
+ * LA ÚNICA SIN BOTÓN, y está bien así: la página de seguimiento de un pedido
+ * cancelado solo dice "este pedido fue cancelado", que es lo mismo que ya dice
+ * el mensaje. Mandar a alguien a una página que no agrega nada gasta el único
+ * gesto que el mensaje pide de verdad, que es contestar. Se cargó sin botón en
+ * Meta y se deja así.
  */
 export const PEDIDO_CANCELADO: Plantilla = {
   nombre: 'pedido_cancelado',
   idioma: IDIOMA,
   variables: 1,
   categoria: 'UTILITY',
-  botonUrl: BOTON_SEGUIMIENTO,
   cuerpo:
     'Hola, te escribimos de Quilmes Corrugados.\n\n' +
     'El pedido *{{1}}* fue cancelado.\n\n' +

@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatM2 } from '@/lib/utils/pricing';
 import { urlSeguimientoPedido } from '@/lib/orders/token-publico';
+import { AvisoDeCambioDeEstado } from '@/components/orders/AvisoDeCambioDeEstado';
+import { explicarResultado, type ResultadoAviso } from '@/lib/avisos/eventos';
 import { formatDate, formatDateTime } from '@/lib/utils/dates';
 import {
   formatBoxDimensions,
@@ -85,6 +87,11 @@ interface OrderWithRelations {
     email: string | null;
     phone: string | null;
     has_credit?: boolean;
+    // El GET trae clients(*), así que estos vienen. Sin declararlos, el
+    // diálogo de aviso los lee como undefined y dice "el cliente no tiene
+    // WhatsApp cargado" cuando sí lo tiene.
+    whatsapp?: string | null;
+    whatsapp_optout?: boolean;
   } | null;
   quote: {
     id: string;
@@ -113,6 +120,9 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
   const [checkNumber, setCheckNumber] = useState('');
   const [checkDate, setCheckDate] = useState('');
   const [linkCopiado, setLinkCopiado] = useState(false);
+  // El estado que se está por aplicar, esperando confirmación. null = sin diálogo.
+  const [estadoAConfirmar, setEstadoAConfirmar] = useState<OrderStatus | null>(null);
+  const [notificar, setNotificar] = useState(true);
   const [checkHolder, setCheckHolder] = useState('');
   const [checkCuit, setCheckCuit] = useState('');
 
@@ -137,15 +147,23 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
-  async function handleStatusChange(newStatus: OrderStatus) {
-    if (!order) return;
+  // El botón ya no cambia el estado: abre el diálogo. El cambio ahora le
+  // escribe al cliente, y un WhatsApp no se puede desenviar.
+  function pedirConfirmacion(newStatus: OrderStatus) {
+    setNotificar(true);
+    setEstadoAConfirmar(newStatus);
+  }
+
+  async function aplicarCambioDeEstado() {
+    if (!order || !estadoAConfirmar) return;
+    const newStatus = estadoAConfirmar;
 
     setActionLoading(`status-${newStatus}`);
     try {
       const res = await fetch(`/api/orders/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: newStatus, notificar }),
       });
 
       const data = await res.json();
@@ -155,7 +173,14 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
         return;
       }
 
+      setEstadoAConfirmar(null);
       await fetchOrder();
+
+      // Lo que pasó con el aviso se dice SIEMPRE, incluso cuando salió bien:
+      // quien mueve el pedido tiene que saber si el cliente se enteró, y un
+      // aviso que no salió en silencio es peor que uno que no salió con cartel.
+      const aviso: ResultadoAviso | null = data.aviso ?? null;
+      if (aviso && aviso.estado !== 'enviada') alert(explicarResultado(aviso));
     } catch (error) {
       console.error('Error:', error);
       alert('Error al cambiar estado');
@@ -295,7 +320,7 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
               key={status}
               variant={status === 'cancelled' ? 'destructive' : 'outline'}
               size="sm"
-              onClick={() => handleStatusChange(status)}
+              onClick={() => pedirConfirmacion(status)}
               disabled={!!actionLoading}
             >
               {actionLoading === `status-${status}` ? (
@@ -810,6 +835,17 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
           })()}
         </div>
       </div>
+      <AvisoDeCambioDeEstado
+        abierto={estadoAConfirmar !== null}
+        nuevoEstado={estadoAConfirmar ?? 'confirmed'}
+        cliente={order.client}
+        notificar={notificar}
+        onNotificarChange={setNotificar}
+        onConfirmar={aplicarCambioDeEstado}
+        onCancelar={() => setEstadoAConfirmar(null)}
+        enviando={!!actionLoading}
+      />
+
     </div>
   );
 }

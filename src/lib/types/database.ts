@@ -399,9 +399,22 @@ export interface CreateClientRequest {
   notes?: string;
 }
 
+/**
+ * Los tres cuerpos que mueven un pedido comparten dos campos:
+ *
+ *   notificar — si se le avisa al cliente por WhatsApp. Opcional y por default
+ *               SÍ: la promesa fue "le notificás todos los movimientos", así
+ *               que el silencio tiene que ser una decisión explícita del
+ *               operador (el casillero del panel), no lo que pasa si nadie
+ *               manda nada.
+ *   actor     — quién lo hizo, para la auditoría de avisos. Hoy cae en
+ *               'sistema' porque los handlers no leen la sesión.
+ */
 export interface UpdateOrderStatusRequest {
   status: OrderStatus;
   notes?: string;
+  notificar?: boolean;
+  actor?: string;
 }
 
 export interface RegisterPaymentRequest {
@@ -636,6 +649,8 @@ export interface ConfirmQuantitiesRequest {
     id: string;
     quantity_delivered: number;
   }[];
+  notificar?: boolean;
+  actor?: string;
 }
 
 export interface DispatchOrderRequest {
@@ -644,6 +659,8 @@ export interface DispatchOrderRequest {
   generate_remito: boolean;
   generate_cot: boolean;
   send_invoice_email: boolean;
+  notificar?: boolean;
+  actor?: string;
 }
 
 export interface CheckExitRequest {

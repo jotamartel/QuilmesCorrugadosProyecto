@@ -11,6 +11,8 @@ import { Eye, Search, GripVertical, Plus } from 'lucide-react';
 import { formatCurrency, formatM2 } from '@/lib/utils/pricing';
 import { formatDate } from '@/lib/utils/dates';
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, CHANNEL_BADGE_LABELS, CHANNEL_BADGE_COLORS } from '@/lib/utils/format';
+import { AvisoDeCambioDeEstado } from '@/components/orders/AvisoDeCambioDeEstado';
+import { explicarResultado, type ResultadoAviso } from '@/lib/avisos/eventos';
 import type { Order, OrderStatus } from '@/lib/types/database';
 
 const statusOptions = [
@@ -39,6 +41,9 @@ export default function OrdenesPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  // El movimiento esperando confirmacion. null = sin dialogo abierto.
+  const [pendiente, setPendiente] = useState<{ orden: Order; nuevoEstado: OrderStatus } | null>(null);
+  const [notificar, setNotificar] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>(() => {
     // Recuperar preferencia del localStorage (solo en cliente)
     if (typeof window !== 'undefined') {
@@ -131,37 +136,52 @@ export default function OrdenesPage() {
     }
   }
 
-  async function handleDrop(e: DragEvent<HTMLDivElement>, newStatus: OrderStatus) {
+  // SOLTAR LA TARJETA YA NO CAMBIA EL ESTADO: ABRE LA CONFIRMACION.
+  //
+  // Antes el drop disparaba el PATCH derecho — un roce en un celular movia el
+  // pedido. Ahora ademas ese movimiento le escribe al cliente, y un WhatsApp
+  // no se puede desenviar. Tampoco se hace el update optimista todavia: si se
+  // pintara la tarjeta en la columna nueva y despues se cancela, hay que
+  // revertirla, y ese revert es justo lo que se olvida y deja la pantalla
+  // mintiendo. Se mueve cuando se confirma.
+  function handleDrop(e: DragEvent<HTMLDivElement>, newStatus: OrderStatus) {
     e.preventDefault();
     setDragOverStatus(null);
+    if (!draggedOrder || draggedOrder.status === newStatus) return;
+    setNotificar(true);
+    setPendiente({ orden: draggedOrder, nuevoEstado: newStatus });
+  }
 
-    if (!draggedOrder || draggedOrder.status === newStatus) {
-      return;
-    }
+  async function aplicarCambioPendiente() {
+    if (!pendiente) return;
+    const { orden, nuevoEstado } = pendiente;
 
-    // Actualizar estado localmente primero (optimistic update)
-    const previousOrders = [...orders];
-    setOrders(orders.map(o =>
-      o.id === draggedOrder.id ? { ...o, status: newStatus } : o
-    ));
-    setUpdatingOrder(draggedOrder.id);
+    const previas = [...orders];
+    setOrders(orders.map((o) => (o.id === orden.id ? { ...o, status: nuevoEstado } : o)));
+    setUpdatingOrder(orden.id);
+    setPendiente(null);
 
     try {
-      const res = await fetch(`/api/orders/${draggedOrder.id}/status`, {
+      const res = await fetch(`/api/orders/${orden.id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: nuevoEstado, notificar }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        // Revertir si falla
-        setOrders(previousOrders);
-        const data = await res.json();
+        setOrders(previas);
         alert(data.error || 'Error al actualizar el estado');
+        return;
       }
+
+      // Si el aviso no salio, se dice: un cliente que no se entero en silencio
+      // es peor que uno que no se entero con cartel.
+      const aviso: ResultadoAviso | null = data.aviso ?? null;
+      if (aviso && aviso.estado !== 'enviada') alert(explicarResultado(aviso));
     } catch (error) {
-      // Revertir si hay error
-      setOrders(previousOrders);
+      setOrders(previas);
       console.error('Error updating order status:', error);
       alert('Error al actualizar el estado');
     } finally {
@@ -393,6 +413,17 @@ export default function OrdenesPage() {
           ))}
         </div>
       )}
+      <AvisoDeCambioDeEstado
+        abierto={pendiente !== null}
+        nuevoEstado={pendiente?.nuevoEstado ?? 'confirmed'}
+        cliente={pendiente?.orden.client as { name?: string; whatsapp?: string | null; whatsapp_optout?: boolean } | null}
+        notificar={notificar}
+        onNotificarChange={setNotificar}
+        onConfirmar={aplicarCambioPendiente}
+        onCancelar={() => { setPendiente(null); setDraggedOrder(null); }}
+        enviando={!!updatingOrder}
+      />
+
     </div>
   );
 }

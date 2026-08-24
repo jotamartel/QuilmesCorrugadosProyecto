@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { notificarEventoDePedido, type ResultadoAviso } from '@/lib/notificaciones-pedido';
 import type { ConfirmQuantitiesRequest } from '@/lib/types/database';
 
 interface RouteParams {
@@ -181,6 +182,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const balanceRedondeado = Math.round(newBalanceAmount * 100) / 100;
 
+    // Este es EL aviso que pidio Fernando: "confirmas cantidades y le manda la
+    // diferencia a pagar". Sale despues del update, y el motor vuelve a leer la
+    // orden en vez de recibir el numero: asi lo que se le dice al cliente es lo
+    // que quedo escrito, no lo que este handler creia estar escribiendo.
+    let aviso: ResultadoAviso | null = null;
+    if (body.notificar !== false) {
+      aviso = await notificarEventoDePedido({
+        orderId,
+        evento: 'saldo_actualizado',
+        actor: body.actor,
+      });
+    }
+
     return NextResponse.json({
       message: 'Cantidades confirmadas correctamente',
       original: {
@@ -194,7 +208,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         balance_amount: balanceRedondeado,
       },
       precision_percent: precisionPct,
-      // Todo lo que el aviso al cliente (etapa 8) necesita, ya resuelto aca
+      aviso,
+      // Todo lo que el aviso al cliente necesita, ya resuelto aca
       // donde se conocen los numeros. El que avisa no re-deriva nada: lee.
       notification_payload: {
         order_number: fullOrder.order_number,

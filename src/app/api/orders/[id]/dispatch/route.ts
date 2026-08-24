@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { notificarEventoDePedido, type ResultadoAviso } from '@/lib/notificaciones-pedido';
 import { isXubioEnabled, isArbaCotEnabled } from '@/lib/config/system';
 import { createBalanceInvoice, createRemito, previewInvoice, previewRemito } from '@/lib/xubio';
 import { generateCot, previewCot } from '@/lib/arba';
@@ -237,7 +238,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Actualizar estado de la orden a "shipped"
-    await supabase
+    //
+    // EL ERROR SE CHEQUEA. Antes no: si este update fallaba, el aviso de
+    // "despachamos tu pedido" salia igual y el operador seguia viendo la orden
+    // en "Lista". El cliente enterandose de algo que en el sistema no paso.
+    const { error: errorDespacho } = await supabase
       .from('orders')
       .update({
         status: 'shipped',
@@ -245,9 +250,36 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       })
       .eq('id', orderId);
 
+    if (errorDespacho) {
+      console.error('[dispatch] no se pudo marcar la orden como despachada:', errorDespacho.message);
+      return NextResponse.json(
+        { error: 'La orden no se pudo marcar como despachada', results },
+        { status: 500 },
+      );
+    }
+
+    // Este endpoint escribe el estado por su cuenta, salteando PATCH /status
+    // (deuda vieja, la unifica el frente de produccion). Mientras tanto el
+    // aviso se dispara tambien desde aca, para que despachar por el camino
+    // formal avise igual que hacerlo desde el panel.
+    //
+    // Si los dos caminos disparan el mismo evento, el segundo no manda: lo
+    // frena la reserva 'enviando' del motor, no el UNIQUE. El UNIQUE evita la
+    // fila duplicada; la llamada a Meta la evita el estado de la reserva. Es
+    // una distincion que costo un doble envio reproducido en pruebas.
+    let aviso: ResultadoAviso | null = null;
+    if (body.notificar !== false) {
+      aviso = await notificarEventoDePedido({
+        orderId,
+        evento: 'despachada',
+        actor: body.actor,
+      });
+    }
+
     return NextResponse.json({
       success: results.errors.length === 0,
       results,
+      aviso,
       message: results.errors.length === 0
         ? 'Orden despachada correctamente'
         : 'Orden despachada con algunos errores',

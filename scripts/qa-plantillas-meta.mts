@@ -91,11 +91,15 @@ const delPedido = PLANTILLAS.filter((p) => p.nombre.startsWith('pedido_'));
   for (const p of delPedido) {
     ok(`${p.nombre}: UTILITY (no MARKETING, que se aprueba con reglas de publicidad)`,
        p.categoria === 'UTILITY', p.categoria);
-    ok(`${p.nombre}: lleva el botón de seguimiento`, !!p.botonUrl);
+    // Cancelado es la única sin botón, a propósito: la página de un pedido
+    // cancelado no agrega nada a lo que ya dice el mensaje.
+    const llevaBoton = p.nombre !== 'pedido_cancelado';
+    ok(`${p.nombre}: ${llevaBoton ? 'lleva' : 'NO lleva'} botón`, !!p.botonUrl === llevaBoton);
     ok(`${p.nombre}: el link NO quedó también en el cuerpo`,
        !/quilmescorrugados\.com\.ar/.test(p.cuerpo), 'el link duplicado confunde y ocupa lugar');
+    if (!p.botonUrl) continue;
     ok(`${p.nombre}: el texto del botón entra en 25 caracteres`,
-       (p.botonUrl?.texto.length ?? 99) <= 25, p.botonUrl?.texto);
+       p.botonUrl.texto.length <= 25, p.botonUrl.texto);
     // La variable va al final de la URL: si la base no termina en /, el token
     // se pega al path y el link no resuelve.
     ok(`${p.nombre}: la URL del botón termina en /pedido/`,
@@ -106,8 +110,8 @@ const delPedido = PLANTILLAS.filter((p) => p.nombre.startsWith('pedido_'));
 
   // El path está congelado en Meta: si alguien lo cambia acá, los links de
   // todos los avisos ya aprobados dejan de coincidir con lo que se envía.
-  const paths = new Set(delPedido.map((p) => p.botonUrl?.base));
-  ok('las seis apuntan al mismo path', paths.size === 1, [...paths].join(' | '));
+  const paths = new Set(delPedido.filter((p) => p.botonUrl).map((p) => p.botonUrl.base));
+  ok('todos los botones apuntan al mismo path', paths.size === 1, [...paths].join(' | '));
 
   // El aviso del saldo no es informativo: la persona va a PAGAR. El botón
   // tiene que decir eso, no "ver mi pedido".

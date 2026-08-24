@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       .from('orders')
       .select(`
         *,
-        client:clients(id, name, company),
+        client:clients(id, name, company, whatsapp, whatsapp_optout),
         quote:quotes(id, quote_number)
       `, { count: 'exact' })
       .gte('created_at', DATA_START_DATE)

@@ -6,6 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isValidOrderStatusTransition, ORDER_STATUS_LABELS } from '@/lib/utils/format';
+import {
+  notificarEventoDePedido,
+  EVENTO_POR_ESTADO,
+  type ResultadoAviso,
+} from '@/lib/notificaciones-pedido';
 import type { OrderStatus, UpdateOrderStatusRequest } from '@/lib/types/database';
 
 interface RouteParams {
@@ -108,8 +113,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       throw updateError;
     }
 
-    // Registrar comunicación
-    await supabase.from('communications').insert({
+    // Registrar comunicación. Si falla, se registra y se sigue: el estado ya
+    // cambió y el aviso al cliente vale más que el renglón del historial.
+    const { error: errorHistorial } = await supabase.from('communications').insert({
       client_id: order.client_id,
       order_id: order.id,
       channel: 'manual',
@@ -123,9 +129,34 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       },
     });
 
+    if (errorHistorial) {
+      console.error('[status] no se pudo registrar en el historial:', errorHistorial.message);
+    }
+
+    // EL AVISO AL CLIENTE.
+    //
+    // Va DESPUÉS del update: si el aviso falla, el pedido ya avanzó igual y lo
+    // único pendiente es contarlo. Al revés —avisar antes de mover— se le
+    // podría decir al cliente que empezamos a fabricar y que el cambio no
+    // quede guardado.
+    //
+    // Prendido por default, apagado si el operador destildó el casillero: la
+    // promesa fue "le notificás todos los movimientos", así que el silencio
+    // tiene que ser una decisión, no el comportamiento por omisión.
+    const evento = EVENTO_POR_ESTADO[newStatus];
+    let aviso: ResultadoAviso | null = null;
+    if (evento && body.notificar !== false) {
+      aviso = await notificarEventoDePedido({
+        orderId: order.id,
+        evento,
+        actor: body.actor,
+      });
+    }
+
     return NextResponse.json({
       success: true,
       order: updatedOrder,
+      aviso,
       message: `Orden ${order.order_number} actualizada a "${ORDER_STATUS_LABELS[newStatus]}"`,
     });
   } catch (error) {

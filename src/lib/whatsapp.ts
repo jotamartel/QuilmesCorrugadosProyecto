@@ -102,6 +102,8 @@ export async function enviarPlantillaWhatsApp(
   telefono: string,
   plantilla: Plantilla,
   variables: string[] = [],
+  /** El valor del {{1}} del botón de URL, para las plantillas que lo llevan. */
+  variableDeBoton?: string,
 ): Promise<'enviada' | 'sin_soporte' | 'error'> {
   if (!transporte.enviarPlantilla) {
     console.error(
@@ -111,10 +113,22 @@ export async function enviarPlantillaWhatsApp(
     return 'sin_soporte';
   }
 
+  // Si la plantilla declara botón, su variable es obligatoria: sin ella Meta
+  // rechaza el envío entero. Cortar acá deja un mensaje que se entiende, en
+  // vez de un error de la API que no dice cuál es el problema.
+  if (plantilla.botonUrl && !variableDeBoton?.trim()) {
+    console.error(
+      '[WhatsApp] la plantilla "%s" lleva botón y no se le pasó su variable',
+      plantilla.nombre,
+    );
+    return 'error';
+  }
+
   const ok = await transporte.enviarPlantilla(telefono, {
     nombre: plantilla.nombre,
     idioma: plantilla.idioma,
     variables,
+    ...(variableDeBoton ? { variableDeBoton } : {}),
   });
 
   if (ok) {

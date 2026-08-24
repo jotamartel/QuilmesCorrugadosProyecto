@@ -55,6 +55,14 @@ export interface PlantillaAEnviar {
   idioma: string;
   /** Los valores de {{1}}, {{2}}… en orden. Vacío si la plantilla no tiene. */
   variables?: string[];
+  /**
+   * El valor de la variable del botón de URL, si la plantilla lleva uno.
+   *
+   * NUMERACIÓN APARTE: el botón tiene su propio {{1}}, independiente del
+   * cuerpo. Una plantilla con dos variables en el cuerpo y un botón manda
+   * {{1}} y {{2}} en el cuerpo, y otro {{1}} en el botón.
+   */
+  variableDeBoton?: string;
 }
 
 /** Lo que el webhook necesita de un proveedor, y nada más. */

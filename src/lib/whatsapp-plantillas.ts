@@ -56,6 +56,28 @@ export interface Plantilla {
    */
   cuerpo: string;
   categoria: 'UTILITY' | 'MARKETING' | 'AUTHENTICATION';
+  /**
+   * El botón de URL dinámica, si la plantilla lleva uno.
+   *
+   * POR QUÉ EL LINK VA EN UN BOTÓN Y NO EN EL TEXTO
+   *
+   * Un link en medio de un párrafo, en un teléfono, es un blanco chico y se
+   * pierde entre las líneas. El botón nativo de WhatsApp va abajo del mensaje,
+   * ocupa el ancho y no compite con nada. Y en estos avisos el link ES la
+   * acción: lleva a la página donde el cliente ve su pedido y —cuando debe
+   * plata— copia el alias y el CBU con un toque, que es lo que un WhatsApp no
+   * puede hacer.
+   *
+   * Meta acepta la variable SOLO al final de la URL, que es justo la forma del
+   * token. La parte fija queda revisada en la aprobación: cambiar el dominio o
+   * el path obliga a dar de alta plantillas nuevas.
+   */
+  botonUrl?: {
+    /** Lo que dice el botón. Máximo 25 caracteres. */
+    texto: string;
+    /** La URL sin la variable, tal cual se carga en Meta. */
+    base: string;
+  };
 }
 
 /**
@@ -79,4 +101,146 @@ export const RETOMAR_CONVERSACION: Plantilla = {
     'Tenemos la respuesta lista. Respondé este mensaje y seguimos por acá.',
 };
 
-export const PLANTILLAS = [RETOMAR_CONVERSACION];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOS AVISOS DEL CICLO DE VIDA DEL PEDIDO
+//
+// Seis eventos, seis plantillas. Es el mínimo que cubre el flujo: menos obliga
+// a unir avisos que dicen cosas distintas, más es trámite muerto.
+//
+// LAS TRES REGLAS QUE LES DAN LA FORMA, todas aprendidas rebotando:
+//
+//   1. Ninguna variable puede ser lo primero ni lo último del cuerpo. Por eso
+//      todas cierran con una línea de texto, que además invita a responder —y
+//      una respuesta del cliente reabre la ventana de 24 horas, que es lo que
+//      permite seguir la conversación en texto libre.
+//   2. Meta rechaza el envío ENTERO si cualquier variable llega vacía. Por eso
+//      cada una es un dato que existe siempre: el número de orden lo genera la
+//      base, los montos siempre están calculados, las fechas tienen texto de
+//      reserva. Ninguna depende de que alguien haya cargado algo opcional.
+//   3. El link va en el botón y no en el texto, con la variable al final de la
+//      URL, que es la única forma que Meta acepta.
+//
+// EL DOMINIO VA ESCRITO ACÁ Y NO SALE DE SITE_URL a propósito: lo que vale es
+// lo que quedó aprobado en Meta, no lo que diga una variable de entorno. Si
+// algún día no coinciden, el que está mal es el código.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** El botón que llevan los seis avisos. Mismo texto en todos, a propósito. */
+const BOTON_SEGUIMIENTO = {
+  texto: 'Ver mi pedido',
+  base: 'https://www.quilmescorrugados.com.ar/pedido/',
+} as const;
+
+const IDIOMA = process.env.META_WA_IDIOMA_PLANTILLAS || 'es_AR';
+
+/**
+ * La seña entró y el pedido queda agendado.
+ *
+ * El saldo va como ESTIMADO y con el motivo al lado: la cantidad producida
+ * varía hasta un 5% y se factura lo entregado, así que el número exacto recién
+ * existe cuando se confirman las cantidades. Prometer acá un número cerrado
+ * que después cambia es un reclamo asegurado.
+ */
+export const PEDIDO_CONFIRMADO: Plantilla = {
+  nombre: 'pedido_confirmado',
+  idioma: IDIOMA,
+  variables: 2,
+  categoria: 'UTILITY',
+  botonUrl: BOTON_SEGUIMIENTO,
+  cuerpo:
+    'Hola, te escribimos de Quilmes Corrugados.\n\n' +
+    'Recibimos la seña del pedido {{1}}. Queda confirmado y agendado para fabricar.\n\n' +
+    'Saldo estimado: $ {{2}}. La cantidad producida puede variar hasta un 5% ' +
+    '—así se fabrica el cartón— y se factura lo entregado, por eso el saldo final ' +
+    'se confirma al terminar la fabricación.\n\n' +
+    'Ante cualquier duda, respondé este mensaje.',
+};
+
+/** Arrancó la fabricación. Es el aviso que pidió el dueño con todas las letras. */
+export const PEDIDO_EN_PRODUCCION: Plantilla = {
+  nombre: 'pedido_en_produccion',
+  idioma: IDIOMA,
+  variables: 2,
+  categoria: 'UTILITY',
+  botonUrl: BOTON_SEGUIMIENTO,
+  cuerpo:
+    'Hola, te escribimos de Quilmes Corrugados.\n\n' +
+    'Empezamos a fabricar el pedido {{1}}.\n' +
+    'Fecha estimada de entrega: {{2}}.\n\n' +
+    'Ante cualquier duda, respondé este mensaje.',
+};
+
+/**
+ * Salió de máquina: acá el número YA es el final.
+ *
+ * Es el único aviso donde el saldo no es estimado, y por eso lo dice. El alias
+ * va como variable y no en el cuerpo fijo: si cambia el banco, cambia el dato
+ * sin re-aprobar la plantilla.
+ */
+export const PEDIDO_SALDO_ACTUALIZADO: Plantilla = {
+  nombre: 'pedido_saldo_actualizado',
+  idioma: IDIOMA,
+  variables: 3,
+  categoria: 'UTILITY',
+  botonUrl: BOTON_SEGUIMIENTO,
+  cuerpo:
+    'Hola, te escribimos de Quilmes Corrugados.\n\n' +
+    'El pedido {{1}} está listo. Confirmamos las cantidades finales: el saldo a pagar es $ {{2}}.\n' +
+    'Alias para transferir: {{3}}\n\n' +
+    'Cuando confirmes la transferencia por acá, coordinamos la entrega.',
+};
+
+export const PEDIDO_DESPACHADO: Plantilla = {
+  nombre: 'pedido_despachado',
+  idioma: IDIOMA,
+  variables: 2,
+  categoria: 'UTILITY',
+  botonUrl: BOTON_SEGUIMIENTO,
+  cuerpo:
+    'Hola, te escribimos de Quilmes Corrugados.\n\n' +
+    'Despachamos el pedido {{1}} el {{2}}. Ya está en camino.\n\n' +
+    'Ante cualquier duda, respondé este mensaje.',
+};
+
+export const PEDIDO_ENTREGADO: Plantilla = {
+  nombre: 'pedido_entregado',
+  idioma: IDIOMA,
+  variables: 1,
+  categoria: 'UTILITY',
+  botonUrl: BOTON_SEGUIMIENTO,
+  cuerpo:
+    'Hola, te escribimos de Quilmes Corrugados.\n\n' +
+    'El pedido {{1}} figura como entregado. Gracias por confiar en nosotros.\n\n' +
+    'Si tenés algún tema con la entrega, respondé este mensaje.',
+};
+
+/**
+ * Se canceló.
+ *
+ * Existe para que el cliente no se entere preguntando. Cierra invitando a
+ * retomar: una cancelación no siempre es el final de la operación.
+ */
+export const PEDIDO_CANCELADO: Plantilla = {
+  nombre: 'pedido_cancelado',
+  idioma: IDIOMA,
+  variables: 1,
+  categoria: 'UTILITY',
+  botonUrl: BOTON_SEGUIMIENTO,
+  cuerpo:
+    'Hola, te escribimos de Quilmes Corrugados.\n\n' +
+    'El pedido {{1}} fue cancelado.\n\n' +
+    'Si querés retomar la operación o necesitás una explicación, respondé este ' +
+    'mensaje y te contactamos.',
+};
+
+
+export const PLANTILLAS = [
+  RETOMAR_CONVERSACION,
+  PEDIDO_CONFIRMADO,
+  PEDIDO_EN_PRODUCCION,
+  PEDIDO_SALDO_ACTUALIZADO,
+  PEDIDO_DESPACHADO,
+  PEDIDO_ENTREGADO,
+  PEDIDO_CANCELADO,
+];

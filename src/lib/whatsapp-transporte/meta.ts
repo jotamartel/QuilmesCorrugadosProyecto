@@ -210,6 +210,34 @@ export const transporteMeta: Transporte = {
       return false;
     }
 
+    // El boton de URL dinamica tiene la misma regla que el cuerpo: vacio, Meta
+    // rechaza el envio entero. Se corta antes.
+    if (plantilla.variableDeBoton !== undefined && !plantilla.variableDeBoton.trim()) {
+      console.error(
+        '[whatsapp:meta] la plantilla "%s" declara boton pero su variable vino vacia',
+        plantilla.nombre,
+      );
+      return false;
+    }
+
+    const componentes: Array<Record<string, unknown>> = [];
+    if (valores.length) {
+      componentes.push({
+        type: 'body',
+        parameters: valores.map((text) => ({ type: 'text', text })),
+      });
+    }
+    if (plantilla.variableDeBoton) {
+      // index '0' = el primer boton de la plantilla. Si algun dia una lleva
+      // dos, este numero deja de ser una constante.
+      componentes.push({
+        type: 'button',
+        sub_type: 'url',
+        index: '0',
+        parameters: [{ type: 'text', text: plantilla.variableDeBoton }],
+      });
+    }
+
     return postear({
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -218,16 +246,9 @@ export const transporteMeta: Transporte = {
       template: {
         name: plantilla.nombre,
         language: { code: plantilla.idioma },
-        // Sin variables NO va el array de componentes: mandarlo vacio es un
-        // error de la API, no un no-op.
-        ...(valores.length
-          ? {
-              components: [{
-                type: 'body',
-                parameters: valores.map((text) => ({ type: 'text', text })),
-              }],
-            }
-          : {}),
+        // Sin componentes NO va el array: mandarlo vacio es un error de la
+        // API, no un no-op.
+        ...(componentes.length ? { components: componentes } : {}),
       },
     });
   },

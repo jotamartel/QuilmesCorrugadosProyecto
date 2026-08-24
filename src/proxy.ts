@@ -81,16 +81,11 @@ const PUBLICO: Array<{ patron: RegExp; metodos?: string[]; nota: string }> = [
   // que la nota no puede clavar uno de los dos: la ruta valida la firma que
   // corresponda al proveedor activo.
   { patron: /^\/api\/whatsapp\/webhook$/, nota: 'webhook: valida firma del proveedor activo' },
-  // La nota decia "valida secret token" y no validaba nada: cualquiera con la
-  // URL podia hacer que el bot contestara, y disparar las llamadas al modelo.
-  // Ahora si, con la cabecera x-telegram-bot-api-secret-token.
-  { patron: /^\/api\/telegram\/webhook$/, nota: 'webhook: valida el secret token de Telegram' },
-  // La nota decia "con su propia API key" y era cierta para UNA de las cuatro:
-  // /webhook verifica la firma con el SDK de Retell. Las otras tres contestaban
-  // 200 sin ninguna credencial —comprobado contra produccion— y registrar-lead
-  // ademas escribe en la cola de ventas. Ahora las tres piden una cabecera
-  // compartida: ver src/lib/retell-acceso.ts.
-  { patron: /^\/api\/retell\//, nota: 'agente de voz: /webhook firma, el resto cabecera compartida' },
+  // ACA HUBO UNA EXCEPCION PARA EL AGENTE DE VOZ (Retell). Se saco el
+  // 24/08/2026 junto con toda la integracion, que no se usaba y no habia
+  // dejado un solo dato en la base. Era ademas la unica familia de rutas
+  // publicas que se defendia con una cabecera compartida en vez de una firma:
+  // sacarla deja menos superficie abierta y una forma menos de proteger cosas.
   // Decia "con API key" y no habia ninguna: RESEND_API_KEY es para MANDAR
   // mails, no para verificar los que entran. Ahora valida la firma de Svix.
   { patron: /^\/api\/email\/inbound$/, nota: 'correo entrante: valida firma de Svix' },

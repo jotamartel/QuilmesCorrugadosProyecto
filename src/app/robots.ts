@@ -15,7 +15,6 @@ const API_PRIVADA = [
   '/api/webhooks/',
   '/api/whatsapp/',
   '/api/telegram/',
-  '/api/retell/',
   '/api/xubio/',
   '/api/traffic/',
   '/api/contacts/',

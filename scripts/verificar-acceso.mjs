@@ -43,14 +43,10 @@ const ABIERTAS = [
  * puesto.
  *
  * Existen porque la lista blanca de src/proxy.ts decia "agente de voz, con su
- * propia API key" y eso era cierto para UNA de las cuatro rutas de retell. Las
- * otras tres contestaban 200 sin nada, y una escribe leads.
+ * propia API key". El agente de voz (Retell) se saco el 24/08/2026: no se usaba.
+ * Las que quedan son webhooks de proveedores, cada uno con su firma.
  */
 const ABIERTAS_PERO_SE_CUIDAN_SOLAS = [
-  ['POST', '/api/retell/cotizar', 'cabecera compartida'],
-  ['POST', '/api/retell/registrar-lead', 'cabecera compartida — escribe leads'],
-  ['POST', '/api/retell/transferir', 'cabecera compartida'],
-  ['POST', '/api/retell/webhook', 'firma del SDK de Retell'],
   ['POST', '/api/email/inbound', 'firma de Svix'],
   ['POST', '/api/whatsapp/webhook', 'firma del proveedor'],
   ['POST', '/api/webhooks/mercadopago', 'firma HMAC'],
@@ -151,7 +147,6 @@ for (const [metodo, ruta, nota] of ABIERTAS) {
 // roto corta antes de llegar a la firma.
 //
 // Lo que si prueba cada una es su propia QA:
-//   scripts/qa-acceso-retell.mts        las tres funciones del agente de voz
 //   scripts/qa-firma-email.mts          la firma de Svix de Resend
 //   scripts/qa-transporte-whatsapp.mts  la firma de Meta
 console.log('\nABIERTAS EN LA COMPUERTA, SE CUIDAN SOLAS — informativo\n');

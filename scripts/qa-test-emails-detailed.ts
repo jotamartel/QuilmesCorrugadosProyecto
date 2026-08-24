@@ -123,20 +123,6 @@ async function runTests() {
   results.push(test3);
   console.log(test3.passed ? '✅ PASS' : `❌ FAIL: ${test3.error || test3.httpCode}`);
   console.log('');
-
-  // Test 4: Retell registrar lead
-  console.log('📞 Test 4: Lead desde Retell AI');
-  const test4 = await testEndpoint(
-    'Retell lead',
-    'POST',
-    `${BASE_URL}/api/retell/registrar-lead`,
-    {
-      nombre: 'Cliente Test',
-      email: 'cliente@example.com',
-      telefono: '+541133411781',
-      consulta: 'Cotización de cajas',
-      cotizacion_id: 'test-123',
-    }
   );
   results.push(test4);
   console.log(test4.passed ? '✅ PASS' : `❌ FAIL: ${test4.error || test4.httpCode}`);

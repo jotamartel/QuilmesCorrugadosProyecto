@@ -91,15 +91,6 @@ test_endpoint "Email inbound" "POST" "$BASE_URL/api/email/inbound" '{
 }'
 echo ""
 
-# Test 4: Retell registrar lead
-echo "📞 Test 4: Lead desde Retell AI"
-test_endpoint "Retell lead" "POST" "$BASE_URL/api/retell/registrar-lead" '{
-  "nombre": "Cliente Test",
-  "email": "cliente@example.com",
-  "telefono": "+541133411781",
-  "consulta": "Cotización de cajas",
-  "cotizacion_id": "test-123"
-}'
 echo ""
 
 echo "✅ Tests completados!"

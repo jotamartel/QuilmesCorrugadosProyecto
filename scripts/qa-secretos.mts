@@ -43,7 +43,6 @@ const PATRONES: Array<[string, RegExp]> = [
   ['Resend', /re_[A-Za-z0-9]{10,}_[A-Za-z0-9]{20,}/],
   ['Twilio', /SK[0-9a-f]{32}/],
   ['Meta / WhatsApp', /EAA[A-Za-z0-9]{100,}/],
-  ['Retell', /key_[a-f0-9]{28,}/],
   ['MercadoPago', /APP_USR-[0-9a-f]{8}-[0-9a-f-]{20,}/],
   ['Secreto de webhook', /whsec_[A-Za-z0-9+/=]{24,}/],
   ['Contraseña de Postgres', /postgres(?:ql)?:\/\/[^:\s]+:(?!TU_|<|\$|\[|\*\*\*)[^@\s]{8,}@/],

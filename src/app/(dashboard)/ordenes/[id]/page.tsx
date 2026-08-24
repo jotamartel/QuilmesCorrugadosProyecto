@@ -26,6 +26,7 @@ import {
   Receipt,
 } from 'lucide-react';
 import { formatCurrency, formatM2 } from '@/lib/utils/pricing';
+import { urlSeguimientoPedido } from '@/lib/orders/token-publico';
 import { formatDate, formatDateTime } from '@/lib/utils/dates';
 import {
   formatBoxDimensions,
@@ -44,6 +45,7 @@ interface OrderWithRelations {
   status: OrderStatus;
   channel: Channel;
   pricing_mode: 'motor' | 'manual';
+  public_token: string;
   total_m2: number;
   subtotal: number;
   printing_cost: number;
@@ -110,6 +112,7 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
   const [checkBank, setCheckBank] = useState('');
   const [checkNumber, setCheckNumber] = useState('');
   const [checkDate, setCheckDate] = useState('');
+  const [linkCopiado, setLinkCopiado] = useState(false);
   const [checkHolder, setCheckHolder] = useState('');
   const [checkCuit, setCheckCuit] = useState('');
 
@@ -315,6 +318,40 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
           ))}
         </div>
       </div>
+
+      {/* El link de seguimiento del cliente. Cada orden tiene su token: este
+          link es DE ESTE pedido, y es lo que va adentro de los avisos de
+          WhatsApp. Muestra estado, hitos y medidas — sin plata ni contacto. */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900">Link de seguimiento del cliente</p>
+              <input
+                readOnly
+                value={urlSeguimientoPedido(order.public_token)}
+                onFocus={(e) => e.target.select()}
+                className="mt-1 w-full text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded px-2 py-1.5 font-mono"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 self-start sm:self-end"
+              onClick={() => {
+                navigator.clipboard.writeText(urlSeguimientoPedido(order.public_token));
+                setLinkCopiado(true);
+                setTimeout(() => setLinkCopiado(false), 2000);
+              }}
+            >
+              {linkCopiado ? 'Copiado ✓' : 'Copiar link'}
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            El cliente ve el estado, los hitos y las medidas. No ve montos ni datos de contacto.
+          </p>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main info */}

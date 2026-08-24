@@ -9,7 +9,7 @@ import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { BelowMinimumModal } from '@/components/public/BelowMinimumModal';
 import { formatCurrency } from '@/lib/utils/pricing';
-import { precioUnitarioARS } from '@/lib/cotizacion/motor';
+import { precioUnitarioARS, VARIACION_PRODUCCION_PCT } from '@/lib/cotizacion/motor';
 import { CONTACTO } from '@/lib/contacto';
 
 // Importar BoxPreview3D dinámicamente
@@ -31,8 +31,6 @@ interface PublicQuoteData {
   quote_number_formatted: string;
   requester_name: string;
   requester_company: string | null;
-  requester_email: string;
-  requester_phone: string;
   length_mm: number;
   width_mm: number;
   height_mm: number;
@@ -261,13 +259,8 @@ export default function QuoteConfirmationPage() {
                       <span className="font-medium">{quote.requester_name}</span>
                     </p>
                   )}
-                  <p>
-                    <span className="text-gray-500">Email:</span>{' '}
-                    <span className="font-medium">{quote.requester_email}</span>
-                  </p>
-                  <p>
-                    <span className="text-gray-500">Teléfono:</span>{' '}
-                    <span className="font-medium">{quote.requester_phone}</span>
+                  <p className="text-gray-500 text-xs pt-1">
+                    Te contactamos al correo y teléfono que dejaste al cotizar.
                   </p>
                 </div>
               </div>
@@ -287,6 +280,14 @@ export default function QuoteConfirmationPage() {
                   <li className="flex items-start gap-2">
                     <span className="text-amber-600">3.</span>
                     Una vez confirmado, emitiremos la factura con el 50% de seña.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-600">4.</span>
+                    <span>
+                      La cantidad producida puede variar hasta un {VARIACION_PRODUCCION_PCT}% —así se
+                      fabrica el cartón— y se factura lo entregado: el saldo final se confirma al
+                      terminar la fabricación.
+                    </span>
                   </li>
                 </ul>
 

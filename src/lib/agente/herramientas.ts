@@ -6,6 +6,7 @@ import {
   precioUnitarioARS,
   urlPlantilla,
   notaImpresion,
+  NOTA_VARIACION_PRODUCCION,
   instruccionDeImpedimento,
   mensajeDeImpedimento,
 } from '@/lib/cotizacion/motor';
@@ -439,6 +440,9 @@ export function crearHerramientas(ctx: ContextoAgente) {
           }
         : null,
       iva: 'Los precios publicados van sin IVA. El IVA es 21% y se informa aparte.',
+      // Faltaba, y es la pregunta que sigue a la seña: "¿cuánto me queda por
+      // pagar?". La respuesta honesta es "depende de lo que salga de máquina".
+      cantidades_y_saldo: NOTA_VARIACION_PRODUCCION,
       material: MATERIAL.nota,
       impresion: c
         ? {

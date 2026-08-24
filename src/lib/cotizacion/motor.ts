@@ -55,6 +55,28 @@ const NOTA_POLIMERO =
   'es una matriz por color, se hace una vez por diseño y queda para las ' +
   'próximas tiradas de ese mismo arte.';
 
+/**
+ * La tolerancia de producción del corrugado.
+ *
+ * Una corrida de fabricación no da la cantidad exacta: la merma y el arranque
+ * de máquina mueven el número hasta un 5% para cualquier lado, y se factura lo
+ * efectivamente entregado. Por eso el saldo que se anuncia al confirmar el
+ * pedido es UNA ESTIMACIÓN: el número final recién existe cuando se confirman
+ * las cantidades (confirm-quantities, que recalcula el saldo sobre los m²
+ * entregados y guarda el snapshot).
+ *
+ * Vive acá y no repetido en cada superficie por la regla de la casa. Ojo: las
+ * plantillas de WhatsApp aprobadas por Meta llevan el "5%" congelado en el
+ * texto — si esta tolerancia cambia, hay que re-aprobar las plantillas.
+ */
+export const VARIACION_PRODUCCION_PCT = 5;
+
+export const NOTA_VARIACION_PRODUCCION =
+  `La cantidad producida puede variar hasta un ${VARIACION_PRODUCCION_PCT}% en más o en menos: ` +
+  'es propio de la fabricación de cartón. Se factura lo efectivamente entregado, ' +
+  'así que el saldo después de la seña se confirma al terminar la producción, ' +
+  'con las cantidades finales.';
+
 export interface BoxInput {
   length_mm: number;
   width_mm: number;

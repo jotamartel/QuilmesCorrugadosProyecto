@@ -1,6 +1,13 @@
 /**
  * API Pública: /api/public/quotes/[id]
  * Ver cotización pública por ID (datos limitados, sin info sensible)
+ *
+ * requester_email y requester_phone se sacaron del SELECT a proposito: el UUID
+ * de la cotizacion viaja por mails, historiales y logs, y devolverle el
+ * contacto del solicitante a cualquiera que lo tenga es la misma clase de
+ * problema que se cerro para orders con public_token. Nombre y empresa quedan
+ * —los tipeo el propio cliente cinco segundos antes, para reconocer su
+ * cotizacion. Migrar public_quotes a su propio token es un frente aparte.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,8 +29,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         quote_number,
         requester_name,
         requester_company,
-        requester_email,
-        requester_phone,
         length_mm,
         width_mm,
         height_mm,

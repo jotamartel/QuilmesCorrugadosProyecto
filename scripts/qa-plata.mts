@@ -101,6 +101,14 @@ try {
     invalidateConfigCache();
     const r2 = JSON.parse(await tool.run({}));
     ok('config incompleta: disponible false y deriva', r2.disponible === false && /derivar_a_humano/.test(r2.instruccion || ''), JSON.stringify(r2));
+
+    // La variacion de produccion: el saldo despues de la seña es estimado.
+    // La regla vive en el motor y el agente la cuenta desde condiciones.
+    const cond = JSON.parse(await (crearHerramientas({ canal: 'whatsapp', telefono: '+5491100000000' }) as Tool[])
+      .find((t) => t.name === 'condiciones_y_precios')!.run({}));
+    ok('condiciones explica la variacion de cantidades',
+       /5%/.test(cond.cantidades_y_saldo || '') && /entregado/.test(cond.cantidades_y_saldo || ''),
+       cond.cantidades_y_saldo);
   }
 
   console.log('');

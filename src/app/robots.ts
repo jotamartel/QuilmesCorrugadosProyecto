@@ -22,7 +22,13 @@ const API_PRIVADA = [
   '/api/marketing/',
 ]
 
-const PRIVADO = [...API_PRIVADA, '/dashboard/', '/admin/', '/_next/', '/static/', '/login', '/auth/']
+const PRIVADO = [
+  ...API_PRIVADA,
+  '/dashboard/', '/admin/', '/_next/', '/static/', '/login', '/auth/',
+  // La pagina de seguimiento es de quien tiene el link. Ya se declara noindex
+  // ella misma; esto es defensa en profundidad.
+  '/pedido/',
+]
 
 /**
  * Lo que se abre DENTRO de una carpeta bloqueada.

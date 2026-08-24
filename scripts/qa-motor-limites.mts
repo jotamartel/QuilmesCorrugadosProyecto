@@ -159,6 +159,59 @@ console.log('Y sigue ofreciendo alternativas de catálogo en vez de derivar');
 }
 
 console.log('');
+console.log('Cada alternativa dice EN QUE se diferencia, sin que nadie deduzca');
+{
+  // El caso real: alguien pidio 600x400x350 y el asistente ofrecio tres
+  // alternativas —dos mas chicas y una mas alta— y cerro con "las dos
+  // primeras son un poco mas chicas". Las chicas eran la primera y la
+  // TERCERA. Tenia el dato bien por alternativa y se equivoco al agrupar.
+  //
+  // Por eso la comparacion la escribe el motor: no hay nada que inferir.
+  const r = cotizar(600, 400, 350, 50);
+  if (r.cotizable) {
+    fallos++;
+    console.log('  FALLA: 600x400x350 x50 no deberia cotizar');
+  } else {
+    const alts = r.impedimento.alternativas;
+    const chequeo = (nombre: string, condicion: boolean, detalle = '') => {
+      if (condicion) console.log(`  ok   ${nombre}`);
+      else { fallos++; console.log(`  FALLA ${nombre}${detalle ? ` — ${detalle}` : ''}`); }
+    };
+
+    chequeo('cada alternativa trae su comparacion escrita',
+      alts.every((a) => typeof a.comparacion === 'string' && a.comparacion.length > 0),
+      JSON.stringify(alts.map((a) => a.comparacion)));
+
+    const baja = alts.find((a) => a.length_mm === 600 && a.height_mm === 300);
+    chequeo('la de 300 de alto se describe como mas baja',
+      /m[aá]s baja/.test(baja?.comparacion ?? ''), baja?.comparacion);
+
+    const alta = alts.find((a) => a.height_mm === 400);
+    chequeo('la de 400 de alto se describe como mas ALTA, nunca como mas chica',
+      /m[aá]s alta/.test(alta?.comparacion ?? '') &&
+      !/m[aá]s baja|m[aá]s chica/.test(alta?.comparacion ?? ''), alta?.comparacion);
+    chequeo('y aclara que entra lo que iba adentro',
+      /entra lo que ibas a guardar/.test(alta?.comparacion ?? ''), alta?.comparacion);
+
+    const corta = alts.find((a) => a.length_mm === 500);
+    chequeo('la mas corta dice las dos diferencias',
+      /m[aá]s corta/.test(corta?.comparacion ?? '') && /m[aá]s baja/.test(corta?.comparacion ?? ''),
+      corta?.comparacion);
+
+    // El alto NO rota —una RSC abre arriba— pero el largo y el ancho si:
+    // apoyar la caja girada noventa grados no cambia por donde se llena.
+    const girada = cotizar(400, 600, 350, 50);
+    if (!girada.cotizable) {
+      const misma = girada.impedimento.alternativas.find(
+        (a) => a.length_mm === 600 && a.width_mm === 400 && a.height_mm === 350,
+      );
+      chequeo('pedir 400x600 en vez de 600x400 no inventa diferencias',
+        misma === undefined || misma.comparacion === 'misma medida',
+        misma?.comparacion);
+    }
+  }
+}
+console.log('');
 console.log(fallos === 0 ? 'Todo bien.' : `${fallos} fallas.`);
 console.log('');
 process.exit(fallos === 0 ? 0 : 1);

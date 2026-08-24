@@ -273,6 +273,23 @@ export interface AlternativaDeCatalogo {
    * va adentro; nosotros no.
    */
   entra: boolean;
+  /**
+   * En qué se diferencia de la pedida, ya escrito.
+   *
+   * POR QUE UNA FRASE Y NO SOLO EL BOOLEANO
+   *
+   * Con `entra` solo, quien contesta tiene que traducir un booleano a
+   * palabras. Un asistente lo hizo mal en una conversación real: ofreció tres
+   * alternativas —dos más chicas y una más alta— y cerró con "las dos primeras
+   * son un poco más chicas", cuando las chicas eran la primera y la TERCERA.
+   * Había dicho bien el dato de cada una dos líneas antes; se equivocó al
+   * agrupar.
+   *
+   * La frase por alternativa saca la deducción del medio: no hay nada que
+   * inferir ni que agrupar. Es la misma regla que el resto del motor — el que
+   * conoce el dato lo dice, el que contesta lo repite.
+   */
+  comparacion: string;
 }
 
 /** Una caja con precio. Es lo que sale cuando el pedido se puede vender. */
@@ -605,6 +622,37 @@ function buscarAlternativas(
   medidasEnStock: Array<{ length_mm: number; width_mm: number; height_mm: number; stock: number }>,
   cuantas = 3,
 ): AlternativaDeCatalogo[] {
+  /**
+   * En qué se diferencia una medida de otra, en castellano.
+   *
+   * Compara con la MISMA regla de rotación que usa `entra`: el alto contra el
+   * alto —una RSC abre arriba, el alto no rota— y la base ordenada de mayor a
+   * menor, porque apoyar la caja girada noventa grados no la cambia.
+   */
+  const comparar = (m: { length_mm: number; width_mm: number; height_mm: number }): string => {
+    const base = [pedida.length_mm, pedida.width_mm].sort((a, b) => b - a);
+    const cand = [m.length_mm, m.width_mm].sort((a, b) => b - a);
+
+    const partes: string[] = [];
+    const mm = (n: number) => `${Math.abs(n)} mm`;
+
+    if (cand[0] !== base[0]) partes.push(`${mm(cand[0] - base[0])} más ${cand[0] > base[0] ? 'larga' : 'corta'}`);
+    if (cand[1] !== base[1]) partes.push(`${mm(cand[1] - base[1])} más ${cand[1] > base[1] ? 'ancha' : 'angosta'}`);
+    if (m.height_mm !== pedida.height_mm) {
+      partes.push(`${mm(m.height_mm - pedida.height_mm)} más ${m.height_mm > pedida.height_mm ? 'alta' : 'baja'}`);
+    }
+
+    if (partes.length === 0) return 'misma medida';
+    const frase = partes.length === 1 ? partes[0] : `${partes.slice(0, -1).join(', ')} y ${partes.at(-1)}`;
+
+    // Lo que importa de verdad no es el tamaño sino si le sirve. Si entra lo
+    // que iba a guardar, eso va pegado a la diferencia para que no haya que
+    // cruzar dos campos.
+    const cabe =
+      m.height_mm >= pedida.height_mm && cand[0] >= base[0] && cand[1] >= base[1];
+    return cabe ? `${frase}, así que entra lo que ibas a guardar` : frase;
+  };
+
   return medidasEnStock
     .filter((m) =>
       !(m.length_mm === pedida.length_mm && m.width_mm === pedida.width_mm && m.height_mm === pedida.height_mm),
@@ -650,6 +698,7 @@ function buscarAlternativas(
           Math.abs(baseCandidata[0] - basePedida[0]) +
           Math.abs(baseCandidata[1] - basePedida[1]),
         entra,
+        comparacion: comparar(m),
       };
     })
     // Las mas parecidas, y nada mas. Una version anterior mandaba al fondo a

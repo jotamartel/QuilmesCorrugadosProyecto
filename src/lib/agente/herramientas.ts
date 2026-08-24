@@ -223,6 +223,8 @@ export function crearHerramientas(ctx: ContextoAgente) {
           // ofrecen las mas parecidas y el cliente decide, pero si es mas
           // chica hay que decirlo.
           entra_lo_que_iba_en_la_pedida: a.entra,
+          // Ya redactada por el motor: en qué se diferencia de la pedida.
+          comparacion: a.comparacion,
           link_para_compartir: `${SITE_URL}/cotizar/${a.length_mm}x${a.width_mm}x${a.height_mm}/${a.cantidad}`,
         })),
         instruccion:
@@ -239,9 +241,11 @@ export function crearHerramientas(ctx: ContextoAgente) {
           (imp.alternativas.length
             ? 'OFRECELE DIRECTAMENTE las de alternativas_de_catalogo, con su medida, su ' +
               'cantidad y su precio, que ya están calculados acá. No preguntes si querés que ' +
-              'las busque: son estas. Si alguna tiene entra_lo_que_iba_en_la_pedida en false, ' +
-              'avisá que es más chica que la medida que pidió, pero ofrecela igual: el cliente ' +
-              'sabe qué va adentro. '
+              'las busque: son estas. Cada una trae en "comparacion" en qué se diferencia de ' +
+              'la que pidió, ya escrito: repetilo pegado a esa medida y NO lo resumas juntando ' +
+              'varias en una sola frase. Agrupar es donde se cuela el error: en una conversación ' +
+              'real se ofrecieron tres, dos más chicas y una más alta, y el cierre dijo "las dos ' +
+              'primeras son más chicas" cuando las chicas eran la primera y la tercera. '
             : '') +
           'NO ofrezcas coordinarlo por WhatsApp, ni consultarlo, ni pasarlo a un asesor para ' +
           'que la busque una persona: la alternativa ya la tenés.',

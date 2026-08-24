@@ -136,6 +136,19 @@ export default function ConfiguracionPage() {
   }
 
   async function handleSaveSystem() {
+    // Un dato bancario mal cargado se difunde a la web, al bot y a los avisos
+    // al mismo tiempo, asi que se valida aca antes de mandar. Vacio es valido:
+    // significa "todavia no publicar" y todos los canales caen a su fallback.
+    const cbu = (systemFormData.payment_bank_cbu || '').trim();
+    if (cbu && !/^d{22}$/.test(cbu)) {
+      alert('El CBU/CVU tiene que tener exactamente 22 dígitos, sin espacios ni guiones.');
+      return;
+    }
+    const cuitBanco = (systemFormData.payment_bank_cuit || '').trim();
+    if (cuitBanco && !/^d{2}-d{8}-d$/.test(cuitBanco)) {
+      alert('El CUIT del titular va con el formato XX-XXXXXXXX-X.');
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch('/api/config', {
@@ -546,6 +559,53 @@ export default function ConfiguracionPage() {
                 onChange={(e) => setSystemFormData({ ...systemFormData, company_start_date: e.target.value })}
                 disabled={!editMode}
               />
+
+              {/* Datos bancarios para transferencias */}
+              <div className="pt-6 border-t">
+                <h3 className="font-semibold text-gray-900">Datos bancarios para transferencias</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Se muestran en la página pública de la cotización, en el bot de WhatsApp y en
+                  los avisos automáticos al cliente. Los cuatro primeros van juntos: si falta
+                  alguno, ningún canal publica ninguno.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Alias"
+                  placeholder="quilmes.corrugados"
+                  value={systemFormData.payment_bank_alias || ''}
+                  onChange={(e) => setSystemFormData({ ...systemFormData, payment_bank_alias: e.target.value })}
+                  disabled={!editMode}
+                />
+                <Input
+                  label="CBU / CVU"
+                  placeholder="22 dígitos"
+                  value={systemFormData.payment_bank_cbu || ''}
+                  onChange={(e) => setSystemFormData({ ...systemFormData, payment_bank_cbu: e.target.value })}
+                  disabled={!editMode}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Input
+                  label="Titular de la cuenta"
+                  value={systemFormData.payment_bank_holder || ''}
+                  onChange={(e) => setSystemFormData({ ...systemFormData, payment_bank_holder: e.target.value })}
+                  disabled={!editMode}
+                />
+                <Input
+                  label="CUIT del titular"
+                  placeholder="XX-XXXXXXXX-X"
+                  value={systemFormData.payment_bank_cuit || ''}
+                  onChange={(e) => setSystemFormData({ ...systemFormData, payment_bank_cuit: e.target.value })}
+                  disabled={!editMode}
+                />
+                <Input
+                  label="Banco (opcional)"
+                  value={systemFormData.payment_bank_name || ''}
+                  onChange={(e) => setSystemFormData({ ...systemFormData, payment_bank_name: e.target.value })}
+                  disabled={!editMode}
+                />
+              </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-3">
               {editMode ? (

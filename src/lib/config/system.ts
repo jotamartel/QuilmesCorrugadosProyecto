@@ -1,13 +1,26 @@
 // Sistema de configuración centralizado
 // Lee y escribe configuración desde la tabla system_config de Supabase
+//
+// POR QUE createAdminClient Y NO EL CLIENTE DE SESION
+//
+// system_config tiene RLS prendido con cero policies: el cliente de sesion lee
+// CERO filas sin error y los upserts rebotan con violacion de RLS. Este modulo
+// usaba el cliente de sesion, asi que getCompanyConfig(), getXubioConfig() y
+// getArbaConfig() devolvian todo vacio en silencio, y el guardado del tab
+// Empresa fallaba. Se descubrio al construir los datos bancarios (2026-08):
+// las 19 keys existentes las habian sembrado migraciones, no la UI.
+//
+// La autorizacion no se pierde: todas las rutas que llaman aca estan detras de
+// la compuerta de src/proxy.ts, que exige sesion antes de llegar al handler.
 
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type {
   SystemConfig,
   CompanyConfig,
   XubioConfig,
   ArbaConfig,
-  FullSystemConfig
+  FullSystemConfig,
+  PaymentBankConfig
 } from '@/lib/types/database';
 
 // Cache en memoria para evitar múltiples queries
@@ -34,7 +47,7 @@ export async function getAllConfig(): Promise<Map<string, string | null>> {
     return configCache;
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data, error } = await supabase
     .from('system_config')
@@ -80,7 +93,7 @@ export async function getConfigValues(keys: string[]): Promise<Record<string, st
  * Establece un valor de configuración
  */
 export async function setConfigValue(key: string, value: string | null): Promise<void> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { error } = await supabase
     .from('system_config')
@@ -99,7 +112,7 @@ export async function setConfigValue(key: string, value: string | null): Promise
  * Establece múltiples valores de configuración
  */
 export async function setConfigValues(values: Record<string, string | null>): Promise<void> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const rows = Object.entries(values).map(([key, value]) => ({
     key,
@@ -198,16 +211,75 @@ export async function getArbaConfig(): Promise<ArbaConfig> {
 }
 
 /**
+ * Los datos bancarios para transferencias, crudos.
+ *
+ * Sembrados vacios por la migracion 032; los carga Fernando desde
+ * /configuracion → Empresa. Para CONSUMIRLOS no usar esto: usar
+ * getBankDataForClient(), que aplica la regla de todo-o-nada.
+ */
+export async function getPaymentBankConfig(): Promise<PaymentBankConfig> {
+  const values = await getConfigValues([
+    'payment_bank_alias',
+    'payment_bank_cbu',
+    'payment_bank_holder',
+    'payment_bank_cuit',
+    'payment_bank_name',
+  ]);
+
+  return {
+    payment_bank_alias: values.payment_bank_alias || '',
+    payment_bank_cbu: values.payment_bank_cbu || '',
+    payment_bank_holder: values.payment_bank_holder || '',
+    payment_bank_cuit: values.payment_bank_cuit || '',
+    payment_bank_name: values.payment_bank_name || '',
+  };
+}
+
+/** Lo que se le muestra a un cliente para transferir. */
+export interface DatosBancarios {
+  alias: string;
+  cbu: string;
+  holder: string;
+  cuit: string;
+  bank: string | null;
+}
+
+/**
+ * Los datos bancarios listos para mostrarle a un cliente, o null.
+ *
+ * TODO O NADA A PROPOSITO: si falta cualquiera de los cuatro obligatorios
+ * (alias, cbu, titular, cuit) devuelve null, y cada consumidor —la pagina
+ * publica de la cotizacion, la herramienta del agente, los avisos— cae a su
+ * texto anterior. Un "CBU: undefined" delante de un cliente es peor que no
+ * mostrar nada, y mostrar el alias sin el titular invita a transferir a una
+ * cuenta que no se puede verificar.
+ */
+export async function getBankDataForClient(): Promise<DatosBancarios | null> {
+  const c = await getPaymentBankConfig();
+  const obligatorios = [c.payment_bank_alias, c.payment_bank_cbu, c.payment_bank_holder, c.payment_bank_cuit];
+  if (obligatorios.some((v) => !v.trim())) return null;
+
+  return {
+    alias: c.payment_bank_alias.trim(),
+    cbu: c.payment_bank_cbu.trim(),
+    holder: c.payment_bank_holder.trim(),
+    cuit: c.payment_bank_cuit.trim(),
+    bank: c.payment_bank_name.trim() || null,
+  };
+}
+
+/**
  * Obtiene toda la configuración del sistema
  */
 export async function getFullSystemConfig(): Promise<FullSystemConfig> {
-  const [company, xubio, arba] = await Promise.all([
+  const [company, xubio, arba, bank] = await Promise.all([
     getCompanyConfig(),
     getXubioConfig(),
     getArbaConfig(),
+    getPaymentBankConfig(),
   ]);
 
-  return { ...company, ...xubio, ...arba };
+  return { ...company, ...xubio, ...arba, ...bank };
 }
 
 /**

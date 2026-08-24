@@ -74,7 +74,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { data: fullOrder, error: fullOrderError } = await supabase
       .from('orders')
       .select(`
-        total_m2, subtotal, total,
+        order_number, total_m2, subtotal, total,
         deposit_amount, deposit_status,
         balance_amount, balance_status,
         printing_cost, die_cut_cost, shipping_cost
@@ -127,16 +127,37 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       newBalanceAmount = newTotal * 0.5;
     }
 
-    // Actualizar total_m2 de cada item según cantidad entregada
-    for (const item of items) {
-      const deliveredQty = item.quantity_delivered ?? item.quantity;
-      const newItemTotalM2 = deliveredQty * Number(item.m2_per_box);
+    // (Aca habia un for muerto que "actualizaba" total_m2 por item sin hacer
+    // nada. No hace falta: el m² entregado se re-deriva siempre sumando
+    // quantity_delivered * m2_per_box, no se persiste calculado.)
 
-      // Buscar el item en body.items para obtener su ID
-      const bodyItem = body.items.find(bi => {
-        // Ya actualizamos quantity_delivered arriba, así que buscamos por cantidad
-        return true; // Simplificamos, el total_m2 se recalcula abajo
+    // EL SNAPSHOT VA ANTES DEL UPDATE, Y SI FALLA SE CORTA.
+    //
+    // Este update pisa subtotal, total y balance_amount: sin esta fila el
+    // presupuesto original desaparece y un reclamo de "me cotizaste X" no se
+    // puede reconstruir. Se inserta ANTES para que un fallo en el historial
+    // aborte el ajuste — perder el rastro es peor que reintentarlo.
+    const precisionPct = Math.round((deliveredTotalM2 / originalTotalM2) * 10000) / 100;
+    const { error: snapshotError } = await supabase
+      .from('order_quantity_adjustments')
+      .insert({
+        order_id: orderId,
+        previous_subtotal: fullOrder.subtotal,
+        previous_total: fullOrder.total,
+        previous_balance_amount: fullOrder.balance_amount,
+        previous_total_m2: originalTotalM2,
+        delivered_total_m2: Math.round(deliveredTotalM2 * 100) / 100,
+        new_subtotal: Math.round(newSubtotal * 100) / 100,
+        new_total: Math.round(newTotal * 100) / 100,
+        new_balance_amount: Math.round(newBalanceAmount * 100) / 100,
+        precision_percent: precisionPct,
+        // Hoy el handler no valida sesion (la compuerta del proxy si), asi que
+        // no hay email para anotar. Cuando se sume, va aca.
+        adjusted_by: null,
       });
+
+    if (snapshotError) {
+      throw snapshotError;
     }
 
     // Actualizar orden con nuevos totales
@@ -158,8 +179,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       throw updateError;
     }
 
-    // Calcular precisión de producción
-    const precisionPercent = (deliveredTotalM2 / originalTotalM2) * 100;
+    const balanceRedondeado = Math.round(newBalanceAmount * 100) / 100;
 
     return NextResponse.json({
       message: 'Cantidades confirmadas correctamente',
@@ -171,9 +191,26 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         total_m2: deliveredTotalM2,
         subtotal: Math.round(newSubtotal * 100) / 100,
         total: Math.round(newTotal * 100) / 100,
-        balance_amount: Math.round(newBalanceAmount * 100) / 100,
+        balance_amount: balanceRedondeado,
       },
-      precision_percent: Math.round(precisionPercent * 100) / 100,
+      precision_percent: precisionPct,
+      // Todo lo que el aviso al cliente (etapa 8) necesita, ya resuelto aca
+      // donde se conocen los numeros. El que avisa no re-deriva nada: lee.
+      notification_payload: {
+        order_number: fullOrder.order_number,
+        new_total: Math.round(newTotal * 100) / 100,
+        new_balance_amount: balanceRedondeado,
+        deposit_amount: depositAmount,
+        delivered_total_m2: Math.round(deliveredTotalM2 * 100) / 100,
+        original_total_m2: originalTotalM2,
+        precision_percent: precisionPct,
+        // Si no hay saldo, el aviso de "saldo actualizado" no corresponde.
+        requires_payment: balanceRedondeado > 0.01,
+        // Se entrego tan poco que la seña supera el total nuevo: hay plata a
+        // devolver y eso se maneja a mano, con aviso al equipo.
+        needs_refund: depositPaid && depositAmount > newTotal + 0.01,
+        variacion_pct: Math.round((deliveredTotalM2 / originalTotalM2 - 1) * 10000) / 100,
+      },
     });
   } catch (error) {
     console.error('Error confirmando cantidades:', error);

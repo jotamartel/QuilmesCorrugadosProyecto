@@ -12,6 +12,7 @@ import {
 import { RETAIL_CONFIG, MINIMOS, ENVIO, HORARIO, MATERIAL } from '@/lib/retail/config';
 import { MEDIDA_MINIMA, MEDIDA_MAXIMA } from '@/lib/utils/box-calculations';
 import { buscarConocimiento, anotarPreguntaSinRespuesta } from '@/lib/conocimiento';
+import { getBankDataForClient } from '@/lib/config/system';
 import { sendNotification } from '@/lib/notifications';
 import { CONTACTO } from '@/lib/contacto';
 import { upsertContactProfile } from '@/lib/contact-matching';
@@ -899,11 +900,54 @@ export function crearHerramientas(ctx: ContextoAgente) {
     },
   });
 
+  /**
+   * Los datos para transferir, leidos de la configuracion.
+   *
+   * Es una herramienta y no texto del prompt a proposito: un dato bancario
+   * recitado de memoria es un dato que alguna vez va a estar desactualizado o
+   * inventado, y una transferencia a una cuenta equivocada no tiene deshacer.
+   * Si la configuracion esta incompleta, la herramienta lo dice y el agente
+   * deriva — nunca da la mitad de los datos.
+   */
+  const datosParaTransferir = betaTool({
+    name: 'datos_para_transferir',
+    description:
+      'Devuelve el alias, CBU, titular y CUIT para que el cliente transfiera la seña ' +
+      'o el saldo. Usala cuando pregunten cómo pagar, si aceptamos transferencia, o ' +
+      'pidan los datos de la cuenta. Nunca digas datos bancarios de memoria: llamala ' +
+      'siempre.',
+    inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
+    run: async () => {
+      const datos = await getBankDataForClient();
+      if (!datos) {
+        return JSON.stringify({
+          disponible: false,
+          instruccion:
+            'Los datos bancarios no están cargados en el sistema. NO inventes ninguno: ' +
+            'decile que un asesor le pasa los datos por acá y llamá a derivar_a_humano.',
+        });
+      }
+      return JSON.stringify({
+        disponible: true,
+        alias: datos.alias,
+        cbu: datos.cbu,
+        titular: datos.holder,
+        cuit: datos.cuit,
+        banco: datos.bank ?? undefined,
+        instruccion:
+          'Pasale los cuatro datos juntos (alias, CBU, titular con CUIT), no en varios ' +
+          'mensajes. Cuando confirme que transfirió, pedile el comprobante por acá y ' +
+          'avisale que una persona lo valida antes de dar por confirmado el pedido.',
+      });
+    },
+  });
+
   return [
     cotizarCajas,
     medidasDeCatalogo,
     condicionesYPrecios,
     plantillaDeImpresion,
+    datosParaTransferir,
     guardarLead,
     noSeLaRespuesta,
     derivarAHumano,

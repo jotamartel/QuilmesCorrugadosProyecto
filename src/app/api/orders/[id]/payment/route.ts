@@ -133,28 +133,35 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       throw updateError;
     }
 
-    // Si es cheque, crear registro en la cartera de cheques
-    if (isCheckPayment && body.check_bank && body.check_number && body.check_date) {
-      // Primero crear el pago
-      const { data: payment } = await supabase
-        .from('payments')
-        .insert({
-          order_id: id,
-          client_id: order.client_id,
-          type: body.payment_type,
-          amount: paymentAmount,
-          method: body.method,
-          check_bank: body.check_bank,
-          check_number: body.check_number,
-          check_date: body.check_date,
-          check_holder: body.check_holder || null,
-          check_cuit: body.check_cuit || null,
-          status: 'completed',
-        })
-        .select()
-        .single();
+    // TODO PAGO DEJA FILA EN payments, SEA CUAL SEA EL METODO.
+    //
+    // Antes el insert vivia adentro del if del cheque: transferencia y
+    // efectivo solo pintaban el flag en la orden, asi que /pagos y cualquier
+    // reporte sobre payments mentian — 8 de los pagos historicos no estaban
+    // (los recupera la migracion 034). Los campos check_* van en null cuando
+    // no aplican.
+    const { data: payment } = await supabase
+      .from('payments')
+      .insert({
+        order_id: id,
+        client_id: order.client_id,
+        type: body.payment_type,
+        amount: paymentAmount,
+        method: body.method,
+        check_bank: isCheckPayment ? body.check_bank : null,
+        check_number: isCheckPayment ? body.check_number : null,
+        check_date: isCheckPayment ? body.check_date : null,
+        check_holder: isCheckPayment ? body.check_holder || null : null,
+        check_cuit: isCheckPayment ? body.check_cuit || null : null,
+        status: 'completed',
+      })
+      .select()
+      .single();
 
-      // Luego crear el cheque en cartera
+    // El cheque ademas entra a la cartera. Son tres escrituras sin
+    // transaccion (orden + pago + cheque); envolverlas en un RPC atomico es
+    // deuda conocida, anotada en el plan como frente aparte.
+    if (isCheckPayment && body.check_bank && body.check_number && body.check_date) {
       await supabase.from('checks').insert({
         payment_id: payment?.id || null,
         client_id: order.client_id,

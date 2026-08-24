@@ -527,7 +527,16 @@ export interface ArbaConfig {
   arba_cot_product_unit: string;
 }
 
-export interface FullSystemConfig extends CompanyConfig, XubioConfig, ArbaConfig {}
+/** Datos bancarios para transferencias. Migracion 032; ver getBankDataForClient(). */
+export interface PaymentBankConfig {
+  payment_bank_alias: string;
+  payment_bank_cbu: string;
+  payment_bank_holder: string;
+  payment_bank_cuit: string;
+  payment_bank_name: string;
+}
+
+export interface FullSystemConfig extends CompanyConfig, XubioConfig, ArbaConfig, PaymentBankConfig {}
 
 // =====================================================
 // TIPOS PARA REQUESTS DE NUEVAS APIs

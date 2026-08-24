@@ -62,14 +62,26 @@ export default function QuoteConfirmationPage() {
   const [error, setError] = useState<string | null>(null);
   const [showBelowMinimumModal, setShowBelowMinimumModal] = useState(false);
   const [pricingConfig, setPricingConfig] = useState<{ price_per_m2_below_minimum: number; min_m2_per_model: number; wholesale_min_m2: number } | null>(null);
+  // null = todavia no cargo o la config esta incompleta: en ambos casos el
+  // paso 3 muestra el texto generico de siempre, nunca datos a medias.
+  const [banco, setBanco] = useState<{ alias: string; cbu: string; holder: string; cuit: string; bank: string | null } | null>(null);
+  const [copiado, setCopiado] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchQuote() {
       try {
-        const [quoteRes, pricingRes] = await Promise.all([
+        const [quoteRes, pricingRes, bancoRes] = await Promise.all([
           fetch(`/api/public/quotes/${id}`),
           fetch('/api/config/pricing'),
+          fetch('/api/public/bank-data'),
         ]);
+
+        // Los datos bancarios son opcionales: si fallan o faltan, la pagina
+        // funciona igual con el texto generico.
+        if (bancoRes.ok) {
+          const b = await bancoRes.json();
+          if (b.available) setBanco(b);
+        }
 
         if (!quoteRes.ok) {
           throw new Error('Cotización no encontrada');
@@ -277,6 +289,43 @@ export default function QuoteConfirmationPage() {
                     Una vez confirmado, emitiremos la factura con el 50% de seña.
                   </li>
                 </ul>
+
+                {/* Los datos para transferir, solo si la config esta completa.
+                    Cuando falta cualquiera de los cuatro, banco es null y el
+                    paso 3 de arriba queda como unico mensaje. */}
+                {banco && (
+                  <div className="mt-4 pt-4 border-t border-amber-200">
+                    <p className="text-sm font-semibold text-amber-900 mb-2">
+                      Datos para transferir la seña:
+                    </p>
+                    <dl className="space-y-1.5 text-sm text-amber-800">
+                      {([
+                        ['Alias', banco.alias],
+                        ['CBU', banco.cbu],
+                        ['Titular', `${banco.holder} (CUIT ${banco.cuit})`],
+                        ...(banco.bank ? [['Banco', banco.bank] as [string, string]] : []),
+                      ] as [string, string][]).map(([etiqueta, valor]) => (
+                        <div key={etiqueta} className="flex items-center gap-2">
+                          <dt className="text-amber-700 w-16 shrink-0">{etiqueta}:</dt>
+                          <dd className="font-medium break-all">{valor}</dd>
+                          {(etiqueta === 'Alias' || etiqueta === 'CBU') && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(valor);
+                                setCopiado(etiqueta);
+                                setTimeout(() => setCopiado(null), 2000);
+                              }}
+                              className="text-xs text-amber-600 hover:text-amber-800 underline shrink-0"
+                            >
+                              {copiado === etiqueta ? 'Copiado ✓' : 'Copiar'}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                )}
               </div>
 
               {/* WhatsApp Button */}

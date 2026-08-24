@@ -160,8 +160,8 @@ export const PEDIDO_CONFIRMADO: Plantilla = {
   botonUrl: BOTON_SEGUIMIENTO,
   cuerpo:
     'Hola, te escribimos de Quilmes Corrugados.\n\n' +
-    'Recibimos la seña del pedido {{1}}. Queda confirmado y agendado para fabricar.\n\n' +
-    'Saldo estimado: $ {{2}}. La cantidad producida puede variar hasta un 5% ' +
+    'Recibimos la seña del pedido *{{1}}*. Queda confirmado y agendado para fabricar.\n\n' +
+    'Saldo estimado: *$ {{2}}*. La cantidad producida puede variar hasta un 5% ' +
     '—así se fabrica el cartón— y se factura lo entregado, por eso el saldo final ' +
     'se confirma al terminar la fabricación.\n\n' +
     'Ante cualquier duda, respondé este mensaje.',
@@ -176,8 +176,8 @@ export const PEDIDO_EN_PRODUCCION: Plantilla = {
   botonUrl: BOTON_SEGUIMIENTO,
   cuerpo:
     'Hola, te escribimos de Quilmes Corrugados.\n\n' +
-    'Empezamos a fabricar el pedido {{1}}.\n' +
-    'Fecha estimada de entrega: {{2}}.\n\n' +
+    'Empezamos a fabricar el pedido *{{1}}*.\n' +
+    'Fecha estimada de entrega: *{{2}}*.\n\n' +
     'Ante cualquier duda, respondé este mensaje.',
 };
 
@@ -196,8 +196,8 @@ export const PEDIDO_SALDO_ACTUALIZADO: Plantilla = {
   botonUrl: BOTON_PARA_PAGAR,
   cuerpo:
     'Hola, te escribimos de Quilmes Corrugados.\n\n' +
-    'El pedido {{1}} está listo. Confirmamos las cantidades finales: el saldo a pagar es $ {{2}}.\n\n' +
-    'Alias para transferir: {{3}}\n' +
+    'El pedido *{{1}}* está listo. Confirmamos las cantidades finales: el saldo a pagar es *$ {{2}}*.\n\n' +
+    'Alias para transferir: *{{3}}*\n' +
     // El alias de la fábrica termina en punto, y en una línea de texto ese
     // punto se lee como puntuación. En vez de aclararlo —que obligaría a saber
     // de antemano cómo es el alias— se empuja al botón, donde se copia el
@@ -214,7 +214,7 @@ export const PEDIDO_DESPACHADO: Plantilla = {
   botonUrl: BOTON_SEGUIMIENTO,
   cuerpo:
     'Hola, te escribimos de Quilmes Corrugados.\n\n' +
-    'Despachamos el pedido {{1}} el {{2}}. Ya está en camino.\n\n' +
+    'Despachamos el pedido *{{1}}* el *{{2}}*. Ya está en camino.\n\n' +
     'Ante cualquier duda, respondé este mensaje.',
 };
 
@@ -226,7 +226,7 @@ export const PEDIDO_ENTREGADO: Plantilla = {
   botonUrl: BOTON_SEGUIMIENTO,
   cuerpo:
     'Hola, te escribimos de Quilmes Corrugados.\n\n' +
-    'El pedido {{1}} figura como entregado. Gracias por confiar en nosotros.\n\n' +
+    'El pedido *{{1}}* figura como entregado. Gracias por confiar en nosotros.\n\n' +
     'Si tenés algún tema con la entrega, respondé este mensaje.',
 };
 
@@ -244,7 +244,7 @@ export const PEDIDO_CANCELADO: Plantilla = {
   botonUrl: BOTON_SEGUIMIENTO,
   cuerpo:
     'Hola, te escribimos de Quilmes Corrugados.\n\n' +
-    'El pedido {{1}} fue cancelado.\n\n' +
+    'El pedido *{{1}}* fue cancelado.\n\n' +
     'Si querés retomar la operación o necesitás una explicación, respondé este ' +
     'mensaje y te contactamos.',
 };

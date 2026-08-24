@@ -57,6 +57,22 @@ for (const p of PLANTILLAS) {
   // Meta solo acepta minúsculas, números y guion bajo en el nombre.
   ok(`${p.nombre}: el nombre tiene forma válida`, /^[a-z0-9_]+$/.test(p.nombre));
   ok(`${p.nombre}: entra en los 1024 caracteres del cuerpo`, cuerpo.length <= 1024, String(cuerpo.length));
+
+  // EL FORMATO DE WHATSAPP NO PERDONA UN ESPACIO MAL PUESTO.
+  //
+  // *texto* pone negrita, pero "* texto*" NO: WhatsApp no abre el formato si
+  // hay un espacio pegado al asterisco, y el cliente recibe los asteriscos
+  // literales. Pasó al cargar pedido_en_produccion, con
+  // "Fecha estimada de entrega:* {{2}}*." — se veía bien en el editor y le
+  // habría llegado roto a cada cliente, sin forma de arreglarlo sin
+  // re-aprobar la plantilla.
+  const asteriscos = (cuerpo.match(/\*/g) ?? []).length;
+  ok(`${p.nombre}: los asteriscos vienen en pares`, asteriscos % 2 === 0, String(asteriscos));
+
+  const tramos = [...cuerpo.matchAll(/\*([^*]*)\*/g)].map((m) => m[1]);
+  ok(`${p.nombre}: ninguna negrita abre o cierra con espacio`,
+     tramos.every((t) => t.length > 0 && t === t.trim()),
+     tramos.filter((t) => t !== t.trim() || !t.length).map((t) => `"*${t}*"`).join(' '));
 }
 
 console.log('');

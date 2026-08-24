@@ -24,6 +24,7 @@ for (const f of ['.env.qa.tmp', '.env.local']) {
 
 const { getBankDataForClient, getPaymentBankConfig, setConfigValues, invalidateConfigCache } =
   await import('@/lib/config/system');
+const { cbuValido, cuitValido } = await import('@/lib/pagos/validaciones');
 const { formatearAliasParaWhatsApp } = await import('@/lib/pagos/datos-bancarios');
 const { createAdminClient } = await import('@/lib/supabase/admin');
 
@@ -122,6 +123,23 @@ try {
     ok('condiciones explica la variacion de cantidades',
        /5%/.test(cond.cantidades_y_saldo || '') && /entregado/.test(cond.cantidades_y_saldo || ''),
        cond.cantidades_y_saldo);
+  }
+
+  console.log('');
+  console.log('El CBU y el CUIT se verifican de verdad, no por largo');
+  {
+    // El dato real de la fabrica: si algun dia alguien lo cambia por uno roto,
+    // esto lo agarra antes que el cliente.
+    ok('el CBU de Quilmes Corrugados valida', cbuValido('2990001700100034600000'));
+    ok('el CUIT de Quilmes Corrugados valida', cuitValido('30-70938614-6'));
+
+    // El modo de falla que el chequeo de largo NO ve: mismos 22 caracteres.
+    ok('un CBU con el ultimo digito cambiado se rechaza', !cbuValido('2990001700100034600001'));
+    ok('un CBU con un digito del medio cambiado se rechaza', !cbuValido('2990001600100034600000'));
+    ok('un CUIT con el verificador cambiado se rechaza', !cuitValido('30-70938614-5'));
+    ok('22 digitos cualesquiera NO alcanzan', !cbuValido('1111111111111111111111'));
+    ok('con espacios igual valida', cbuValido('2990 0017 0010 0034 6000 00'));
+    ok('menos de 22 digitos se rechaza', !cbuValido('299000170010003460000'));
   }
 
   console.log('');

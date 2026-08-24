@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LoadingPage, LoadingSpinner } from '@/components/ui/loading';
 import { Badge } from '@/components/ui/badge';
+import { cbuValido, cuitValido } from '@/lib/pagos/validaciones';
 import {
   Settings,
   DollarSign,
@@ -139,14 +140,22 @@ export default function ConfiguracionPage() {
     // Un dato bancario mal cargado se difunde a la web, al bot y a los avisos
     // al mismo tiempo, asi que se valida aca antes de mandar. Vacio es valido:
     // significa "todavia no publicar" y todos los canales caen a su fallback.
+    //
+    // Se valida el DIGITO VERIFICADOR, no el largo: un CBU con un digito mal
+    // tipeado tiene los mismos 22 caracteres que uno bueno, y la transferencia
+    // rebota o cae en otra cuenta.
     const cbu = (systemFormData.payment_bank_cbu || '').trim();
-    if (cbu && !/^d{22}$/.test(cbu)) {
-      alert('El CBU/CVU tiene que tener exactamente 22 dígitos, sin espacios ni guiones.');
+    if (cbu && !cbuValido(cbu)) {
+      alert(
+        /^d{22}$/.test(cbu)
+          ? 'Ese CBU/CVU no es válido: el dígito verificador no cierra. Revisá que no haya un número cambiado.'
+          : 'El CBU/CVU son 22 dígitos, sin espacios ni guiones.',
+      );
       return;
     }
     const cuitBanco = (systemFormData.payment_bank_cuit || '').trim();
-    if (cuitBanco && !/^d{2}-d{8}-d$/.test(cuitBanco)) {
-      alert('El CUIT del titular va con el formato XX-XXXXXXXX-X.');
+    if (cuitBanco && !cuitValido(cuitBanco)) {
+      alert('Ese CUIT no es válido: el dígito verificador no cierra. Revisalo antes de guardar.');
       return;
     }
     setSaving(true);
@@ -579,7 +588,7 @@ export default function ConfiguracionPage() {
                 />
                 <Input
                   label="CBU / CVU"
-                  placeholder="22 dígitos"
+                  placeholder="22 dígitos, sin espacios ni guiones"
                   value={systemFormData.payment_bank_cbu || ''}
                   onChange={(e) => setSystemFormData({ ...systemFormData, payment_bank_cbu: e.target.value })}
                   disabled={!editMode}

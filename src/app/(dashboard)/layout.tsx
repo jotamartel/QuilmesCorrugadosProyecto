@@ -23,6 +23,7 @@ import {
   Key,
   MessageCircle,
   MessageCircleQuestion,
+  MessageSquare,
   Eye,
   TrendingUp,
   AlertCircle,
@@ -37,6 +38,10 @@ const navigation = [
   { name: 'Leads Web', href: '/leads-web', icon: UserPlus },
   { name: 'Menores al Mínimo', href: '/leads-web/below-minimum', icon: AlertCircle },
   { name: 'Cot. Wpp', href: '/whatsapp', icon: MessageCircle },
+  // Aparte de Cot. Wpp a proposito: en WhatsApp la bandeja es una lista de
+  // pendientes que se pueden contestar; el chat del sitio es anonimo y no se
+  // puede responder. Mezclarlos ensucia la bandeja que si sirve para atender.
+  { name: 'Chat del sitio', href: '/chat-web', icon: MessageSquare },
   { name: 'Sin responder', href: '/conocimiento', icon: MessageCircleQuestion },
   { name: 'Ordenes', href: '/ordenes', icon: ShoppingCart },
   // Va pegada a Ordenes pero es otra pregunta: /ordenes es la gestion del

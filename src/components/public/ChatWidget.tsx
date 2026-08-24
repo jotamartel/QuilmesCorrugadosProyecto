@@ -23,6 +23,34 @@ function getAttributionParams(): Record<string, string> {
   return out;
 }
 const STORAGE_KEY = 'quilmes-chat-history';
+
+/**
+ * El id de esta conversación, para poder leerla después desde el panel.
+ *
+ * Vive junto al historial en localStorage, así que dura lo mismo: si la
+ * persona vuelve mañana con el chat abierto, sigue siendo la misma
+ * conversación; si borra los datos del sitio, empieza una nueva.
+ *
+ * No identifica a nadie: es un número al azar para agrupar mensajes.
+ */
+const SESION_KEY = 'quilmes-chat-sesion';
+
+function obtenerSesion(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    const guardada = localStorage.getItem(SESION_KEY);
+    if (guardada) return guardada;
+    const nueva =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `s-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(SESION_KEY, nueva);
+    return nueva;
+  } catch {
+    // Storage bloqueado: se atiende igual, esta conversación no se anota.
+    return '';
+  }
+}
 const INITIAL_VISIBLE = 20;
 const LOAD_CHUNK = 20;
 const SCROLL_THRESHOLD = 80;
@@ -225,6 +253,9 @@ export function ChatWidget() {
 
   const handleRestoreNo = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
+    // La sesión también: borrar el historial y seguir con el mismo id haría
+    // que en el panel se vea una conversación que salta de tema sin motivo.
+    localStorage.removeItem(SESION_KEY);
     setShowRestorePrompt(false);
     setRestoreChecked(true);
   }, []);
@@ -262,6 +293,7 @@ export function ChatWidget() {
           message: text,
           history: messages,
           attribution,
+          sesion: obtenerSesion(),
         }),
       });
 

@@ -33,13 +33,17 @@ import {
   ORDER_STATUS_COLORS,
   PAYMENT_METHOD_LABELS,
   ORDER_STATUS_FLOW,
+  CHANNEL_BADGE_LABELS,
+  CHANNEL_BADGE_COLORS,
 } from '@/lib/utils/format';
-import type { OrderItem, OrderStatus, PaymentMethod, PaymentStatus } from '@/lib/types/database';
+import type { OrderItem, OrderStatus, PaymentMethod, PaymentStatus, Channel } from '@/lib/types/database';
 
 interface OrderWithRelations {
   id: string;
   order_number: string;
   status: OrderStatus;
+  channel: Channel;
+  pricing_mode: 'motor' | 'manual';
   total_m2: number;
   subtotal: number;
   printing_cost: number;
@@ -249,6 +253,12 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
               <Badge className={ORDER_STATUS_COLORS[order.status as OrderStatus]}>
                 {ORDER_STATUS_LABELS[order.status as OrderStatus]}
               </Badge>
+              <Badge className={CHANNEL_BADGE_COLORS[order.channel]}>
+                {CHANNEL_BADGE_LABELS[order.channel]}
+              </Badge>
+              {order.pricing_mode === 'manual' && (
+                <Badge className="bg-purple-100 text-purple-800">Precio negociado</Badge>
+              )}
             </div>
             <p className="text-gray-500">
               Creada el {formatDate(order.created_at)}

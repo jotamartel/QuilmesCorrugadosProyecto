@@ -3,7 +3,7 @@
  * Quilmes Corrugados
  */
 
-import type { QuoteStatus, OrderStatus, PaymentMethod, PaymentTerms } from '@/lib/types/database';
+import type { QuoteStatus, OrderStatus, PaymentMethod, PaymentTerms, Channel } from '@/lib/types/database';
 
 /**
  * Traducciones de estados de cotización
@@ -45,6 +45,28 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 /**
  * Colores para estados de orden (Tailwind classes)
  */
+/**
+ * Etiqueta del canal de una orden, para el badge del panel.
+ *
+ * Fernando pidio "diferenciar manual de web": DOS categorias. Por eso
+ * {manual, whatsapp, email} se agrupan como 'Manual' — todos entraron por una
+ * persona — y 'Web' va solo. El dato granular sigue en la columna: si algun
+ * dia hace falta abrirlo en cuatro, se cambia aca y en ningun otro lado.
+ */
+export const CHANNEL_BADGE_LABELS: Record<Channel, string> = {
+  manual: 'Manual',
+  whatsapp: 'Manual',
+  email: 'Manual',
+  web: 'Web',
+};
+
+export const CHANNEL_BADGE_COLORS: Record<Channel, string> = {
+  manual: 'bg-amber-100 text-amber-800',
+  whatsapp: 'bg-amber-100 text-amber-800',
+  email: 'bg-amber-100 text-amber-800',
+  web: 'bg-sky-100 text-sky-800',
+};
+
 export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
   pending_deposit: 'bg-yellow-100 text-yellow-800',
   confirmed: 'bg-blue-100 text-blue-800',

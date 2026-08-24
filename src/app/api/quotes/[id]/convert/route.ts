@@ -74,6 +74,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         quote_id: quote.id,
         client_id: quote.client_id,
         status: 'pending_deposit',
+        // Sin esto, toda orden convertida caeria en el default 'manual' de la
+        // migracion 037 y la marca web/manual mentiria justo al reves.
+        channel: quote.channel,
+        pricing_mode: 'motor',
         total_m2: quote.total_m2,
         subtotal: quote.subtotal,
         printing_cost: quote.printing_cost,

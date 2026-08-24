@@ -172,6 +172,15 @@ export interface Order {
   quote_id: string | null;
   client_id: string | null;
   status: OrderStatus;
+  /** Origen del pedido. Migracion 037; el convert lo hereda de la quote. */
+  channel: Channel;
+  /** motor = precio del cotizador; manual = precio negociado por el vendedor. */
+  pricing_mode: 'motor' | 'manual';
+  /** Llave de la pagina publica /pedido/[token]. La genera la base. */
+  public_token: string;
+  /** Dia acordado con el cliente para la entrega (migracion 036). */
+  scheduled_delivery_date: string | null;
+  delivery_time_window: string | null;
   total_m2: number;
   subtotal: number;
   printing_cost: number;
@@ -309,6 +318,53 @@ export interface CalculateQuoteResponse {
     production_days: number;
     estimated_delivery: string;
     warnings: string[];
+  };
+}
+
+/**
+ * Crear una orden SIN cotizacion previa (pedidos por telefono o mostrador).
+ *
+ * pricing_mode discrimina quien pone el precio: 'motor' lo calcula el
+ * cotizador con las primitivas de siempre; 'manual' lo escribe el vendedor
+ * (pedido negociado). La GEOMETRIA (m² por caja, plancha) la calcula el motor
+ * en los dos modos: eso es fisica del rollo, no negocio.
+ */
+export interface CreateOrderRequest {
+  client_id?: string;
+  items: Array<{
+    length_mm: number;
+    width_mm: number;
+    height_mm: number;
+    quantity: number;
+  }>;
+  has_printing?: boolean;
+  printing_colors?: number;
+  has_die_cut?: boolean;
+  pricing_mode: 'motor' | 'manual';
+  /** Solo con pricing_mode 'manual'. */
+  manual_pricing?: {
+    subtotal: number;
+    printing_cost?: number;
+    die_cut_cost?: number;
+    shipping_cost?: number;
+    total: number;
+  };
+  estimated_delivery?: string;
+  delivery_address?: string;
+  delivery_city?: string;
+  delivery_notes?: string;
+  notes?: string;
+  /** Default 'manual': es un pedido cargado desde el panel. */
+  channel?: Channel;
+  /**
+   * 'confirmed' solo si la seña YA se cobro: exige deposit. Cualquier otro
+   * estado se alcanza por las transiciones normales, no naciendo en el.
+   */
+  initial_status?: 'pending_deposit' | 'confirmed';
+  deposit?: {
+    method: PaymentMethod;
+    paid_at?: string;
+    amount?: number;
   };
 }
 

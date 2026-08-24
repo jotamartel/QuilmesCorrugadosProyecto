@@ -7,10 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { LoadingPage, LoadingSpinner } from '@/components/ui/loading';
-import { Eye, Search, GripVertical } from 'lucide-react';
+import { Eye, Search, GripVertical, Plus } from 'lucide-react';
 import { formatCurrency, formatM2 } from '@/lib/utils/pricing';
 import { formatDate } from '@/lib/utils/dates';
-import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '@/lib/utils/format';
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, CHANNEL_BADGE_LABELS, CHANNEL_BADGE_COLORS } from '@/lib/utils/format';
 import type { Order, OrderStatus } from '@/lib/types/database';
 
 const statusOptions = [
@@ -179,6 +179,12 @@ export default function OrdenesPage() {
           <p className="text-gray-500">Gestiona las órdenes de producción</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/ordenes/nueva">
+            <Button variant="primary" size="sm">
+              <Plus className="w-4 h-4 mr-1" />
+              Nueva orden
+            </Button>
+          </Link>
           <Button
             variant={viewMode === 'list' ? 'primary' : 'outline'}
             size="sm"
@@ -244,6 +250,7 @@ export default function OrdenesPage() {
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Origen</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">m2</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
@@ -267,6 +274,11 @@ export default function OrdenesPage() {
                               </p>
                             )}
                           </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge className={CHANNEL_BADGE_COLORS[order.channel]}>
+                            {CHANNEL_BADGE_LABELS[order.channel]}
+                          </Badge>
                         </td>
                         <td className="px-4 py-3 text-sm">{formatM2(order.total_m2)}</td>
                         <td className="px-4 py-3 text-sm font-medium">{formatCurrency(order.total)}</td>
@@ -334,7 +346,12 @@ export default function OrdenesPage() {
                           <GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
-                              <p className="font-medium text-sm">{order.order_number}</p>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <p className="font-medium text-sm">{order.order_number}</p>
+                                <Badge className={`text-[10px] px-1 py-0 ${CHANNEL_BADGE_COLORS[order.channel]}`}>
+                                  {CHANNEL_BADGE_LABELS[order.channel]}
+                                </Badge>
+                              </div>
                               {updatingOrder === order.id && (
                                 <LoadingSpinner size="sm" />
                               )}

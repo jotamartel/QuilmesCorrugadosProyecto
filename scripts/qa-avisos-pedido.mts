@@ -40,6 +40,20 @@ function ok(nombre: string, condicion: boolean, detalle = '') {
 
 const db = createAdminClient();
 
+// LA CONFIGURACION REAL SE GUARDA ANTES DE TOCARLA.
+//
+// Esta QA prueba el caso "no hay alias cargado", y para eso lo tiene que
+// vaciar. Corre contra la base de PRODUCCION: sin restaurarlo despues, la
+// fabrica se queda sin datos bancarios y ni la web ni el bot los publican.
+// Paso de verdad, y se descubrio recien al revisar que habia quedado abierto.
+const KEYS_BANCO = [
+  'payment_bank_alias', 'payment_bank_cbu',
+  'payment_bank_holder', 'payment_bank_cuit', 'payment_bank_name',
+];
+const { data: bancoPrevio } = await db
+  .from('system_config').select('key, value').in('key', KEYS_BANCO);
+const configBancaria = Object.fromEntries((bancoPrevio ?? []).map((r) => [r.key, r.value]));
+
 // ── Meta, mockeado. Se cuenta cada llamada y se guarda el último cuerpo. ─────
 const fetchReal = globalThis.fetch;
 let llamadas = 0;
@@ -347,6 +361,22 @@ try {
   }
 } finally {
   globalThis.fetch = fetchReal;
+
+  // Primero la configuracion: es lo unico de acá que, si no se repone, deja
+  // la fabrica sin poder cobrar.
+  await setConfigValues(configBancaria);
+  invalidateConfigCache();
+  const { data: verif } = await db
+    .from('system_config').select('key, value').in('key', KEYS_BANCO);
+  const perdidas = (verif ?? []).filter(
+    (r) => (configBancaria[r.key] ?? '') !== (r.value ?? ''),
+  );
+  console.log(
+    perdidas.length
+      ? `\n  ATENCION: no se pudo restaurar ${perdidas.map((p) => p.key).join(', ')}`
+      : '\n  (configuracion bancaria restaurada)',
+  );
+
   await db.from('order_notifications').delete().eq('order_id', ORDEN);
   await db.from('communications').delete().eq('order_id', ORDEN);
   await db.from('orders').delete().eq('id', ORDEN);

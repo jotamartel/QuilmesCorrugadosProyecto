@@ -77,16 +77,24 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Sidebar */}
+      {/* El aside es una COLUMNA FLEX, y no es decorativo.
+          Antes era un bloque suelto con el footer en absolute bottom-0: el nav
+          crecía más que la pantalla y el cartel de la versión quedaba apoyado
+          encima del último ítem del menú, que hoy es "API Keys". Cada vez que
+          se agrega una entrada al menú el problema empeora.
+          Ahora el nav se lleva el espacio sobrante y scrollea solo; el footer
+          es un hermano más, no algo flotando por arriba. */}
       <aside
         className={`
           fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-200
+          flex flex-col
           transform transition-transform duration-200 ease-in-out
           lg:translate-x-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
+        <div className="shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-200">
           <Link href="/" className="flex items-center gap-2">
             <Box className="w-8 h-8 text-blue-600" />
             <span className="font-bold text-gray-900">Quilmes</span>
@@ -99,8 +107,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="p-4 space-y-1">
+        {/* Navigation
+            min-h-0 va junto con flex-1: sin eso, el min-height:auto que traen
+            los items flex impide que se achique y el overflow-y no scrollea
+            nunca — vuelve a desbordar, en silencio. */}
+        <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1">
           {navigation.map((item) => {
             const isActive = pathname === item.href ||
               (item.href !== '/' && pathname.startsWith(item.href));
@@ -127,7 +138,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+        <div className="shrink-0 p-4 border-t border-gray-200 bg-white">
           <p className="text-xs text-gray-500 text-center">
             Quilmes Corrugados v1.0
           </p>

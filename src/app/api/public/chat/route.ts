@@ -3,7 +3,11 @@ import { generateChatResponse } from '@/lib/whatsapp-ai';
 import type { ConversationTurn } from '@/lib/whatsapp-ai';
 import { responder, agenteDisponible } from '@/lib/agente';
 import { CONTACTO } from '@/lib/contacto';
-import { anotarIntercambio, anotarContactoSiHay } from '@/lib/chat-web/conversaciones';
+import {
+  anotarIntercambio,
+  anotarContactoSiHay,
+  yaDejoContacto,
+} from '@/lib/chat-web/conversaciones';
 
 /**
  * POST /api/public/chat — el chat del sitio.
@@ -50,9 +54,14 @@ export async function POST(request: NextRequest) {
 
     if (agenteDisponible()) {
       try {
+        // Se mira ANTES de contestar: las herramientas necesitan saber si
+        // esta persona ya dejó cómo ubicarla para decidir si corresponde
+        // pedírselo. Sin sesión no hay conversación guardada, y entonces
+        // tampoco hay a quién volver a escribirle: se pide igual.
         const r = await responder(message, turns, {
           canal: 'web',
           paginaActual: attribution?.pagePath,
+          yaTenemosContacto: sesion ? await yaDejoContacto(sesion) : false,
         });
         if (r.texto) {
           // Se loguea qué herramientas usó para poder medir después si de

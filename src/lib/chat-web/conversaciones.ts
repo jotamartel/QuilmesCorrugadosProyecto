@@ -104,6 +104,32 @@ export function contactoEnElTexto(texto: string): string | null {
   return null;
 }
 
+/**
+ * Si esta conversación ya dejó un contacto.
+ *
+ * Lo consulta el endpoint del chat ANTES de llamar al agente, para que las
+ * herramientas sepan si hace falta pedirlo. Que lo decida el sistema y no el
+ * modelo es lo que evita las dos formas de embromarla: pedirlo de nuevo a
+ * alguien que ya lo dio, y no pedirlo nunca.
+ *
+ * Ante la duda dice que SÍ lo tenemos: si la base falla, preferimos no pedir
+ * un dato de más antes que insistirle a alguien que ya lo dejó.
+ */
+export async function yaDejoContacto(sesion: string): Promise<boolean> {
+  if (!sesion?.trim()) return false;
+  try {
+    const { data } = await createAdminClient()
+      .from('chat_web_conversaciones')
+      .select('contacto')
+      .eq('sesion', sesion)
+      .maybeSingle();
+    return !!data?.contacto;
+  } catch (e) {
+    console.error('[chat-web] no se pudo mirar si dejó contacto:', e);
+    return true;
+  }
+}
+
 /** Anota el contacto si aparece, sin pisar uno que ya estaba. */
 export async function anotarContactoSiHay(sesion: string, texto: string): Promise<void> {
   const contacto = contactoEnElTexto(texto);

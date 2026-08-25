@@ -142,6 +142,80 @@ try {
   }
 
   console.log('');
+  console.log('El contacto se PIDE, y lo decide el motor — no el modelo');
+  {
+    // POR QUE ACA Y NO EN EL PROMPT: depende de si esta persona ya dejo un
+    // dato, que es estado que el modelo no tiene. Dejarselo a el termina en
+    // pedirselo dos veces o no pedirselo nunca.
+    const { crearHerramientas } = await import('@/lib/agente/herramientas');
+    const { yaDejoContacto } = await import('@/lib/chat-web/conversaciones');
+    type Tool = { name: string; run: (a: Record<string, unknown>) => Promise<string> };
+    const cotizar = (ctx: Record<string, unknown>) =>
+      (crearHerramientas(ctx as never) as Tool[]).find((t) => t.name === 'cotizar_cajas')!;
+
+    // Un pedido que SI se puede vender.
+    const bueno = { largo_mm: 400, ancho_mm: 300, alto_mm: 300, cantidad: 4000, colores_impresion: 0 };
+    // Y el caso real del 25/08: 400 cajas de 400x600x500, abajo del minimo.
+    // Es el que MAS necesita seguimiento: no puede comprar hoy, pero quiere.
+    const bajoMinimo = { largo_mm: 400, ancho_mm: 600, alto_mm: 500, cantidad: 400, colores_impresion: 2 };
+
+    const web = { canal: 'web', yaTenemosContacto: false };
+    const webConContacto = { canal: 'web', yaTenemosContacto: true };
+    const wpp = { canal: 'whatsapp', telefono: '+5491100000000' };
+
+    const conPrecio = JSON.parse(await cotizar(web).run(bueno));
+    ok('con precio, el motor manda pedir el contacto', !!conPrecio.pedile_un_contacto);
+    ok('y dice que va DESPUES, en el mismo mensaje',
+       /mismo mensaje/.test(conPrecio.pedile_un_contacto || ''), conPrecio.pedile_un_contacto);
+    ok('y que si no lo deja no se insiste',
+       /NO insistas/.test(conPrecio.pedile_un_contacto || ''), conPrecio.pedile_un_contacto);
+    ok('y que si lo deja se guarde',
+       /guardar_lead/.test(conPrecio.pedile_un_contacto || ''), conPrecio.pedile_un_contacto);
+
+    const sinPrecio = JSON.parse(await cotizar(web).run(bajoMinimo));
+    ok('el pedido bajo el minimo tambien lo pide', !!sinPrecio.pedile_un_contacto,
+       `se_puede_cotizar=${sinPrecio.se_puede_cotizar}`);
+    ok('(y efectivamente no tiene precio)', sinPrecio.se_puede_cotizar === false);
+
+    const yaLoDio = JSON.parse(await cotizar(webConContacto).run(bueno));
+    ok('a quien YA lo dejo no se lo vuelve a pedir', !yaLoDio.pedile_un_contacto);
+
+    const porWpp = JSON.parse(await cotizar(wpp).run(bueno));
+    ok('por WhatsApp no se pide nunca: el numero ya lo tenemos',
+       !porWpp.pedile_un_contacto);
+
+    // Y el dato que alimenta todo esto sale de la base, no de la nada.
+    //
+    // Sesion propia: la de arriba ya dejo un contacto en un bloque anterior, y
+    // reusarla haria que este chequeo pase por el motivo equivocado.
+    const LIMPIA = `${SESION}-sin-contacto`;
+    await anotarIntercambio({ sesion: LIMPIA, pregunta: 'hola', respuesta: 'hola' });
+    ok('sin contacto anotado, yaDejoContacto dice que no',
+       (await yaDejoContacto(LIMPIA)) === false);
+    await anotarContactoSiHay(LIMPIA, 'escribime a compras@fabrica.test');
+    ok('y una vez anotado, dice que si', (await yaDejoContacto(LIMPIA)) === true);
+    ok('una sesion vacia no cuenta como que dejo contacto',
+       (await yaDejoContacto('')) === false);
+
+    // Se limpia acá porque el finally solo conoce SESION.
+    {
+      const { data: c } = await db.from('chat_web_conversaciones')
+        .select('id').eq('sesion', LIMPIA).maybeSingle();
+      if (c) {
+        await db.from('chat_web_mensajes').delete().eq('conversacion_id', c.id);
+        await db.from('chat_web_conversaciones').delete().eq('id', c.id);
+      }
+    }
+
+    // El endpoint tiene que estar pasandolo: sin esto todo lo de arriba es
+    // codigo que nadie llama.
+    const { readFileSync } = await import('node:fs');
+    const ruta = readFileSync('src/app/api/public/chat/route.ts', 'utf8');
+    ok('el endpoint le pasa el estado al agente',
+       /yaTenemosContacto: sesion \? await yaDejoContacto\(sesion\) : false/.test(ruta));
+  }
+
+  console.log('');
   console.log('Y sigue aparte de WhatsApp');
   {
     const { data: enWhatsApp } = await db.from('communications')

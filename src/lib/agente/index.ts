@@ -202,6 +202,10 @@ export const POR_CANAL: Record<ContextoAgente['canal'], string> = {
 ESTE CANAL
 Estás en el chat del sitio. La persona tiene el cotizador y las páginas a mano, así que podés mandarla ahí cuando convenga.
 
+Acá es ANÓNIMA: no tenemos ni su nombre ni cómo escribirle, y cuando cierra la pestaña la conversación se terminó para siempre. Por eso, cuando la respuesta de una herramienta traiga "pedile_un_contacto", hacé lo que dice: cerrás con una frase pidiéndole un mail y su nombre, ofreciéndole mandarle lo que le pasaste por escrito. Va DESPUÉS de resolver y en el mismo mensaje, nunca antes ni suelto.
+
+Eso no es lo mismo que anunciar un llamado. El llamado se ofrece cuando lo pide; el contacto se pide para poder seguir la conversación. Y si el campo no viene, es porque esta persona ya lo dejó: no se lo pidas de nuevo.
+
 CÓMO SE LEE
 Una cotización son seis o siete números seguidos y en un párrafo corrido se pierden todos. Poné en negrita, con doble asterisco, solo lo que la persona busca con el ojo: la medida, la cantidad y el total con IVA. Nada más: si va todo en negrita no resalta nada.
 

@@ -47,6 +47,16 @@ export interface ContextoAgente {
   canal: 'web' | 'whatsapp';
   /** E.164 sin el prefijo whatsapp:, cuando el canal lo trae. */
   telefono?: string;
+  /**
+   * Si esta conversación ya dejó un mail o un teléfono.
+   *
+   * Solo aplica al chat del sitio: por WhatsApp el número viene solo. Lo
+   * resuelve el endpoint mirando la conversación guardada, y con eso las
+   * herramientas deciden si corresponde pedirlo — el modelo no tiene que
+   * acordarse de si ya lo pidió tres mensajes atrás, que es justo lo que
+   * termina en pedirlo dos veces o no pedirlo nunca.
+   */
+  yaTenemosContacto?: boolean;
 }
 
 async function leerCatalogoDeStock() {
@@ -74,6 +84,31 @@ async function leerCatalogoDeStock() {
  * conviene sacarle de encima.
  */
 export function crearHerramientas(ctx: ContextoAgente) {
+  /**
+   * Si en ESTA respuesta corresponde pedirle un mail o un teléfono.
+   *
+   * POR QUE LO DECIDE EL MOTOR Y NO EL PROMPT
+   *
+   * Porque depende de un estado que el modelo no tiene: si esta persona ya
+   * dejó un contacto en algún mensaje anterior. Dejárselo a él termina en
+   * una de las dos formas de embromarla —pedírselo de nuevo a quien ya lo
+   * dio, o no pedírselo nunca— y las dos las vimos.
+   *
+   * POR WHATSAPP NO VA NUNCA: el número ya lo tenemos, pedirlo es raro.
+   *
+   * Y VA DESPUES DE RESOLVER, NO ANTES. Una puerta antes de dar el precio
+   * se lleva puesta a la persona que entró justamente a ver un precio, y esa
+   * que se va no queda registrada en ningún lado: no se puede ni medir.
+   * Acá el dato se pide a cambio de algo —te lo mando por escrito— y recién
+   * cuando ya se demostró que servimos.
+   */
+  const pedirContactoSiCorresponde = () =>
+    ctx.canal === 'web' && !ctx.yaTenemosContacto
+      ? {
+          pedile_un_contacto:
+            'Cerrá con UNA sola frase pidiéndole un mail (o un teléfono) y su nombre, ofreciéndole algo a cambio: mandarle esto por escrito para que lo tenga y lo pueda compartir con quien decide. Es la única forma de volver a hablarle: acá es anónimo y cuando cierra la pestaña se terminó. Pedilo UNA vez y en el mismo mensaje de la respuesta, nunca en uno aparte. Si no lo deja o cambia de tema, NO insistas y seguí atendiendo igual. Y si lo deja, guardalo con guardar_lead.',
+        }
+      : {};
   const cotizarCajas = betaTool({
   name: 'cotizar_cajas',
   description:
@@ -228,6 +263,7 @@ export function crearHerramientas(ctx: ContextoAgente) {
           comparacion: a.comparacion,
           link_para_compartir: `${SITE_URL}/cotizar/${a.length_mm}x${a.width_mm}x${a.height_mm}/${a.cantidad}`,
         })),
+        ...pedirContactoSiCorresponde(),
         instruccion:
           'NO des ningun precio para la medida que pidió: no lo tenés y no existe. ' +
           'ARRANCA tu respuesta con texto_para_el_cliente, que ya explica por que no se puede ' +
@@ -325,6 +361,7 @@ export function crearHerramientas(ctx: ContextoAgente) {
                   'ofrecerlo. Si pregunta la persona, contale lo que dice por_que.',
               },
       link_para_compartir: `${SITE_URL}/cotizar/${largo_mm}x${ancho_mm}x${alto_mm}/${cantidad}`,
+      ...pedirContactoSiCorresponde(),
       instruccion:
         'Al dar el precio decí siempre que es en pesos, que el subtotal va sin IVA y ' +
         'el total con IVA incluido, el plazo y hasta cuándo vale. Pasale el link. ' +

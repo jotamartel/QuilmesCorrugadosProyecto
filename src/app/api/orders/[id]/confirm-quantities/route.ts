@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { notificarEventoDePedido, type ResultadoAviso } from '@/lib/notificaciones-pedido';
-import { repartirElPago } from '@/lib/pagos/esquemas';
+import { repartirElPago, baseDeLaSena } from '@/lib/pagos/esquemas';
+import { IVA } from '@/lib/cotizacion/motor';
 import type { ConfirmQuantitiesRequest } from '@/lib/types/database';
 
 interface RouteParams {
@@ -121,12 +122,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Si entregamos más, el balance aumenta
     let newBalanceAmount: number;
 
+    // Lo que el cliente debe es CON IVA, igual que al crear la orden.
+    const newTotalConIva = Math.round(newTotal * (1 + IVA) * 100) / 100;
+
     if (depositPaid) {
-      // La seña ya se pagó, el balance es el nuevo total menos lo ya pagado
-      newBalanceAmount = Math.max(0, newTotal - depositAmount);
+      // La seña ya se pagó, el balance es lo que debe menos lo ya pagado
+      newBalanceAmount = Math.max(0, Math.round((newTotalConIva - depositAmount) * 100) / 100);
     } else {
       // Si la seña no se pagó aún, se mantiene la condición estándar.
-      newBalanceAmount = repartirElPago(newTotal).contraEntrega;
+      newBalanceAmount = repartirElPago(baseDeLaSena(newTotal, newTotalConIva)).contraEntrega;
     }
 
     // (Aca habia un for muerto que "actualizaba" total_m2 por item sin hacer

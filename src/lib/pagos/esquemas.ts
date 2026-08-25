@@ -59,9 +59,13 @@
 export const SENA_PCT = 50;
 
 /**
- * SOBRE QUE TOTAL SE CALCULA LA SEÑA. PENDIENTE DE FERNANDO.
+ * SOBRE QUE TOTAL SE CALCULA LA SEÑA.
  *
- * El sistema hoy contesta las dos cosas y no coinciden:
+ * DECIDIDO EL 25/08/2026: sobre el total CON IVA. Es lo que dice la cotización
+ * que el cliente tiene en la mano, lo que va a totalizar la factura de seña de
+ * Xubio, y la lectura natural de "50% de seña" —la mitad de lo que debe—.
+ *
+ * Hasta ese día el sistema contestaba las dos cosas y no coincidían:
  *
  *   - `orders` vive entero en NETO. `orders.total` no tiene IVA (es
  *     subtotal + impresión + troquel + envío, ver calculateTotal en
@@ -78,12 +82,31 @@ export const SENA_PCT = 50;
  * $606.598,59: $105.277,44. No es un redondeo, es qué le pedimos que
  * transfiera.
  *
- * MIENTRAS NO ESTE DECIDIDO se usa el neto, que es lo que la fábrica cobró en
- * las siete órdenes y lo que el panel va a conciliar. Si erramos para este
- * lado cobramos de menos y lo recupera el saldo; para el otro lado le
- * cobraríamos de más a alguien y hay que devolverle plata.
+ * LO QUE CAMBIO AL DECIDIRLO
+ *
+ * No alcanzaba con que el asistente dijera el número nuevo: `deposit_amount` y
+ * `balance_amount` seguían saliendo del neto, así que el chat le habría pedido
+ * $606.598,59 y el panel habría esperado $501.321,15. Ahora las dos rutas que
+ * crean órdenes —y la que recalcula al confirmar cantidades— reparten sobre el
+ * mismo total con IVA, así que seña + saldo es lo que el cliente debe.
+ *
+ * `orders.total` sigue siendo NETO y no se tocó: es lo que era, lo que hay en
+ * las órdenes viejas y de donde Xubio saca el precio unitario. Por eso ahora
+ * seña + saldo NO da `total`, y da bien: son cosas distintas. El panel muestra
+ * el total con IVA al lado de los pagos para que se vea de dónde salen.
  */
-export const SENA_SOBRE: 'neto' | 'con_iva' = 'neto';
+export const SENA_SOBRE: 'neto' | 'con_iva' = 'con_iva';
+
+/**
+ * Cuál de los dos totales manda, para no repetir el ternario en cada llamador.
+ *
+ * Recibe los dos y elige: el que decide es este archivo, no el que llama. Los
+ * dos parámetros son a propósito —no calcula el IVA acá— para que este módulo
+ * siga sin importar nada y pueda usarse en componentes 'use client'.
+ */
+export function baseDeLaSena(totalNeto: number, totalConIva: number): number {
+  return SENA_SOBRE === 'neto' ? totalNeto : totalConIva;
+}
 
 export type EsquemaDePago = 'standard' | 'credit';
 

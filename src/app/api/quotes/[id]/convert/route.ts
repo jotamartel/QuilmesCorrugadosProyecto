@@ -6,7 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateDeliveryDate, toISODateString } from '@/lib/utils/dates';
-import { repartirElPago } from '@/lib/pagos/esquemas';
+import { repartirElPago, baseDeLaSena } from '@/lib/pagos/esquemas';
+import { IVA } from '@/lib/cotizacion/motor';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -64,9 +65,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // El reparto sale de @/lib/pagos/esquemas, unico dueño del porcentaje.
+    // El reparto sale de @/lib/pagos/esquemas, unico dueño del porcentaje y de
+    // sobre que total se aplica. quote.total es NETO, igual que orders.total.
+    const totalConIva = Math.round(Number(quote.total) * (1 + IVA) * 100) / 100;
     const { alConfirmar: depositAmount, contraEntrega: balanceAmount } =
-      repartirElPago(quote.total);
+      repartirElPago(baseDeLaSena(Number(quote.total), totalConIva));
 
     // Crear orden
     const { data: order, error: orderError } = await supabase

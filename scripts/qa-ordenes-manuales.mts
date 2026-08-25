@@ -111,7 +111,20 @@ try {
       ok('nace confirmada con la seña registrada',
          orden.status === 'confirmed' && orden.deposit_status === 'paid' && orden.deposit_method === 'efectivo');
       ok('confirmed_at seteado', orden.confirmed_at !== null);
-      ok('saldo = total - seña', Number(orden.balance_amount) === 25000);
+      // El saldo cierra contra el total CON IVA, no contra `total`.
+      //
+      // Antes esperaba 25000, o sea total(50000) - seña(25000). Eso daba por
+      // sentado que el cliente debe el neto, y no: debe 60500. El saldo que
+      // quedaba anotado se comia el 21% del IVA.
+      //
+      // Se corrigio el 25/08/2026 al decidir que la seña sale del total con
+      // IVA (ver SENA_SOBRE en @/lib/pagos/esquemas). `orders.total` sigue
+      // siendo neto —no se toco— asi que seña + saldo NO da `total` y da bien.
+      ok('saldo = total con IVA - seña', Number(orden.balance_amount) === 35500,
+         `balance_amount = ${orden.balance_amount}, esperado 60500 - 25000`);
+      ok('y seña + saldo es lo que el cliente debe',
+         Number(orden.deposit_amount) + Number(orden.balance_amount) === 60500,
+         `${orden.deposit_amount} + ${orden.balance_amount}`);
       const { data: pago } = await db.from('payments').select('type, amount, method')
         .eq('order_id', orden.id as string).maybeSingle();
       ok('la seña dejo fila en payments', pago?.type === 'deposit' && Number(pago?.amount) === 25000,

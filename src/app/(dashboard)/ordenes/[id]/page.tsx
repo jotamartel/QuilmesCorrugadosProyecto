@@ -488,6 +488,21 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* De dónde salen los dos montos de abajo.
+
+                  Sin esto no se entiende: el "Total" de la ficha es NETO —la
+                  tabla orders no tiene columna de IVA— y la seña sale del total
+                  CON IVA, que es lo que el cliente efectivamente paga. O sea
+                  que seña + saldo da ESTE número y no aquel, y los dos están
+                  bien. Antes de mostrarlo, alguien iba a sumar los dos montos
+                  contra el total de arriba y pensar que la cuenta está rota. */}
+              <div className="flex items-baseline justify-between pb-3 border-b text-sm">
+                <span className="text-gray-500">Total con IVA, que es sobre lo que se seña</span>
+                <span className="font-medium tabular-nums">
+                  {formatCurrency(order.deposit_amount + order.balance_amount)}
+                </span>
+              </div>
+
               {/* Deposit */}
               <div className="p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between mb-3">

@@ -36,9 +36,9 @@ for (const f of ['.env.qa.tmp', '.env.local']) {
   if (existsSync(f)) { dotenv.config({ path: f, override: true }); break; }
 }
 
-const { SENA_PCT, SENA_SOBRE, repartirElPago, porcentajeAlEntregar, PAGO } =
+const { SENA_PCT, SENA_SOBRE, repartirElPago, baseDeLaSena, porcentajeAlEntregar, PAGO } =
   await import('@/lib/pagos/esquemas');
-const { calcularCotizacion, precioUnitarioARS } = await import('@/lib/cotizacion/motor');
+const { calcularCotizacion, precioUnitarioARS, IVA } = await import('@/lib/cotizacion/motor');
 const { getActivePricingConfig } = await import('@/lib/utils/pricing');
 const { crearHerramientas } = await import('@/lib/agente/herramientas');
 
@@ -86,7 +86,8 @@ console.log('Un solo dueño del porcentaje: nadie lo escribe a mano');
   const lee = (f: string) => readFileSync(f, 'utf8');
 
   const ordenes = lee('src/app/api/orders/route.ts');
-  ok('la API de ordenes usa repartirElPago', /repartirElPago\(total\)/.test(ordenes));
+  ok('la API de ordenes usa repartirElPago sobre la base que decide esquemas',
+     /repartirElPago\(baseDeLaSena\(total, totalConIva\)\)/.test(ordenes));
   ok('y ya no divide el total a mano', !/\(total \/ 2\)/.test(ordenes));
 
   const xubio = lee('src/lib/xubio/invoices.ts');
@@ -96,7 +97,8 @@ console.log('Un solo dueño del porcentaje: nadie lo escribe a mano');
      (xubio.match(/.{0,40}\? 100 : 50.{0,20}|.{0,30}[^\w]50[^\w%].{0,30}/g) || []).join(' | '));
 
   const convert = lee('src/app/api/quotes/[id]/convert/route.ts');
-  ok('convertir cotizacion en pedido usa repartirElPago', /repartirElPago\(quote\.total\)/.test(convert));
+  ok('convertir cotizacion en pedido usa la misma base',
+     /repartirElPago\(baseDeLaSena\(Number\(quote\.total\), totalConIva\)\)/.test(convert));
 
   const utils = lee('src/lib/utils/pricing.ts');
   ok('calculatePaymentAmounts ya no existe', !/export function calculatePaymentAmounts/.test(utils));
@@ -162,7 +164,14 @@ console.log('La herramienta le da al asistente el monto, no el porcentaje');
   // equipo concilia la transferencia. `orders.total` es NETO —sin IVA— y
   // deposit_amount es su mitad, asi que si el asistente cotiza sobre el total
   // con IVA le pide un 21% de mas a alguien que ya esta por transferir.
-  const comoLaGuardaLaOrden = repartirElPago(q.subtotal!).alConfirmar;
+  // Se reproduce el camino de orders/route.ts, no se le pregunta a la
+  // herramienta: si los dos usaran el mismo helper el chequeo no probaria nada.
+  // (printing/diecut/shipping son 0 en este pedido, asi que orders.total === subtotal)
+  const totalDeLaOrden = q.subtotal!;
+  const conIvaDeLaOrden = Math.round(totalDeLaOrden * (1 + IVA) * 100) / 100;
+  const comoLaGuardaLaOrden = repartirElPago(
+    baseDeLaSena(totalDeLaOrden, conIvaDeLaOrden),
+  ).alConfirmar;
   ok('coincide con el deposit_amount que va a guardar la orden',
      r.sena_a_transferir === precioUnitarioARS(comoLaGuardaLaOrden),
      `el asistente dice ${r.sena_a_transferir} y la orden guardaria ` +
@@ -331,7 +340,10 @@ console.log('');
 console.log('El saldo, cuando se confirman las cantidades finales');
 {
   const cq = readFileSync('src/app/api/orders/[id]/confirm-quantities/route.ts', 'utf8');
-  ok('sale del mismo reparto', /repartirElPago\(newTotal\)\.contraEntrega/.test(cq));
+  ok('sale del mismo reparto y la misma base',
+     /repartirElPago\(baseDeLaSena\(newTotal, newTotalConIva\)\)\.contraEntrega/.test(cq));
+  ok('y el saldo con la seña ya cobrada tambien sale del total con IVA',
+     /newTotalConIva - depositAmount/.test(cq));
   ok('y ya no multiplica por 0.5', !/newTotal \* 0\.5/.test(cq));
 }
 

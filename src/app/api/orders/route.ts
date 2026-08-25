@@ -10,8 +10,8 @@ import { DATA_START_DATE } from '@/lib/utils/constants';
 import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
 import { getPricePerM2, calculateSubtotal, calculateTotal, getProductionDays, getActivePricingConfig } from '@/lib/utils/pricing';
 import { calculateDeliveryDate, toISODateString } from '@/lib/utils/dates';
-import { porQueNoSeFabrica } from '@/lib/cotizacion/motor';
-import { repartirElPago } from '@/lib/pagos/esquemas';
+import { porQueNoSeFabrica, IVA } from '@/lib/cotizacion/motor';
+import { repartirElPago, baseDeLaSena } from '@/lib/pagos/esquemas';
 import type { OrderStatus, CreateOrderRequest, PaymentMethod } from '@/lib/types/database';
 
 // GET /api/orders - Lista órdenes
@@ -207,12 +207,18 @@ export async function POST(request: NextRequest) {
     // vive el porcentaje. Si al crear la orden ya se cobro otra cosa manda lo
     // cobrado: dos de las siete ordenes que hay tienen seña de 47,6% y 49,1%
     // porque se registro lo que la persona efectivamente transfirio.
-    const condicion = repartirElPago(total);
+    //
+    // `total` es NETO: la tabla orders no tiene columna de IVA. Pero lo que el
+    // cliente paga es con IVA, y sobre eso se calcula la seña (ver SENA_SOBRE).
+    // Por eso seña + saldo da el total con IVA y NO da `total`: son cosas
+    // distintas y las dos estan bien.
+    const totalConIva = Math.round(total * (1 + IVA) * 100) / 100;
+    const condicion = repartirElPago(baseDeLaSena(total, totalConIva));
     const depositAmount =
       initialStatus === 'confirmed' && typeof body.deposit?.amount === 'number' && body.deposit.amount > 0
         ? Math.round(body.deposit.amount * 100) / 100
         : condicion.alConfirmar;
-    const balanceAmount = Math.round((total - depositAmount) * 100) / 100;
+    const balanceAmount = Math.round((totalConIva - depositAmount) * 100) / 100;
     const now = new Date().toISOString();
 
     const hasPrinting = body.has_printing || (body.printing_colors ?? 0) > 0;

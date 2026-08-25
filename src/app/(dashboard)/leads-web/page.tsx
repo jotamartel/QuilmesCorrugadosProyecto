@@ -326,11 +326,11 @@ export default function LeadsWebPage() {
                         <td className="px-6 py-4 text-sm">
                           {quote.length_mm}x{quote.width_mm}x{quote.height_mm}
                           <span className="text-gray-500 ml-1">
-                            ({quote.quantity.toLocaleString('es-AR')} u.)
+                            ({quote.quantity?.toLocaleString('es-AR') ?? '—'} u.)
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right text-sm">
-                          {quote.total_sqm.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
+                          {quote.total_sqm?.toLocaleString('es-AR', { minimumFractionDigits: 0 }) ?? '—'}
                         </td>
                         <td className="px-6 py-4 text-right font-medium">
                           {formatCurrency(quote.subtotal)}

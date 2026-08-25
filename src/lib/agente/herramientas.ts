@@ -621,6 +621,56 @@ export function crearHerramientas(ctx: ContextoAgente) {
       const hayCotizacion =
         args.largo_mm && args.ancho_mm && args.alto_mm && args.cantidad;
 
+      // LOS NUMEROS SE CALCULAN ACA, NO SE DEJAN PARA DESPUES.
+      //
+      // Hasta el 25/08/2026 esta fila se guardaba con las medidas y la cantidad
+      // y nada mas: m², precio por caja y subtotal quedaban en null, y el
+      // precio existia solo como texto adentro de `message`. El vendedor abria
+      // la cotizacion en el panel y tenia que volver a cotizarla a mano, con la
+      // conversacion al lado, para saber que le habiamos dicho al cliente.
+      //
+      // El motor ya tiene todo lo que hace falta. Si el pedido no se puede
+      // vender —abajo del minimo, medida imposible— no hay precio y los campos
+      // se quedan en null a proposito: es un lead igual, y el tipo lo contempla.
+      let calculos: Record<string, number> | null = null;
+      if (hayCotizacion) {
+        try {
+          const config = await getActivePricingConfig();
+          if (config) {
+            const q = calcularCotizacion(
+              [{
+                length_mm: args.largo_mm!,
+                width_mm: args.ancho_mm!,
+                height_mm: args.alto_mm!,
+                quantity: args.cantidad!,
+                printing_colors: 0,
+              }],
+              config,
+              await leerCatalogoDeStock(),
+            );
+            if (q.cotizable) {
+              const caja = q.boxes[0];
+              calculos = {
+                sheet_width_mm: Math.round(caja.sheet_width_mm),
+                sheet_length_mm: Math.round(caja.sheet_length_mm),
+                sqm_per_box: caja.sqm_per_box,
+                total_sqm: q.total_m2,
+                // El precio por m² vive en la caja, no en la cotización: es el
+                // escalón que le tocó a ESE volumen.
+                price_per_m2: caja.price_per_m2,
+                unit_price: caja.unit_price,
+                subtotal: q.subtotal,
+                estimated_days: q.estimated_days,
+              };
+            }
+          }
+        } catch (e) {
+          // Que no se pueda calcular NO puede costar el lead: se guarda igual
+          // con lo que hay. Un contacto sin precio sirve; perderlo, no.
+          console.error('[Agente] no se pudieron calcular los numeros del lead:', e);
+        }
+      }
+
       // La tabla exige al menos un canal de contacto. Sin telefono ni mail la
       // fila no le sirve a nadie: alcanza con el perfil de contacto.
       const sePuedeContactar = !!telefono || !!args.email;
@@ -681,6 +731,9 @@ export function crearHerramientas(ctx: ContextoAgente) {
             width_mm: hayCotizacion ? args.ancho_mm : null,
             height_mm: hayCotizacion ? args.alto_mm : null,
             quantity: hayCotizacion ? args.cantidad : null,
+            // Los m² y los precios, ya resueltos por el motor. Van sueltos para
+            // que el spread no meta claves con undefined cuando no hay calculo.
+            ...(calculos ?? {}),
             message: args.resumen,
             // source y canal tienen un CHECK que solo admite 'web' y
             // 'whatsapp'. Que la consulta la haya tomado el asistente y no el

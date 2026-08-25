@@ -1050,10 +1050,25 @@ export interface PublicQuote {
   requested_contact: boolean;
 
   // Datos de la caja
-  length_mm: number;
-  width_mm: number;
-  height_mm: number;
-  quantity: number;
+  //
+  // NULABLES, Y NO ES UN DETALLE.
+  //
+  // Una fila de public_quotes no siempre es una cotización: `guardar_lead` la
+  // usa también para el que dejó su teléfono sin haber dado medidas todavía.
+  // Ahí van los cuatro en null —el CHECK de la tabla exige los cuatro o
+  // ninguno— y el tipo decía `number`.
+  //
+  // El 25/08/2026 eso volteó /cotizaciones-web entera: la tabla hacía
+  // `quote.quantity.toLocaleString()` sobre tres filas que el asistente de
+  // WhatsApp había guardado sin medidas, y la página no renderizaba nada. Un
+  // "Application error" en blanco por tres filas incompletas de sesenta.
+  //
+  // Mentirle al compilador sale más caro que el null: si el tipo hubiera dicho
+  // la verdad, tsc marcaba cada lugar que había que contemplar.
+  length_mm: number | null;
+  width_mm: number | null;
+  height_mm: number | null;
+  quantity: number | null;
   has_printing: boolean;
   printing_colors: number;
 
@@ -1063,15 +1078,20 @@ export interface PublicQuote {
   design_preview_url: string | null;
 
   // Cálculos
-  sheet_width_mm: number;
-  sheet_length_mm: number;
-  sqm_per_box: number;
-  total_sqm: number;
-  price_per_m2: number;
+  //
+  // También nulables: los llena el cotizador de la web, pero una consulta
+  // tomada por el asistente puede no tener precio —porque todavía no dio
+  // medidas, o porque el pedido quedó por debajo del mínimo y no hay precio
+  // que calcular—. Ver el comentario de "Datos de la caja".
+  sheet_width_mm: number | null;
+  sheet_length_mm: number | null;
+  sqm_per_box: number | null;
+  total_sqm: number | null;
+  price_per_m2: number | null;
   price_per_m2_applied: number | null; // Precio realmente aplicado (puede ser con recargo)
-  unit_price: number;
-  subtotal: number;
-  estimated_days: number;
+  unit_price: number | null;
+  subtotal: number | null;
+  estimated_days: number | null;
 
   // Pedidos menores al mínimo
   is_below_minimum: boolean;

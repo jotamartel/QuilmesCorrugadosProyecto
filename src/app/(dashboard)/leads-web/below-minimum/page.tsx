@@ -93,7 +93,7 @@ export default function BelowMinimumLeadsPage() {
                 <p className="text-sm text-gray-600">m² promedio</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {quotes.length > 0
-                    ? (quotes.reduce((sum, q) => sum + q.total_sqm, 0) / quotes.length).toFixed(0)
+                    ? (quotes.reduce((sum, q) => sum + (q.total_sqm ?? 0), 0) / quotes.length).toFixed(0)
                     : '0'}
                 </p>
               </div>
@@ -109,7 +109,7 @@ export default function BelowMinimumLeadsPage() {
               <div>
                 <p className="text-sm text-gray-600">Valor total</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(quotes.reduce((sum, q) => sum + q.subtotal, 0))}
+                  {formatCurrency(quotes.reduce((sum, q) => sum + (q.subtotal ?? 0), 0))}
                 </p>
               </div>
               <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
@@ -167,7 +167,13 @@ export default function BelowMinimumLeadsPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {quotes.map((quote) => {
-                    const whatsappMessage = `Hola ${quote.requester_name}, te escribo sobre tu cotización ${quote.quote_number_formatted} (${quote.total_sqm.toFixed(2)}m², ${quote.quantity} cajas).`;
+                    // Sin medidas el mensaje no dice el detalle en vez de decir
+                    // "undefined m²", que es lo que le llegaria al cliente.
+                    const detalle =
+                      quote.total_sqm != null && quote.quantity != null
+                        ? ` (${quote.total_sqm.toFixed(2)}m², ${quote.quantity} cajas)`
+                        : '';
+                    const whatsappMessage = `Hola ${quote.requester_name}, te escribo sobre tu cotización ${quote.quote_number_formatted}${detalle}.`;
                     const whatsappUrl = `https://wa.me/${quote.requester_phone.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMessage)}`;
 
                     return (
@@ -189,12 +195,12 @@ export default function BelowMinimumLeadsPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900 font-medium">
-                            {quote.quantity.toLocaleString('es-AR')} cajas
+                            {quote.quantity?.toLocaleString('es-AR') ?? '—'} cajas
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            {quote.total_sqm.toFixed(2)} m²
+                            {quote.total_sqm != null ? `${quote.total_sqm.toFixed(2)} m²` : '—'}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

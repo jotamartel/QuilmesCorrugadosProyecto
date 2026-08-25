@@ -148,7 +148,17 @@ export function calculateTotal(
 /**
  * Formatea un monto en pesos argentinos
  */
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number | null | undefined): string {
+  // UN MONTO QUE NO EXISTE NO ES CERO.
+  //
+  // Intl.format(null) devuelve "$ 0,00" sin quejarse, y eso en pantalla dice
+  // que la cotización salió gratis. No es lo mismo que "todavía no tiene
+  // precio", que es lo que pasa con las consultas que toma el asistente sin
+  // medidas o con un pedido por debajo del mínimo.
+  //
+  // La raya se lee como falta de dato y no se confunde con un importe.
+  if (amount === null || amount === undefined || Number.isNaN(amount)) return '—';
+
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
     currency: 'ARS',
@@ -158,9 +168,12 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
- * Formatea m² con separador de miles
+ * Formatea m² con separador de miles. Mismo criterio que formatCurrency: sin
+ * dato va raya, no un cero que se lee como una caja sin superficie.
  */
-export function formatM2(m2: number): string {
+export function formatM2(m2: number | null | undefined): string {
+  if (m2 === null || m2 === undefined || Number.isNaN(m2)) return '—';
+
   return new Intl.NumberFormat('es-AR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,

@@ -110,10 +110,15 @@ export const PAYMENT_TERMS_LABELS: Record<PaymentTerms, string> = {
  * Formatea medidas de caja (ej: "400 x 300 x 200 mm")
  */
 export function formatBoxDimensions(
-  length: number,
-  width: number,
-  height: number
+  length: number | null | undefined,
+  width: number | null | undefined,
+  height: number | null | undefined
 ): string {
+  // Las tres o ninguna, igual que el CHECK de la tabla: una consulta tomada
+  // por el asistente antes de que la persona diera las medidas las tiene en
+  // null, y "null x null x null mm" es peor que no decir nada.
+  if (length == null || width == null || height == null) return 'Sin medidas';
+
   return `${length} x ${width} x ${height} mm`;
 }
 

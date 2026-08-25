@@ -201,7 +201,9 @@ export default function VentaRetailDetailPage({ params }: { params: Promise<{ id
                     <td className="px-4 py-3 text-sm">{sale.sqm_per_box?.toFixed(3)} m²</td>
                     <td className="px-4 py-3 text-sm">{sale.total_sqm?.toFixed(2)} m²</td>
                     <td className="px-4 py-3 text-sm text-right tabular-nums">
-                      {sale.quantity ? precioUnitarioARS(sale.subtotal / sale.quantity) : '-'}
+                      {sale.quantity && sale.subtotal != null
+                        ? precioUnitarioARS(sale.subtotal / sale.quantity)
+                        : '-'}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-right">
                       {formatCurrency(sale.subtotal)}

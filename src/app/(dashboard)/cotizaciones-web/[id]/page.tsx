@@ -294,7 +294,9 @@ export default function CotizacionWebDetailPage() {
 
                   <div>
                     <p className="text-sm text-gray-500">Cantidad</p>
-                    <p className="font-medium">{quote.quantity.toLocaleString('es-AR')} unidades</p>
+                    <p className="font-medium">
+                      {quote.quantity != null ? `${quote.quantity.toLocaleString('es-AR')} unidades` : '—'}
+                    </p>
                   </div>
 
                   <div>
@@ -328,27 +330,38 @@ export default function CotizacionWebDetailPage() {
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">m² por caja</p>
-                      <p className="font-medium">{quote.sqm_per_box.toFixed(4)}</p>
+                      <p className="font-medium">{quote.sqm_per_box?.toFixed(4) ?? '—'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">m² totales</p>
-                      <p className="font-medium">{quote.total_sqm.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
+                      <p className="font-medium">{quote.total_sqm?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) ?? '—'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Días de producción</p>
-                      <p className="font-medium">{quote.estimated_days} días</p>
+                      <p className="font-medium">
+                        {quote.estimated_days != null ? `${quote.estimated_days} días` : '—'}
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Vista 3D pequeña */}
+                {/* Vista 3D pequeña.
+                    Solo si hay medidas: una consulta que el asistente tomó
+                    antes de que la persona las diera no tiene caja que dibujar,
+                    y el visor con ceros muestra un plano, no un error. */}
                 <div>
-                  <BoxPreview3D
-                    length={quote.length_mm}
-                    width={quote.width_mm}
-                    height={quote.height_mm}
-                    autoRotate={true}
-                  />
+                  {quote.length_mm != null && quote.width_mm != null && quote.height_mm != null ? (
+                    <BoxPreview3D
+                      length={quote.length_mm}
+                      width={quote.width_mm}
+                      height={quote.height_mm}
+                      autoRotate={true}
+                    />
+                  ) : (
+                    <div className="flex h-full min-h-40 items-center justify-center rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">
+                      Todavía no dejó las medidas
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>

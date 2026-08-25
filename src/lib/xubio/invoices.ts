@@ -12,6 +12,7 @@ import type {
   XubioVoucherType,
 } from './types';
 import { XUBIO_IVA_21 } from './types';
+import { SENA_PCT, porcentajeAlEntregar } from '@/lib/pagos/esquemas';
 
 /**
  * Determina el tipo de factura según la condición fiscal del cliente
@@ -77,7 +78,7 @@ function generateInvoiceItems(
 }
 
 /**
- * Crea una factura de seña (50%) en Xubio
+ * Crea la factura de la seña en Xubio (el porcentaje sale de @/lib/pagos/esquemas)
  */
 export async function createDepositInvoice(
   orderId: string
@@ -111,8 +112,8 @@ export async function createDepositInvoice(
   const client = order.client as Client;
   const invoiceType = getInvoiceType(client.tax_condition);
 
-  // Generar items (50% para seña)
-  const items = generateInvoiceItems(order, order.items, 50);
+  // Generar items (el porcentaje de seña vive en @/lib/pagos/esquemas)
+  const items = generateInvoiceItems(order, order.items, SENA_PCT);
 
   // Crear factura
   const invoiceRequest: XubioInvoiceRequest = {
@@ -122,7 +123,7 @@ export async function createDepositInvoice(
     punto_venta: parseInt(xubioConfig.xubio_point_of_sale) || 1,
     concepto: 1, // Productos
     items,
-    observaciones: `Seña 50% - Orden ${order.order_number}`,
+    observaciones: `Seña ${SENA_PCT}% - Orden ${order.order_number}`,
   };
 
   const invoice = await xubioPost<XubioInvoiceResponse>('/facturas', invoiceRequest);
@@ -151,7 +152,8 @@ export async function createDepositInvoice(
 }
 
 /**
- * Crea una factura de saldo (50% restante o 100% para crédito) en Xubio
+ * Crea la factura de saldo en Xubio: lo que quedó después de la seña, o el total
+ * entero si el pedido va a cuenta corriente y nunca hubo seña.
  */
 export async function createBalanceInvoice(
   orderId: string
@@ -186,7 +188,7 @@ export async function createBalanceInvoice(
   const invoiceType = getInvoiceType(client.tax_condition);
 
   // Porcentaje según esquema de pago
-  const percentage = order.payment_scheme === 'credit' ? 100 : 50;
+  const percentage = porcentajeAlEntregar(order.payment_scheme);
 
   // Generar items
   const items = generateInvoiceItems(order, order.items, percentage);
@@ -209,7 +211,7 @@ export async function createBalanceInvoice(
     items,
     observaciones: order.payment_scheme === 'credit'
       ? `Pago a ${client.credit_days} días - Orden ${order.order_number}`
-      : `Saldo 50% - Orden ${order.order_number}`,
+      : `Saldo ${porcentajeAlEntregar(order.payment_scheme)}% - Orden ${order.order_number}`,
   };
 
   const invoice = await xubioPost<XubioInvoiceResponse>('/facturas', invoiceRequest);
@@ -279,7 +281,8 @@ export async function previewInvoice(
 
   const client = order.client as Client;
   const invoiceType = getInvoiceType(client.tax_condition);
-  const percentage = type === 'deposit' ? 50 : (order.payment_scheme === 'credit' ? 100 : 50);
+  const percentage =
+    type === 'deposit' ? SENA_PCT : porcentajeAlEntregar(order.payment_scheme);
 
   const items = generateInvoiceItems(order, order.items, percentage);
 

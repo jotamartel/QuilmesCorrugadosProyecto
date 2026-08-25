@@ -11,6 +11,7 @@ import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculation
 import { getPricePerM2, calculateSubtotal, calculateTotal, getProductionDays, getActivePricingConfig } from '@/lib/utils/pricing';
 import { calculateDeliveryDate, toISODateString } from '@/lib/utils/dates';
 import { porQueNoSeFabrica } from '@/lib/cotizacion/motor';
+import { repartirElPago } from '@/lib/pagos/esquemas';
 import type { OrderStatus, CreateOrderRequest, PaymentMethod } from '@/lib/types/database';
 
 // GET /api/orders - Lista órdenes
@@ -201,10 +202,16 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Seña y saldo ────────────────────────────────────────────────────────
+    //
+    // La condicion sale de @/lib/pagos/esquemas, que es el unico lugar donde
+    // vive el porcentaje. Si al crear la orden ya se cobro otra cosa manda lo
+    // cobrado: dos de las siete ordenes que hay tienen seña de 47,6% y 49,1%
+    // porque se registro lo que la persona efectivamente transfirio.
+    const condicion = repartirElPago(total);
     const depositAmount =
       initialStatus === 'confirmed' && typeof body.deposit?.amount === 'number' && body.deposit.amount > 0
         ? Math.round(body.deposit.amount * 100) / 100
-        : Math.round((total / 2) * 100) / 100;
+        : condicion.alConfirmar;
     const balanceAmount = Math.round((total - depositAmount) * 100) / 100;
     const now = new Date().toISOString();
 

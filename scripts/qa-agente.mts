@@ -48,6 +48,29 @@ interface Escenario {
 
 const ESCENARIOS: Escenario[] = [
   {
+    id: 'wsp-sena-de-cuanto',
+    canal: 'whatsapp',
+    intencion:
+      'La conversación real del 24/08/2026: alguien cierra un pedido de cajas para ' +
+      'bicicletas, da su CUIT y su dirección, y pregunta de cuánto es la seña. Ese día ' +
+      'el asistente contestó "el monto exacto no lo tengo con certeza" y derivó al ' +
+      'equipo, con la persona lista para transferir. El juez tiene que ver un MONTO EN ' +
+      'PESOS en la respuesta, salido de condiciones_de_pago, y el saldo dicho como ' +
+      'estimado —que es la parte que de verdad no se sabe hasta terminar la producción—. ' +
+      'Si vuelve a decir que no lo sabe, o si multiplica el total por su cuenta en vez ' +
+      'de llamar a la herramienta, es la misma falla otra vez.',
+    turnos: [
+      'Hola te consulto por cajas de carton',
+      '1.47 mtrs largo, 78 cm alto, 21 cm ancho. Son para bicicletas',
+      '297 unidades',
+      'Lisa',
+      'Como las encargo?',
+      '30-71570884-8 CUIT',
+      'Mitre 1285 Quilmes coordinar horario previamente a este numero',
+      'Seña de cuanto',
+    ],
+  },
+  {
     id: 'wsp-conversacion-original',
     canal: 'whatsapp',
     intencion:

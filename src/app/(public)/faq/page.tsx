@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { SITE_URL } from '@/lib/site';
 import { MINIMOS, ENVIO, HORARIO } from '@/lib/retail/config';
+import { PAGO } from '@/lib/pagos/esquemas';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
@@ -59,7 +60,7 @@ const faqs = [
   },
   {
     question: '¿Qué formas de pago aceptan?',
-    answer: 'Aceptamos transferencia bancaria, cheques y efectivo. Para nuevos clientes, el primer pedido requiere un 50% de seña al confirmar la orden. Clientes habituales pueden acceder a condiciones de pago especiales.',
+    answer: PAGO.largo,
   },
 ];
 

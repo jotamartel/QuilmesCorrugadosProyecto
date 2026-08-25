@@ -139,17 +139,11 @@ export function calculateTotal(
   return Math.round(total * 100) / 100;
 }
 
-/**
- * Calcula los montos de pago (50% seña, 50% contra entrega)
- */
-export function calculatePaymentAmounts(total: number): {
-  deposit: number;
-  balance: number;
-} {
-  const deposit = Math.round((total / 2) * 100) / 100;
-  const balance = Math.round((total - deposit) * 100) / 100;
-  return { deposit, balance };
-}
+// ACA HABIA UN calculatePaymentAmounts() que repartia el total en seña y
+// saldo con su propio 50 escrito a mano. No lo llamaba nadie. Se saco el
+// 25/08/2026 al unificar la regla en @/lib/pagos/esquemas: repartirElPago()
+// hace lo mismo, contempla el pedido a cuenta corriente y lee el porcentaje
+// de un solo lugar.
 
 /**
  * Formatea un monto en pesos argentinos

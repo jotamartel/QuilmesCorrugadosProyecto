@@ -11,6 +11,7 @@ import {
 import { MEDIDA_MINIMA, MEDIDA_MAXIMA } from '@/lib/utils/box-calculations';
 import { mensajeDeImpedimento } from '@/lib/cotizacion/motor';
 import { SITE_URL } from '@/lib/site';
+import { PAGO } from '@/lib/pagos/esquemas';
 import { parseBoxDimensions, validateDimensions } from '@/lib/whatsapp';
 import type { PricingConfig } from '@/lib/types/database';
 import { HORARIO } from '@/lib/retail/config';
@@ -132,8 +133,9 @@ pide una mejora, derivar a un asesor.
 - Validez de cotización: 7 días
 
 ### Formas de pago
-- Pago contado y cheque a 30 días (según perfil del cliente)
-- Seña 50% para confirmar, resto contra entrega
+- ${PAGO.formas}
+- ${PAGO.corto}
+- El monto exacto de la seña no lo calcules vos: decile que se lo confirma alguien del equipo
 
 ### Datos de contacto
 - WhatsApp: ${BUSINESS_PHONE}

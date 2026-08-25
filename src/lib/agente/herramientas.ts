@@ -14,6 +14,7 @@ import { RETAIL_CONFIG, MINIMOS, ENVIO, HORARIO, MATERIAL } from '@/lib/retail/c
 import { MEDIDA_MINIMA, MEDIDA_MAXIMA } from '@/lib/utils/box-calculations';
 import { buscarConocimiento, anotarPreguntaSinRespuesta } from '@/lib/conocimiento';
 import { getBankDataForClient } from '@/lib/config/system';
+import { PAGO, SENA_PCT, SENA_SOBRE, repartirElPago } from '@/lib/pagos/esquemas';
 import { sendNotification } from '@/lib/notifications';
 import { CONTACTO } from '@/lib/contacto';
 import { upsertContactProfile } from '@/lib/contact-matching';
@@ -447,6 +448,18 @@ export function crearHerramientas(ctx: ContextoAgente) {
       // Faltaba, y es la pregunta que sigue a la seña: "¿cuánto me queda por
       // pagar?". La respuesta honesta es "depende de lo que salga de máquina".
       cantidades_y_saldo: NOTA_VARIACION_PRODUCCION,
+      // El COMO se paga vive aca porque es una condicion comercial como el
+      // envio o el plazo. El CUANTO no: se calcula, y se calcula en
+      // condiciones_de_pago. Dejar el porcentaje suelto sin decir eso es
+      // dejarle al modelo justo lo que necesita para multiplicar el total y
+      // pasar un monto de su propia cosecha.
+      pago: {
+        formas: PAGO.formas,
+        condicion: PAGO.corto,
+        el_monto_exacto:
+          'No lo calcules vos. Llama a condiciones_de_pago con las medidas y la ' +
+          'cantidad del pedido y te devuelve la seña en pesos.',
+      },
       material: MATERIAL.nota,
       impresion: c
         ? {
@@ -800,12 +813,13 @@ export function crearHerramientas(ctx: ContextoAgente) {
     name: 'no_se_la_respuesta',
     description:
       'Usala cuando te preguntan algo que no podes contestar con las otras ' +
-      'herramientas: formas de pago, si entregan un sabado, si hacen un tipo de ' +
+      'herramientas: si entregan un sabado, si hacen un tipo de ' +
       'caja que no cotizamos, cualquier cosa que no este en condiciones ni en el ' +
       'catalogo. Primero busca si el equipo ya respondio algo parecido, y si no, ' +
       'anota la consulta y avisa para que una persona siga la conversacion. NO la ' +
-      'uses para lo que si podes averiguar: cotizar, el catalogo, las condiciones ' +
-      'o los limites de fabricacion.',
+      'uses para lo que si podes averiguar: cotizar, el catalogo, las condiciones, ' +
+      'los limites de fabricacion, ni COMO NI CUANTO SE PAGA —para eso esta ' +
+      'condiciones_de_pago, que ademas calcula la seña.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -935,6 +949,177 @@ export function crearHerramientas(ctx: ContextoAgente) {
     },
   });
 
+
+  /**
+   * De cuanto es la seña.
+   *
+   * POR QUE ES UNA HERRAMIENTA Y NO UNA FRASE DEL PROMPT
+   *
+   * Porque la respuesta es un monto, y un monto que el modelo saca
+   * multiplicando es un monto que alguna vez va a estar mal. "El 50% de
+   * $1.213.197" tiene una sola respuesta correcta y muchas parecidas.
+   *
+   * POR QUE RECOTIZA EN VEZ DE RECIBIR EL TOTAL
+   *
+   * Podria pedirle el total al modelo, que lo tiene escrito tres mensajes mas
+   * arriba. Pero ese numero salio de un texto que el mismo redacto, y leerlo
+   * de ahi es la clase de paso donde se cuela un digito. Con las medidas y la
+   * cantidad, el motor lo vuelve a calcular: mismo pedido, mismo total, misma
+   * seña. Es el mismo criterio que ya se usa para [COTIZADO-WEB].
+   *
+   * EL SALDO NO ES UN NUMERO CERRADO Y LA SEÑA SI
+   *
+   * La produccion varia hasta un 5% y se factura lo entregado, asi que el
+   * saldo se confirma al terminar. La seña no: es el 50% del total cotizado y
+   * se puede decir con confianza. Distinguirlos importa —el 24/08/2026 el
+   * asistente contesto "no lo tengo con certeza" a alguien que estaba por
+   * transferir, cuando lo incierto era la otra mitad.
+   */
+  const condicionesDePago = betaTool({
+    name: 'condiciones_de_pago',
+    description:
+      'De cuanto es la seña para arrancar un pedido, cuanto queda de saldo y que ' +
+      'formas de pago se aceptan. Usala cuando pregunten cuanto hay que señar, ' +
+      'cuanto se paga para empezar, como se paga, si tomamos cheque o tarjeta, o ' +
+      'cuanto queda debiendo. Si ya cotizaste en esta conversacion pasale las ' +
+      'medidas y la cantidad de ESE pedido y te devuelve la seña ya calculada en ' +
+      'pesos. NUNCA saques la seña multiplicando vos: llamala.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        largo_mm: { type: 'integer', description: 'Solo si ya cotizaste: el largo de esa cotizacion' },
+        ancho_mm: { type: 'integer', description: 'Solo si ya cotizaste' },
+        alto_mm: { type: 'integer', description: 'Solo si ya cotizaste' },
+        cantidad: { type: 'integer', description: 'Solo si ya cotizaste: la cantidad de esa cotizacion' },
+        colores_impresion: {
+          type: 'integer',
+          description:
+            'Colores de impresion de la cotizacion, 0 si va lisa. Tiene que ser el ' +
+            'MISMO que usaste al cotizar: con otro numero cambia el total y la seña ' +
+            'te sale distinta a la que le pasaste.',
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    run: async (args) => {
+      // Lo que vale siempre, haya o no un pedido sobre la mesa.
+      const siempre = {
+        formas_de_pago: PAGO.formas,
+        condicion: PAGO.corto,
+        sobre_el_saldo: NOTA_VARIACION_PRODUCCION,
+      };
+
+      const hayPedido =
+        typeof args.largo_mm === 'number' &&
+        typeof args.ancho_mm === 'number' &&
+        typeof args.alto_mm === 'number' &&
+        typeof args.cantidad === 'number';
+
+      if (!hayPedido) {
+        return JSON.stringify({
+          ...siempre,
+          hay_monto: false,
+          instruccion:
+            'Contale la condicion tal como viene en "condicion" y las formas de pago. NO ' +
+            'calcules ningun monto: no tenes el total. Si YA cotizaste en esta ' +
+            'conversacion, volve a llamarme ahora con las medidas, la cantidad y los ' +
+            'colores de esa cotizacion y te doy la seña en pesos. Si todavia no ' +
+            'cotizaste, pedile medidas y cantidad para cotizar primero.',
+        });
+      }
+
+      // LOS COLORES NO SE ASUMEN.
+      //
+      // Estaban con `?? 0`, que es la respuesta correcta para la caja lisa y la
+      // equivocada en silencio para la impresa: la seña saldria de un total que
+      // no es el que el cliente tiene escrito, y el error viaja hasta el banco.
+      // Preferimos un viaje mas: el modelo acaba de cotizar, el dato lo tiene.
+      if (typeof args.colores_impresion !== 'number') {
+        return JSON.stringify({
+          ...siempre,
+          hay_monto: false,
+          instruccion:
+            'Te faltan los colores de impresion de esa cotizacion y NO los voy a asumir: ' +
+            'con impresion el total cambia y la seña te saldria distinta a la que ya le ' +
+            'pasaste. Volve a llamarme con colores_impresion, que es 0 si la cotizaste ' +
+            'lisa. NO le digas nada a la persona todavia.',
+        });
+      }
+
+      const config = await getActivePricingConfig();
+      if (!config) {
+        return JSON.stringify({
+          ...siempre,
+          hay_monto: false,
+          instruccion:
+            'No se pudo leer la configuracion de precios, asi que no tenes el total ni la ' +
+            'seña. Contale la condicion en porcentaje, NO inventes un monto, y decile que ' +
+            'el numero exacto se lo confirma alguien del equipo.',
+        });
+      }
+
+      const q = calcularCotizacion(
+        [{
+          length_mm: args.largo_mm!,
+          width_mm: args.ancho_mm!,
+          height_mm: args.alto_mm!,
+          quantity: args.cantidad!,
+          printing_colors: args.colores_impresion,
+        }],
+        config,
+        await leerCatalogoDeStock(),
+      );
+
+      // Si el pedido no se vende no hay total, y sin total no hay seña. Pasa
+      // cuando el modelo llama con una medida que quedo abajo del minimo.
+      if (!q.cotizable) {
+        return JSON.stringify({
+          ...siempre,
+          hay_monto: false,
+          instruccion:
+            'Ese pedido no se puede cotizar, asi que no hay seña que calcular. Volve a ' +
+            'cotizar_cajas para ver por que, y resolve eso antes de hablar de la seña.',
+        });
+      }
+
+      // SOBRE QUE TOTAL. Ver SENA_SOBRE en @/lib/pagos/esquemas: el sistema
+      // hoy contesta las dos cosas y la diferencia es el 21% del IVA.
+      const baseDeLaSena = SENA_SOBRE === 'neto' ? q.subtotal : q.total_with_tax;
+      const comoSeLlama = SENA_SOBRE === 'neto' ? 'subtotal sin IVA' : 'total con IVA';
+      const { alConfirmar } = repartirElPago(baseDeLaSena);
+
+      // El saldo es lo que falta para el total CON IVA, siempre: sea cual sea
+      // la base de la seña, el cliente termina pagando el total con IVA.
+      const saldo = Math.round((q.total_with_tax - alConfirmar) * 100) / 100;
+
+      return JSON.stringify({
+        ...siempre,
+        hay_monto: true,
+        medidas_mm: `${args.largo_mm}x${args.ancho_mm}x${args.alto_mm}`,
+        cantidad: args.cantidad,
+        subtotal_sin_iva: precioUnitarioARS(q.subtotal),
+        total_con_iva: precioUnitarioARS(q.total_with_tax),
+        // Ya calculado y ya escrito. El modelo lo copia, no lo deduce.
+        sena_a_transferir: precioUnitarioARS(alConfirmar),
+        porcentaje_de_sena: SENA_PCT,
+        // Sin esto el monto se lee como "la mitad del total con IVA" y no lo es.
+        la_sena_se_calcula_sobre: comoSeLlama,
+        saldo_estimado: precioUnitarioARS(saldo),
+        instruccion:
+          `Decile que la seña es ${precioUnitarioARS(alConfirmar)} y ACLARALE sobre que ` +
+          `sale: es el ${SENA_PCT}% del ${comoSeLlama}, ${precioUnitarioARS(baseDeLaSena)}. ` +
+          'Sin esa aclaracion el numero no le va a cerrar con el total que ya tiene ' +
+          'escrito y va a pensar que nos equivocamos. Pasale el monto TAL CUAL, sin ' +
+          'redondearlo ni recalcularlo. El saldo decilo como estimado y aclarale en la ' +
+          'misma frase por que: se factura lo que se entrega y la produccion varia, asi ' +
+          'que el numero final sale al terminar. Si todavia no le pasaste donde ' +
+          'transferir, llama tambien a datos_para_transferir y mandale las dos cosas ' +
+          'juntas: un monto sin CBU lo deja igual de trabado que un CBU sin monto.',
+      });
+    },
+  });
+
   /**
    * Los datos para transferir, leidos de la configuracion.
    *
@@ -987,6 +1172,7 @@ export function crearHerramientas(ctx: ContextoAgente) {
     medidasDeCatalogo,
     condicionesYPrecios,
     plantillaDeImpresion,
+    condicionesDePago,
     datosParaTransferir,
     guardarLead,
     noSeLaRespuesta,

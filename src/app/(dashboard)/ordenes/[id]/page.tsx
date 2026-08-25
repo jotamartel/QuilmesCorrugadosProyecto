@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
+import { SENA_PCT } from '@/lib/pagos/esquemas';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -491,7 +492,7 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
               <div className="p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h4 className="font-medium">Seña (50%)</h4>
+                    <h4 className="font-medium">Seña ({SENA_PCT}%)</h4>
                     <p className="text-2xl font-bold">{formatCurrency(order.deposit_amount)}</p>
                   </div>
                   <Badge variant={order.deposit_status === 'paid' ? 'success' : 'warning'}>
@@ -563,7 +564,7 @@ export default function OrdenDetailPage({ params }: { params: Promise<{ id: stri
               <div className="p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h4 className="font-medium">Saldo (50%)</h4>
+                    <h4 className="font-medium">Saldo ({100 - SENA_PCT}%)</h4>
                     <p className="text-2xl font-bold">{formatCurrency(order.balance_amount)}</p>
                   </div>
                   <Badge variant={order.balance_status === 'paid' ? 'success' : 'warning'}>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { notificarEventoDePedido, type ResultadoAviso } from '@/lib/notificaciones-pedido';
+import { repartirElPago } from '@/lib/pagos/esquemas';
 import type { ConfirmQuantitiesRequest } from '@/lib/types/database';
 
 interface RouteParams {
@@ -124,8 +125,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // La seña ya se pagó, el balance es el nuevo total menos lo ya pagado
       newBalanceAmount = Math.max(0, newTotal - depositAmount);
     } else {
-      // Si la seña no se pagó aún, mantener el esquema 50/50
-      newBalanceAmount = newTotal * 0.5;
+      // Si la seña no se pagó aún, se mantiene la condición estándar.
+      newBalanceAmount = repartirElPago(newTotal).contraEntrega;
     }
 
     // (Aca habia un for muerto que "actualizaba" total_m2 por item sin hacer

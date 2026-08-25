@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { SENA_PCT } from '@/lib/pagos/esquemas';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -360,7 +361,7 @@ export default function NuevaOrdenPage() {
                   <Select label="Cómo se cobró" value={depositMethod}
                     options={METODOS.map((m) => ({ value: m.value, label: m.label }))}
                     onChange={(e) => setDepositMethod(e.target.value as PaymentMethod)} />
-                  <Input label="Monto de la seña (vacío = 50%)" type="number" value={depositAmount}
+                  <Input label={`Monto de la seña (vacío = ${SENA_PCT}%)`} type="number" value={depositAmount}
                     onChange={(e) => setDepositAmount(e.target.value)} />
                 </div>
               )}

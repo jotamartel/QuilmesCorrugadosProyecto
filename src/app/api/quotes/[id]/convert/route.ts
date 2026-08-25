@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateDeliveryDate, toISODateString } from '@/lib/utils/dates';
+import { repartirElPago } from '@/lib/pagos/esquemas';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -63,9 +64,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Calcular montos de pago (50/50)
-    const depositAmount = Math.round((quote.total / 2) * 100) / 100;
-    const balanceAmount = Math.round((quote.total - depositAmount) * 100) / 100;
+    // El reparto sale de @/lib/pagos/esquemas, unico dueño del porcentaje.
+    const { alConfirmar: depositAmount, contraEntrega: balanceAmount } =
+      repartirElPago(quote.total);
 
     // Crear orden
     const { data: order, error: orderError } = await supabase

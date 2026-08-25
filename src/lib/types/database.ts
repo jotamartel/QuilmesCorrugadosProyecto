@@ -1,6 +1,8 @@
 // Tipos de base de datos para Quilmes Corrugados
 
 export type PaymentTerms = 'contado' | 'cheque_30';
+import { SENA_PCT } from '@/lib/pagos/esquemas';
+
 export type PaymentMethod = 'transferencia' | 'cheque' | 'efectivo' | 'echeq';
 export type QuoteStatus = 'draft' | 'sent' | 'approved' | 'rejected' | 'expired' | 'converted';
 export type OrderStatus = 'pending_deposit' | 'confirmed' | 'in_production' | 'ready' | 'shipped' | 'delivered' | 'cancelled';
@@ -775,7 +777,7 @@ export const TAX_CONDITION_LABELS: Record<TaxCondition, string> = {
 };
 
 export const PAYMENT_SCHEME_LABELS: Record<PaymentScheme, string> = {
-  standard: 'Estándar (50% + 50%)',
+  standard: `Estándar (${SENA_PCT}% + ${100 - SENA_PCT}%)`,
   credit: 'A crédito',
 };
 

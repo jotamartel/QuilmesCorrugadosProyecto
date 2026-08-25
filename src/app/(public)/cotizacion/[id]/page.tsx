@@ -10,6 +10,7 @@ import { LandingFooter } from '@/components/public/LandingFooter';
 import { BelowMinimumModal } from '@/components/public/BelowMinimumModal';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { precioUnitarioARS, VARIACION_PRODUCCION_PCT } from '@/lib/cotizacion/motor';
+import { SENA_PCT } from '@/lib/pagos/esquemas';
 import { CONTACTO } from '@/lib/contacto';
 
 // Importar BoxPreview3D dinámicamente
@@ -279,7 +280,7 @@ export default function QuoteConfirmationPage() {
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-amber-600">3.</span>
-                    Una vez confirmado, emitiremos la factura con el 50% de seña.
+                    Una vez confirmado, emitiremos la factura con el {SENA_PCT}% de seña.
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-amber-600">4.</span>

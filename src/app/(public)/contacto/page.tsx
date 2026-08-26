@@ -92,7 +92,7 @@ export default function ContactoPage() {
                   <MapPin className="w-5 h-5 text-[#002E55] mt-0.5 shrink-0" />
                   <div>
                     <h3 className="font-semibold text-gray-900">Ubicación</h3>
-                    <p className="text-gray-600">Quilmes, Buenos Aires, Argentina</p>
+                    <p className="text-gray-600">{CONTACTO.direccion}, Argentina</p>
                   </div>
                 </div>
 
@@ -150,6 +150,39 @@ export default function ContactoPage() {
               </div>
             </div>
           </div>
+
+          {/* Dónde estamos: el embed clásico de Google Maps del negocio. No usa
+              la API de Maps Platform (que factura por carga) ni ninguna key:
+              es el iframe gratuito de "Compartir → Insertar un mapa", con la
+              ficha del perfil de Google Business y el botón de cómo llegar. */}
+          <section className="mb-12" aria-labelledby="mapa-titulo">
+            <h2 id="mapa-titulo" className="text-xl font-bold text-gray-900 mb-4">
+              Dónde estamos
+            </h2>
+            <div className="overflow-hidden rounded-xl border border-gray-200">
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3279.5!2d-58.2429798!3d-34.7383833!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x95a32ef8f174d295%3A0x27b722dc660e86d7!2sQuilmes%20Corrugados!5e0!3m2!1ses!2sar!4v1756230000000"
+                title={`Mapa de Quilmes Corrugados en ${CONTACTO.direccion}`}
+                width="100%"
+                height="400"
+                style={{ border: 0 }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                allowFullScreen
+              />
+            </div>
+            <p className="mt-3 text-sm text-gray-600">
+              {CONTACTO.direccion}.{' '}
+              <a
+                href="https://maps.app.goo.gl/yMqqkhtgP1jrZeWN7"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-[#002E55] hover:underline"
+              >
+                Abrir en Google Maps
+              </a>
+            </p>
+          </section>
 
           {/* Zona de envío */}
           <section className="bg-gray-50 rounded-xl p-8 text-center">

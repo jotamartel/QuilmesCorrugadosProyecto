@@ -53,7 +53,9 @@ export const IVA = 0.21;
 const NOTA_POLIMERO =
   'Lo único que se cobra aparte es el polímero, que va a cargo del comprador: ' +
   'es una matriz por color, se hace una vez por diseño y queda para las ' +
-  'próximas tiradas de ese mismo arte.';
+  'próximas tiradas de ese mismo arte. Lo cotiza la fábrica con su gráfica ' +
+  'sobre el diseño terminado: mandanos el arte y te pasamos el precio apenas ' +
+  'esté.';
 
 /**
  * La tolerancia de producción del corrugado.

@@ -336,7 +336,11 @@ export function crearHerramientas(ctx: ContextoAgente) {
               que_hacer:
                 'Este pedido lleva impresión: avisá que el polímero se cotiza aparte y va a ' +
                 'cargo del comprador, así el total no parece cerrado cuando todavía falta ese ' +
-                'ítem. Y llamá a plantilla_impresion con estas medidas: el PDF del desplegado ' +
+                'ítem. Pero el polímero lo cotiza LA FÁBRICA con su gráfica: NUNCA mandes a ' +
+                'la persona a cotizarlo por su cuenta ni le digas "pasáselo a quien te lo ' +
+                `cotice". Pedile el diseño —por este mismo chat o a ${CONTACTO.email}— y ` +
+                'decile que lo mandamos a cotizar y le pasamos el precio apenas esté. Y llamá ' +
+                'a plantilla_impresion con estas medidas: el PDF del desplegado ' +
                 'se manda adjunto y es lo que el diseñador necesita para armar el arte sobre ' +
                 'la medida real.',
             }
@@ -349,7 +353,14 @@ export function crearHerramientas(ctx: ContextoAgente) {
                   'PREGUNTASELO, en el mismo mensaje del precio, al final y en una sola ' +
                   'frase. Si no se lo preguntás no se entera de que existe. El precio de ' +
                   'arriba es sin impresión y sigue valiendo; no anticipes ningún recargo. Si ' +
-                  'dice que sí, preguntale cuántos colores y volvé a cotizar con ese número.',
+                  'dice que sí, recotizá con impresión: usá los colores que diga, y si no ' +
+                  'los tiene definidos cotizá con 1 y leé como_se_cobra de la respuesta ' +
+                  'nueva. Cuando la impresión viene incluida, de 1 a 3 colores el precio es ' +
+                  'EL MISMO: no lo obligues a fijar un número que no cambia nada — solo ' +
+                  'define cuántos polímeros lleva, y eso se cierra cuando tenga el arte. ' +
+                  'Solo si como_se_cobra dice que cada color suma un porcentaje, el número ' +
+                  'sí mueve el precio: cotizá con la cantidad que esté considerando (entre ' +
+                  'dos opciones, la más alta) y decile cuánto cambia con la otra.',
               }
             : {
                 lleva: false,
@@ -504,7 +515,11 @@ export function crearHerramientas(ctx: ContextoAgente) {
             tecnica: 'flexografía',
             como_se_cobra: notaImpresion(c),
             incluida_desde_m2: c.printing_included_min_m2,
-            polimero: 'Se cotiza aparte, va a cargo del comprador y depende del diseño. No lo estimes.',
+            polimero:
+              'Se cotiza aparte, va a cargo del comprador y depende del diseño. No lo ' +
+              'estimes. Lo cotiza la fábrica con su gráfica: pedí el diseño (por este chat ' +
+              `o a ${CONTACTO.email}) y avisá que le pasamos el precio apenas esté. No ` +
+              'mandes a la persona a cotizarlo por su cuenta.',
           }
         : null,
       limites_de_fabricacion: {

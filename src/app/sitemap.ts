@@ -163,6 +163,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     },
     {
+      // Puerta de entrada de desarrolladores y asistentes de IA a la API de
+      // cotizacion. Estaba permitida en robots.ts pero fuera del sitemap.
+      url: `${BASE_URL}/api/v1/docs`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    {
       url: `${BASE_URL}/privacidad`,
       lastModified: now,
       changeFrequency: 'yearly',

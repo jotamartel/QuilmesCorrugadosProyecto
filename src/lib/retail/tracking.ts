@@ -1,7 +1,16 @@
 /**
  * Tracking utility for Facebook Pixel and Google Ads
  * Events are only fired if the corresponding pixel/tag IDs are configured.
+ *
+ * Usa los tags GLOBALES del layout raíz (MetaPixel + GoogleAds): este módulo
+ * no carga scripts propios. Antes vivía sobre RetailTracking, que duplicaba
+ * fbevents.js y gtag.js en /cajas con otra env var (NEXT_PUBLIC_FB_PIXEL_ID)
+ * y sin advanced matching; ahora comparte gate, identidad y espejo a la
+ * Conversions API con el resto del sitio.
  */
+
+import { nuevoEventId } from '@/lib/marketing/identidad';
+import { espejarACapi } from '@/lib/utils/tracking';
 
 type TrackingEventName =
   | 'PageView'
@@ -26,16 +35,24 @@ declare global {
   }
 }
 
-const FB_PIXEL_ID = process.env.NEXT_PUBLIC_FB_PIXEL_ID;
+// Mismo gate que MetaPixel en el layout raíz: si se seteara otra variable acá
+// (como la vieja NEXT_PUBLIC_FB_PIXEL_ID) la configuración quedaría partida.
+const FB_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
 const GADS_CONVERSION_LABEL = process.env.NEXT_PUBLIC_GADS_CONVERSION_LABEL;
 
+// La Conversions API acepta estos nombres (ver /api/marketing/evento):
+// AddToCart y PageView quedan solo en el pixel.
+const EVENTOS_CAPI = new Set(['ViewContent', 'InitiateCheckout', 'Lead']);
+
 function fbTrack(event: string, params?: TrackingParams) {
   if (typeof window === 'undefined' || !window.fbq || !FB_PIXEL_ID) return;
-  if (params) {
-    window.fbq('track', event, params);
-  } else {
-    window.fbq('track', event);
+  // Mismo event_id en pixel y CAPI: Meta deduplica y los dos caminos suman
+  // cobertura (bloqueadores, ITP) en vez de duplicar conversiones.
+  const eventId = nuevoEventId(event);
+  window.fbq('track', event, params ?? {}, { eventID: eventId });
+  if (EVENTOS_CAPI.has(event)) {
+    espejarACapi(event, eventId, params as Record<string, unknown> | undefined);
   }
 }
 

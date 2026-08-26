@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { QuoterForm } from '@/components/public/QuoterForm';
@@ -9,9 +8,9 @@ import { ResumenClave } from '@/components/public/ResumenClave';
 import { PreguntasFrecuentes } from '@/components/public/PreguntasFrecuentes';
 import { CtaMovilFijo } from '@/components/public/CtaMovilFijo';
 import { BotonCompartir } from '@/components/public/BotonCompartir';
+import { CajasPorRubro } from '@/components/public/CajasPorRubro';
 import Link from 'next/link';
 import { Factory, Truck, Ruler, Palette, ArrowDown, ShoppingBag } from 'lucide-react';
-import { trackEvent } from '@/lib/utils/tracking';
 import { RETAIL_CONFIG, ENVIO, MINIMOS } from '@/lib/retail/config';
 
 const benefits = [
@@ -38,11 +37,9 @@ const benefits = [
 ];
 
 export default function LandingPage() {
-  // Trackear vista de landing page
-  useEffect(() => {
-    trackEvent('landing_page_view');
-  }, []);
-
+  // Sin trackEvent('landing_page_view'): GA4 ya manda page_view automático
+  // en cada carga (send_page_view: true) y el evento extra duplicaba el
+  // conteo de vistas de la home.
   return (
     <div className="min-h-screen bg-white">
       <LandingHeader />
@@ -148,6 +145,9 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Landings por rubro: el módulo que las cuelga de la home */}
+      <CajasPorRubro className="bg-white" />
+
       {/* Quoter Section */}
       <section id="cotizador" className="py-6 px-4 bg-gray-50">
         <div className="max-w-7xl mx-auto">
@@ -193,7 +193,12 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* conSchema={false}: estas preguntas repiten las de /faq (mínimo,
+          impresión, envíos) y el FAQPage duplicado en varias URLs hace que
+          Google pueda retirar el rich snippet en todas. El schema queda en
+          /faq y en las landings de rubro, que tienen preguntas propias. */}
       <PreguntasFrecuentes
+        conSchema={false}
         preguntas={[
           {
             pregunta: '¿Cuánto sale una caja de cartón corrugado?',

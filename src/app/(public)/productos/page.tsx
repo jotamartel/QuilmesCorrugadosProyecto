@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { BreadcrumbSchema, ProductSchema } from '@/components/public/SchemaMarkup';
+import { CajasPorRubro } from '@/components/public/CajasPorRubro';
 import { Package, Palette, ShoppingBag, Truck, ArrowRight } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
@@ -46,7 +47,9 @@ const products = [
 
 export default function ProductosPage() {
   useEffect(() => {
-    trackEvent('product_page_view');
+    // Con section, como el resto de las landings: sin el parámetro esta página
+    // quedaba fuera de las audiencias segmentadas por sección.
+    trackEvent('product_page_view', { section: 'productos' });
   }, []);
 
   return (
@@ -150,6 +153,10 @@ export default function ProductosPage() {
               </div>
             </div>
           </section>
+
+          {/* Landings por rubro: /productos cataloga por TIPO de caja; esto
+              enlaza el corte por USO, que vive en las landings verticales. */}
+          <CajasPorRubro className="mb-16 !py-0" />
 
           {/* CTA */}
           <div className="text-center bg-[#002E55] rounded-xl p-8 md:p-12 text-white">

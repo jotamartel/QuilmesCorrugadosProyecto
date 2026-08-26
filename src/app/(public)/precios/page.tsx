@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
+import { CajasPorRubro } from '@/components/public/CajasPorRubro';
 import { getActivePricingConfig } from '@/lib/utils/pricing';
 import { calcularCotizacion } from '@/lib/cotizacion/motor';
 import { EJEMPLOS, rutaEjemplo } from '@/lib/cotizacion/ejemplos';
 import { SITE_URL } from '@/lib/site';
+import { metadataPagina } from '@/lib/seo';
 import type { PricingConfig } from '@/lib/types/database';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import { precioUnitarioARS } from '@/lib/cotizacion/motor';
@@ -26,12 +28,12 @@ import { notaImpresion } from '@/lib/cotizacion/motor';
 
 export const revalidate = 300;
 
-export const metadata: Metadata = {
-  title: 'Precios de cajas de cartón corrugado',
-  description:
+export const metadata: Metadata = metadataPagina({
+  titulo: 'Precios de cajas de cartón corrugado',
+  descripcion:
     'Precio por m² de cajas de cartón corrugado a medida, actualizado, con los cuatro tramos por volumen. Fábrica en Quilmes, Buenos Aires. Cotización online al instante.',
-  alternates: { canonical: '/precios' },
-};
+  ruta: '/precios',
+});
 
 const ars = (n: number) => '$' + Math.round(Number(n)).toLocaleString('es-AR');
 const m2 = (n: number) => Number(n).toLocaleString('es-AR') + ' m²';
@@ -406,6 +408,10 @@ export default async function PreciosPage() {
           </p>
         </div>
       </section>
+
+      {/* Landings por rubro: quien llega buscando precio suele venir con un
+          uso en mente; desde acá se cuelgan las verticales con anchor real. */}
+      <CajasPorRubro className="bg-gray-50" />
 
       <LandingFooter />
     </div>

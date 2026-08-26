@@ -10,7 +10,7 @@ export function LandingFooter() {
   return (
     <footer id="contacto" className="bg-[#002E55] text-gray-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-4">
@@ -47,6 +47,41 @@ export function LandingFooter() {
               <li className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-[#4F6D87]" />
                 <span>Quilmes, Buenos Aires</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Cajas por rubro: las landings verticales no recibian ni un link
+              interno desde el resto del sitio (solo se enlazaban entre si), y
+              con el canonical que ademas apuntaba a la home quedaban invisibles
+              para Google. El footer las enlaza desde todas las paginas. */}
+          <div>
+            <h3 className="font-semibold text-white mb-4">Cajas por rubro</h3>
+            <ul className="space-y-2">
+              <li>
+                <Link href="/cajas-ecommerce" className="hover:text-white">
+                  Cajas para e-commerce
+                </Link>
+              </li>
+              <li>
+                <Link href="/cajas-alimentos" className="hover:text-white">
+                  Cajas para delivery y gastronomía
+                </Link>
+              </li>
+              <li>
+                <Link href="/cajas-mudanza" className="hover:text-white">
+                  Cajas para mudanza
+                </Link>
+              </li>
+              <li>
+                <Link href="/mayorista" className="hover:text-white">
+                  Venta mayorista
+                </Link>
+              </li>
+              <li>
+                <Link href="/cajas" className="hover:text-white">
+                  Compra minorista
+                </Link>
               </li>
             </ul>
           </div>

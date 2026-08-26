@@ -40,6 +40,21 @@ const DOMINIO_PROPIO = "https://www.quilmescorrugados.com.ar";
 const soloDesdeVercel = [{ type: "host" as const, value: DOMINIO_VERCEL }];
 
 const nextConfig: NextConfig = {
+  async headers() {
+    return [
+      {
+        // Los redirects de abajo cubren solo el alias principal. Los otros
+        // hosts que Vercel expone —el del equipo, el de la rama git y el de
+        // cada deploy (quilmes-corrugados-xxxx.vercel.app)— siguen sirviendo
+        // el sitio completo y ya aparecieron indexados en Google compitiendo
+        // con el dominio propio. El noindex por header los saca del índice
+        // sin tocar el robots del dominio real.
+        source: "/:path*",
+        has: [{ type: "host" as const, value: "(?<vercelHost>.*\\.vercel\\.app)" }],
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+    ];
+  },
   async redirects() {
     return [
       {

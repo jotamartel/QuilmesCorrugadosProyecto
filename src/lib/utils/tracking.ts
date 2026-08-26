@@ -12,8 +12,11 @@ import {
   type DatosDeContacto,
 } from '@/lib/marketing/identidad';
 
+// Sin 'landing_page_view' (GA4 ya manda page_view automático, el evento extra
+// duplicaba vistas) ni 'contact_form_submitted' (estaba mapeado como conversión
+// primaria con value 1500 pero /contacto no tiene formulario: nunca disparó, y
+// configurarlo en Google Ads era armar una meta imposible de cumplir).
 export type ConversionEvent =
-  | 'landing_page_view'
   | 'quoter_viewed'
   | 'quote_started'
   | 'box_added'
@@ -23,7 +26,6 @@ export type ConversionEvent =
   | 'whatsapp_click'
   | 'phone_click'
   | 'email_click'
-  | 'contact_form_submitted'
   | 'contact_page_view'
   | 'product_page_view'
   | 'faq_viewed'
@@ -41,16 +43,17 @@ function mapToFbqEvent(
 ): { event: string; params?: Record<string, unknown> } | null {
   const base = (eventData || {}) as Record<string, unknown>;
   const contentName = (base.section || base.sectionId || eventType) as string;
+  // El monto real de la cotización viaja como totalAmount; 2000 es solo el
+  // respaldo para los llamadores que no lo tienen (BelowMinimumModal). Antes
+  // el 2000 fijo pisaba siempre al real y el algoritmo de pujas optimizaba
+  // por cantidad de leads en vez de por facturación.
+  const montoCotizacion =
+    typeof base.totalAmount === 'number' ? base.totalAmount : 2000;
   switch (eventType) {
     case 'quote_submitted':
       return {
         event: 'Lead',
-        params: { content_name: 'quote_submitted', value: 2000, currency: 'ARS', ...base },
-      };
-    case 'contact_form_submitted':
-      return {
-        event: 'Lead',
-        params: { content_name: 'contact_form_submitted', value: 1500, currency: 'ARS', ...base },
+        params: { content_name: 'quote_submitted', ...base, value: montoCotizacion, currency: 'ARS' },
       };
     case 'chat_message_sent':
       return {
@@ -111,12 +114,14 @@ function mapToGtagEvent(
     case 'quote_submitted':
       return {
         name: 'quote_submitted',
-        params: { ...base, value: 2000, currency: 'ARS' },
-      };
-    case 'contact_form_submitted':
-      return {
-        name: 'contact_form_submitted',
-        params: { ...base, value: 1500, currency: 'ARS' },
+        // Mismo criterio que en el mapeo de Meta: value real de la cotización,
+        // 2000 solo como respaldo. El 2000 fijo hacía que tROAS optimizara a
+        // ciegas del monto.
+        params: {
+          ...base,
+          value: typeof base.totalAmount === 'number' ? base.totalAmount : 2000,
+          currency: 'ARS',
+        },
       };
     case 'whatsapp_click':
       return {
@@ -128,8 +133,6 @@ function mapToGtagEvent(
         name: 'phone_click',
         params: { ...base, value: 500, currency: 'ARS' },
       };
-    case 'landing_page_view':
-      return { name: 'page_view', params: base };
     default:
       return { name: eventType, params: base };
   }
@@ -147,7 +150,9 @@ function mapToGtagEvent(
  * Falla en silencio a proposito: esto es telemetria, nunca puede interrumpir
  * lo que la persona estaba haciendo.
  */
-function espejarACapi(
+// Exportada para que el tracking del flujo retail (/cajas) espeje sus eventos
+// por el mismo camino, con el mismo formato de event_id.
+export function espejarACapi(
   nombre: string,
   eventId: string,
   params?: Record<string, unknown>,

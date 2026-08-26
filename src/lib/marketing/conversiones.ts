@@ -20,7 +20,10 @@
 
 import crypto from 'crypto';
 
-const META_PIXEL_ID = process.env.META_PIXEL_ID || process.env.NEXT_PUBLIC_FB_PIXEL_ID;
+// El respaldo es la variable pública del Pixel: antes caía a
+// NEXT_PUBLIC_FB_PIXEL_ID (el nombre viejo del stack retail, ya retirado) y la
+// configuración podía quedar partida entre dos nombres para el mismo ID.
+const META_PIXEL_ID = process.env.META_PIXEL_ID || process.env.NEXT_PUBLIC_META_PIXEL_ID;
 const META_CAPI_TOKEN = process.env.META_CAPI_ACCESS_TOKEN;
 const META_API_VERSION = 'v21.0';
 

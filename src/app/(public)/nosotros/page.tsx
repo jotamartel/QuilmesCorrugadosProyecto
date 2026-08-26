@@ -1,24 +1,20 @@
 import type { Metadata } from 'next';
 import { SITE_URL } from '@/lib/site';
+import { metadataPagina } from '@/lib/seo';
 import Link from 'next/link';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { BreadcrumbSchema, OrganizationSchema } from '@/components/public/SchemaMarkup';
 import { Factory, Users, MapPin, Award, ArrowRight } from 'lucide-react';
 
-export const metadata: Metadata = {
-  title: 'Sobre Nosotros | Fábrica de Cajas de Cartón en Quilmes',
-  description: 'Quilmes Corrugados: +20 años fabricando cajas de cartón corrugado a medida en Quilmes, Buenos Aires. Fábrica propia, +500 clientes activos. Conocé nuestra historia y valores.',
-  alternates: {
-    canonical: `${SITE_URL}/nosotros`,
-  },
-  openGraph: {
-    title: 'Sobre Quilmes Corrugados | Fábrica de Cartón Corrugado',
-    description: '+20 años fabricando cajas de cartón corrugado a medida en Quilmes, Buenos Aires.',
-    url: `${SITE_URL}/nosotros`,
-    type: 'website',
-  },
-};
+// El template del layout público agrega "| Quilmes Corrugados"; el title
+// anterior ya traía su propio "| Fábrica de..." y quedaba con doble pipe.
+export const metadata: Metadata = metadataPagina({
+  titulo: 'Nosotros: fábrica de cajas de cartón en Quilmes',
+  descripcion:
+    'Quilmes Corrugados: +20 años fabricando cajas de cartón corrugado a medida en Quilmes, Buenos Aires. Fábrica propia, +500 clientes activos. Conocé nuestra historia y valores.',
+  ruta: '/nosotros',
+});
 
 const stats = [
   { value: '+20', label: 'Años de experiencia', icon: Award },

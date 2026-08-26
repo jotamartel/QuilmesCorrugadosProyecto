@@ -27,6 +27,17 @@ const PRIVADO = [
   // La pagina de seguimiento es de quien tiene el link. Ya se declara noindex
   // ella misma; esto es defensa en profundidad.
   '/pedido/',
+  // Idem: la cotizacion es de quien tiene el link, y el estado de pago lleva
+  // querystring propio de cada compra. Las dos ya se declaran noindex.
+  '/cotizacion/',
+  '/cajas/pago',
+  // El route group (dashboard) publica sus rutas PLANAS, no bajo /dashboard/:
+  // el middleware las protege con auth, pero listarlas evita que un crawler
+  // gaste presupuesto en URLs que siempre redirigen al login.
+  '/inicio', '/clientes', '/ordenes', '/cotizaciones', '/costos', '/pagos',
+  '/produccion', '/reportes', '/cheques', '/whatsapp', '/catalogo',
+  '/leads-web', '/cotizaciones-web', '/funnels', '/trafico', '/configuracion',
+  '/ventas-retail', '/chat-web', '/conocimiento', '/api-keys', '/api-stats',
 ]
 
 /**

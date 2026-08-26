@@ -25,12 +25,20 @@ interface Props {
   preguntas: Pregunta[];
   titulo?: string;
   className?: string;
+  /**
+   * El FAQPage se emite solo cuando las preguntas son propias de la página.
+   * La home repite las de /faq, y el mismo par pregunta-respuesta marcado en
+   * dos URLs es motivo para que Google retire el rich snippet de las dos:
+   * ahí se apaga con conSchema={false} y el HTML visible queda igual.
+   */
+  conSchema?: boolean;
 }
 
 export function PreguntasFrecuentes({
   preguntas,
   titulo = 'Preguntas frecuentes',
   className = '',
+  conSchema = true,
 }: Props) {
   const schema = {
     '@context': 'https://schema.org',
@@ -44,10 +52,12 @@ export function PreguntasFrecuentes({
 
   return (
     <section className={`px-4 py-12 ${className}`} aria-labelledby="faq-titulo">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
-      />
+      {conSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+        />
+      )}
       <div className="mx-auto max-w-3xl">
         <h2 id="faq-titulo" className="mb-6 text-center text-2xl font-bold text-gray-900">
           {titulo}

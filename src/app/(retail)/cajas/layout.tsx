@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import { JetBrains_Mono, DM_Sans } from 'next/font/google';
-import RetailTracking from '@/components/retail/RetailTracking';
 
 const jetbrainsMono = JetBrains_Mono({
   variable: '--font-retail-mono',
@@ -29,9 +28,12 @@ export default function RetailLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Sin RetailTracking: cargaba un segundo fbevents.js y un segundo gtag.js
+  // con el mismo AW- sobre los que ya monta el layout raíz (MetaPixel +
+  // GoogleAds), duplicando cada PageView del flujo retail. Los eventos del
+  // BoxGame usan los tags globales vía lib/retail/tracking.ts.
   return (
     <div className={`${jetbrainsMono.variable} ${dmSans.variable}`}>
-      <RetailTracking />
       {children}
     </div>
   );

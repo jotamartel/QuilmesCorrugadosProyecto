@@ -31,7 +31,8 @@ import type { OrderStatus } from '@/lib/types/database';
 export const revalidate = 30;
 
 export const metadata: Metadata = {
-  title: 'Seguimiento de pedido | Quilmes Corrugados',
+  // El template del layout público ya agrega "| Quilmes Corrugados".
+  title: 'Seguimiento de pedido',
   // La pagina es de quien tiene el link: no se indexa (robots.ts ademas cierra
   // /pedido/ entero, defensa en profundidad).
   robots: { index: false, follow: false },

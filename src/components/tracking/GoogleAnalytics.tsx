@@ -11,10 +11,11 @@ const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
  * Para Google Ads: vincular GA4 a Google Ads e importar conversiones desde eventos.
  *
  * Eventos mapeados para conversiones (configurar en Google Ads):
- * - quote_submitted → Cotización completada (primaria)
- * - contact_form_submitted → Formulario contacto (primaria)
+ * - quote_submitted → Cotización completada (primaria, con value real)
+ * - price_revealed → Precio revelado con lead identificado (secundaria)
  * - whatsapp_click → Clic WhatsApp (secundaria)
  * - phone_click → Clic teléfono (secundaria)
+ * - chat_message_sent → Mensaje en el chat (secundaria)
  */
 export function GoogleAnalytics() {
   if (!GA_MEASUREMENT_ID) return null;

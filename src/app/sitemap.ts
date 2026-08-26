@@ -126,12 +126,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'monthly',
       priority: 0.85,
     },
-    {
-      url: `${BASE_URL}/cajas-alimentos`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.85,
-    },
+    // /cajas-alimentos queda fuera a propósito: producto en pausa (microcorrugado
+    // tercerizado sin cerrar), la página tiene noindex en su layout.
     {
       url: `${BASE_URL}/mayorista`,
       lastModified: now,

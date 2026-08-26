@@ -190,11 +190,6 @@ export default function CajasEcommercePage() {
               </Link>
             </li>
             <li>
-              <Link href="/cajas-alimentos" className="text-[#002E55] hover:underline">
-                Cajas para delivery y gastronomía
-              </Link>
-            </li>
-            <li>
               <Link href="/mayorista" className="text-[#002E55] hover:underline">
                 Compra por mayor
               </Link>

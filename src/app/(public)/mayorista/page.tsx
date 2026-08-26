@@ -175,7 +175,6 @@ export default function MayoristaPage() {
           <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
             <li><Link href="/cajas-ecommerce" className="text-[#002E55] hover:underline">Cajas para e-commerce</Link></li>
             <li><Link href="/cajas-mudanza" className="text-[#002E55] hover:underline">Cajas para mudanza</Link></li>
-            <li><Link href="/cajas-alimentos" className="text-[#002E55] hover:underline">Cajas para delivery</Link></li>
             <li><Link href="/precios" className="text-[#002E55] hover:underline">Escalera de precios</Link></li>
             <li><Link href="/api/v1/docs" className="text-[#002E55] hover:underline">Cotizar por API</Link></li>
             <li><Link href="/faq" className="text-[#002E55] hover:underline">Todas las preguntas</Link></li>

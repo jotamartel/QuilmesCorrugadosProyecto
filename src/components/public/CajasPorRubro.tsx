@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ShoppingBag, Pizza, Home, Warehouse, ArrowRight } from 'lucide-react';
+import { ShoppingBag, Home, Warehouse, ArrowRight } from 'lucide-react';
 
 /**
  * Tarjetas hacia las landings verticales.
@@ -19,12 +19,8 @@ const RUBROS = [
     titulo: 'Cajas para e-commerce',
     descripcion: 'Medidas para correo y Mercado Envíos, con tu logo.',
   },
-  {
-    href: '/cajas-alimentos',
-    icon: Pizza,
-    titulo: 'Cajas para delivery y gastronomía',
-    descripcion: 'Pizzas, empanadas y catering. Cartón apto alimentos.',
-  },
+  // Gastronomía/delivery quitada: es microcorrugado y todavía no se vende
+  // (tercerización en negociación). Volver a agregarla cuando cierre.
   {
     href: '/cajas-mudanza',
     icon: Home,
@@ -50,7 +46,7 @@ export function CajasPorRubro({ className = '' }: { className?: string }) {
           La misma fábrica y el mismo cotizador, con lo que cambia según tu uso:
           medidas, resistencia e impresión.
         </p>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {RUBROS.map((rubro) => (
             <Link
               key={rubro.href}

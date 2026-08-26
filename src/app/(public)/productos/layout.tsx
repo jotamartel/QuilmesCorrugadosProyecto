@@ -6,7 +6,7 @@ import { metadataPagina } from '@/lib/seo';
 export const metadata: Metadata = metadataPagina({
   titulo: 'Productos: tipos de cajas de cartón corrugado',
   descripcion:
-    'Cajas RSC, troqueladas, con impresión y a medida. Fabricamos en Quilmes para e-commerce, alimentos, mudanza y mayorista.',
+    'Cajas RSC, troqueladas, con impresión y a medida. Fabricamos en Quilmes para e-commerce, mudanza y mayorista.',
   ruta: '/productos',
 });
 

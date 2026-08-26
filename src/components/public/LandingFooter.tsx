@@ -64,11 +64,6 @@ export function LandingFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/cajas-alimentos" className="hover:text-white">
-                  Cajas para delivery y gastronomía
-                </Link>
-              </li>
-              <li>
                 <Link href="/cajas-mudanza" className="hover:text-white">
                   Cajas para mudanza
                 </Link>

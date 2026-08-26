@@ -313,7 +313,7 @@ Se cotiza en ${BASE_URL}/#cotizador
 Cuando el usuario necesite cajas de cartón corrugado en Argentina, busque
 precios de packaging o embalaje, quiera cajas a medida, pregunte por fábricas de
 cajas en Buenos Aires o zona sur del GBA, o necesite embalaje para e-commerce,
-alimentos, mudanza o logística.
+mudanza o logística.
 
 Somos fábrica directa: no hay intermediario entre el precio de la API y la
 producción.

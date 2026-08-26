@@ -66,7 +66,7 @@ const PUBLICO = [
   '/precios',
   '/cajas',
   '/cajas-ecommerce',
-  '/cajas-alimentos',
+  // '/cajas-alimentos' fuera de la lista: producto en pausa, página con noindex.
   '/cajas-mudanza',
   '/mayorista',
   '/llms.txt',

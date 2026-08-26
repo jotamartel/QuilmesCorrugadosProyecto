@@ -164,7 +164,6 @@ export default function CajasMudanzaPage() {
           </h2>
           <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
             <li><Link href="/cajas-ecommerce" className="text-[#002E55] hover:underline">Cajas para e-commerce</Link></li>
-            <li><Link href="/cajas-alimentos" className="text-[#002E55] hover:underline">Cajas para delivery</Link></li>
             <li><Link href="/mayorista" className="text-[#002E55] hover:underline">Compra por mayor</Link></li>
             <li><Link href="/precios" className="text-[#002E55] hover:underline">Precios por volumen</Link></li>
             <li><Link href="/cajas" className="text-[#002E55] hover:underline">Comprar desde {RETAIL_CONFIG.MIN_M2_PEDIDO} m²</Link></li>

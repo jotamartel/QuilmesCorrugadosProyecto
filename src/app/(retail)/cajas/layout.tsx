@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { JetBrains_Mono, DM_Sans } from 'next/font/google';
+import { MicrosoftClarity } from '@/components/tracking/MicrosoftClarity';
 
 const jetbrainsMono = JetBrains_Mono({
   variable: '--font-retail-mono',
@@ -34,6 +35,7 @@ export default function RetailLayout({
   // BoxGame usan los tags globales vía lib/retail/tracking.ts.
   return (
     <div className={`${jetbrainsMono.variable} ${dmSans.variable}`}>
+      <MicrosoftClarity />
       {children}
     </div>
   );

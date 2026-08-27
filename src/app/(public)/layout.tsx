@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG, ENVIO, MINIMOS } from '@/lib/retail/config';
 import { TrafficTracker } from '@/components/tracking/TrafficTracker';
+import { MicrosoftClarity } from '@/components/tracking/MicrosoftClarity';
 import { LenisProvider } from '@/components/providers/LenisProvider';
 import { ChatWidget } from '@/components/public/ChatWidget';
 
@@ -38,6 +39,7 @@ export default function PublicLayout({
   return (
     <>
       <TrafficTracker />
+      <MicrosoftClarity />
       <LenisProvider>
         {children}
         <ChatWidget />

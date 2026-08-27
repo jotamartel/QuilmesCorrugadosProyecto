@@ -451,8 +451,7 @@ export function BoxItemForm({
             <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm">
               <p className="text-xs text-blue-800">
                 Esta caja supera el largo máximo de plancha, así que se fabrica en{' '}
-                <strong>dos mitades que se pegan</strong>. El precio ya lo incluye: el material
-                de la segunda solapa y un 25% por el pegado y la mano de obra.
+                <strong>dos mitades que se pegan</strong>. El precio ya lo incluye.
               </p>
             </div>
           )}

@@ -850,14 +850,17 @@ export function calcularCotizacion(
       sheet_width_mm: unfolded.unfoldedWidth,
       sheet_length_mm: unfolded.unfoldedLength,
       pieces: unfolded.pieces,
+      // El desglose del recargo (solapa + porcentaje del pegado) NO va en la
+      // nota a propósito: es la que se le repite al cliente tal cual —el bot,
+      // /cotizar, el MCP— y la fábrica prefiere no itemizarlo (pedido de
+      // Julián, 27-08-2026). El detalle para integradores vive en la spec
+      // OpenAPI y en llms.txt.
       ...(unfolded.pieces === 2
         ? {
             pieces_note:
               `El desarrollo de una pieza (${2 * (box.length_mm + box.width_mm) + 50} mm) supera el ` +
               `largo máximo de plancha (${LARGO_MAXIMO_PLANCHA} mm), así que la caja se fabrica en ` +
-              `dos mitades de ${unfolded.unfoldedLength} mm que se pegan. El precio ya lo incluye ` +
-              `todo: el material de la segunda solapa y un ${Math.round(RECARGO_DOS_MITADES * 100)}% ` +
-              `por el pegado y la mano de obra.`,
+              `dos mitades de ${unfolded.unfoldedLength} mm que se pegan. El precio ya lo incluye.`,
           }
         : {}),
       sqm_per_box: unfolded.m2,

@@ -44,6 +44,8 @@ export interface BoxCalculations {
   minM2Piso: number;
   /** Por debajo del limite no se produce a medida: se vende de stock desde /cajas */
   esDeStock: boolean;
+  /** 2 = caja en dos mitades pegadas; el precio ya trae su recargo. */
+  pieces: 1 | 2;
 }
 
 interface BoxItemFormProps {
@@ -130,6 +132,7 @@ export function calculateBoxItem(box: BoxItemData, pricingConfig?: PricingConfig
     minM2AMedida: pricingConfig.wholesale_min_m2,
     minM2Piso: pricingConfig.min_m2_pedido,
     esDeStock: totalSqm < pricingConfig.wholesale_min_m2,
+    pieces: unfolded.pieces,
   };
 }
 
@@ -428,8 +431,12 @@ export function BoxItemForm({
           {calculations && (
             <div className="bg-gray-50 rounded-lg p-3 text-sm">
               <div className="flex justify-between text-gray-600">
-                <span>Plancha:</span>
-                <span className="font-medium">{calculations.sheetWidth} × {calculations.sheetLength} mm</span>
+                <span>{calculations.pieces === 2 ? 'Planchas:' : 'Plancha:'}</span>
+                <span className="font-medium">
+                  {calculations.pieces === 2
+                    ? `2 de ${calculations.sheetWidth} × ${calculations.sheetLength} mm`
+                    : `${calculations.sheetWidth} × ${calculations.sheetLength} mm`}
+                </span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>m² totales:</span>
@@ -438,16 +445,35 @@ export function BoxItemForm({
             </div>
           )}
 
+          {/* Caja en dos mitades: se avisa acá, junto al desglose, para que el
+              proceso no aparezca de sorpresa recién en la cotización. */}
+          {calculations && calculations.pieces === 2 && (
+            <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+              <p className="text-xs text-blue-800">
+                Esta caja supera el largo máximo de plancha, así que se fabrica en{' '}
+                <strong>dos mitades que se pegan</strong>. El precio ya lo incluye: el material
+                de la segunda solapa y un 25% por el pegado y la mano de obra.
+              </p>
+            </div>
+          )}
+
           {/* Debajo del mínimo para fabricar a medida. Entre ese mínimo y el
-              escalón de precio no va ningún aviso: ese pedido se vende normal. */}
+              escalón de precio no va ningún aviso: ese pedido se vende normal.
+              Los 500 m² NO son un mínimo para ESTA medida: es el piso de las
+              medidas estándar de catálogo que se venden de stock. Decir "el
+              mínimo de compra es 158" acá prometía fabricar a medida por
+              debajo de los 1.000 m², que es justo lo que no hacemos. */}
           {calculations && calculations.esDeStock && (
             <div className="p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
               <p className="text-xs text-yellow-800">
                 Con esta medida, <strong>{calculations.minCajasAMedida.toLocaleString('es-AR')}</strong>{' '}
                 cajas son los {calculations.minM2AMedida.toLocaleString('es-AR')} m² desde los que
-                fabricamos a medida, y{' '}
-                <strong>{calculations.minCajasPiso.toLocaleString('es-AR')}</strong> son el mínimo de
-                compra de {calculations.minM2Piso.toLocaleString('es-AR')} m².
+                fabricamos a medida. Para pedidos más chicos (desde{' '}
+                {calculations.minM2Piso.toLocaleString('es-AR')} m²) vendemos{' '}
+                <a href="/cajas" className="underline font-medium">
+                  medidas estándar de catálogo
+                </a>
+                , que salen de stock.
               </p>
             </div>
           )}

@@ -53,35 +53,41 @@ export function PriceSummary({
   // (ese canal tambien pide 500 m² minimo). Es agregado, no por caja: dos
   // cajas de 300 m² suman 600 y sí llegan.
   const bajoMinimoPiso = totalSqm > 0 && totalSqm < pisoMinM2;
-  const m2Faltantes = Math.max(0, pisoMinM2 - totalSqm);
   // Con una sola medida podemos ser concretos y decirle exactamente cuantas
-  // cajas mas hacen falta —como hace el motor con impedimento.cajas_necesarias—.
-  // Con varias, no tiene sentido: la cuenta depende de cual crezca.
-  const cajasParaMinimo =
+  // cajas mas hacen falta. OJO CON EL OBJETIVO: este cotizador fabrica a
+  // medida, y eso arranca en minM2AMedida (1.000 m²), no en el piso de venta
+  // de 500 — ese piso es de las medidas estandar de catalogo que salen de
+  // stock. La version anterior invitaba a llegar a "N cajas de esta medida"
+  // apuntando a los 500, y a esa altura el pedido igual no se podia fabricar.
+  const cajasParaAMedida =
     boxes.length === 1 && validCalculations.length === 1 && validCalculations[0].sqmPerBox > 0
-      ? Math.ceil(pisoMinM2 / validCalculations[0].sqmPerBox)
+      ? validCalculations[0].minCajasAMedida
       : null;
+  const minM2AMedida = validCalculations[0]?.minM2AMedida ?? 1000;
 
   // Aviso de "no llegas al minimo". Aparece MIENTRAS ajusta cantidades, no al
-  // final, y dice m² faltantes (y cajas cuando hay una sola medida) en vez de
-  // solo "no llegas". El minimo no se negocia: por eso el tono rojo y no se
-  // ofrece "hablemoslo".
+  // final. El minimo no se negocia: por eso el tono rojo y no se ofrece
+  // "hablemoslo".
   const panelBajoMinimo = (
     <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-      <p className="text-red-900 font-medium">Todavía no llegás al mínimo de compra</p>
+      <p className="text-red-900 font-medium">Todavía no llegás al mínimo</p>
       <p className="text-sm text-red-800 mt-1">
-        Fabricamos desde <strong>{pisoMinM2.toLocaleString('es-AR')} m²</strong> de cartón.
-        Con este pedido son{' '}
-        {totalSqm.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m²: te faltan{' '}
-        <strong>{m2Faltantes.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m²</strong>
-        {cajasParaMinimo !== null ? (
+        Una medida propia se fabrica desde{' '}
+        <strong>{minM2AMedida.toLocaleString('es-AR')} m²</strong> de cartón
+        {cajasParaAMedida !== null ? (
           <>
-            , o sea <strong>{cajasParaMinimo.toLocaleString('es-AR')}</strong> cajas de
-            esta medida.
+            {' '}
+            — <strong>{cajasParaAMedida.toLocaleString('es-AR')}</strong> cajas de esta
+            medida
           </>
-        ) : (
-          '.'
-        )}
+        ) : null}
+        . Con este pedido son{' '}
+        {totalSqm.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m². Para pedidos
+        más chicos vendemos{' '}
+        <Link href="/cajas" className="underline font-medium">
+          medidas estándar de catálogo
+        </Link>{' '}
+        de stock, desde {pisoMinM2.toLocaleString('es-AR')} m².
       </p>
     </div>
   );

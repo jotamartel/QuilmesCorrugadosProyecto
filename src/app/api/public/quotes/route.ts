@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
+import { calculateUnfolded, calculateTotalM2, RECARGO_DOS_MITADES } from '@/lib/utils/box-calculations';
 import { getPricePerM2, calculateSubtotal, getProductionDays } from '@/lib/utils/pricing';
 import { sendNotification } from '@/lib/notifications';
 import { notifyNewRetailLead } from '@/lib/telegram/notifications';
@@ -91,8 +91,11 @@ export async function POST(request: NextRequest) {
     // Obtener precio por m² según volumen
     const pricePerM2 = getPricePerM2(totalSqm, config);
 
-    // Calcular subtotal
-    const subtotal = calculateSubtotal(totalSqm, pricePerM2);
+    // Calcular subtotal. Si la caja va en dos mitades (su desarrollo no entra
+    // en el largo de plancha), el m² ya trae la solapa extra y acá se cobra
+    // el pegado, igual que en el motor.
+    const factorMitades = unfolded.pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1;
+    const subtotal = Math.round(totalSqm * pricePerM2 * factorMitades * 100) / 100;
 
     // Calcular precio unitario
     const unitPrice = Math.round((subtotal / body.quantity) * 100) / 100;

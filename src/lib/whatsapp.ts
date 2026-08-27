@@ -631,7 +631,7 @@ export function validateDimensions(length: number, width: number, height: number
   // Los limites salen del motor, no de una copia local.
   //
   // Aca estaban escritos a mano el ancho de rollo y las medidas minimas, pero
-  // NO la medida maxima —2000x2000x1500—, que si esta en el motor. Resultado:
+  // NO la medida maxima (MEDIDA_MAXIMA), que si esta en el motor. Resultado:
   // por WhatsApp se aceptaba una caja de 2500x900x400, se seguia el flujo
   // preguntandole la cantidad, y recien mucho despues —o nunca— se enteraba de
   // que esa caja no se fabrica. Con porQueNoSeFabrica() los tres limites son

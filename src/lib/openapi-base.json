@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Quilmes Corrugados Quote API",
-    "description": "API pública para cotización de cajas de cartón corrugado. Diseñada para integración con LLMs, agentes de IA y sistemas B2B.\n\n## Información del Negocio\n\nQuilmes Corrugados es una fábrica argentina de cajas de cartón corrugado ubicada en Lugones 219, Quilmes, Buenos Aires.\n\n## Cómo cotizar\n\nGET con parámetros en la URL para una medida, POST para hasta 10 medidas juntas. Los dos devuelven el mismo precio, que es el que paga un cliente real.\n\n## Dos canales\n\n- De 500 a 1.000 m²: medidas estándar de catálogo, sin impresión, entrega más rápida. Se cotiza en /cajas y el pedido se cierra por WhatsApp\n- Desde 1.000 m²: producción a medida, con precio por m² que baja según el volumen\n\nLa respuesta incluye el campo `channel` indicando cuál corresponde.\n\n## Restricciones\n\n- Solo fabricamos para Argentina\n- Solo cartón corrugado\n- Mínimo de compra: 500 m² de cartón desplegado. Se mide en superficie, no en cantidad de cajas\n- Medida mínima por caja: 200 x 200 x 100 mm; ancho + alto no puede superar 1200 mm\n- Precios en ARS (Peso Argentino) sin IVA\n\n## Rate Limiting\n\n- Sin API key: 10 requests/minuto\n- Con API key: 100 requests/minuto",
+    "description": "API pública para cotización de cajas de cartón corrugado. Diseñada para integración con LLMs, agentes de IA y sistemas B2B.\n\n## Información del Negocio\n\nQuilmes Corrugados es una fábrica argentina de cajas de cartón corrugado ubicada en Lugones 219, Quilmes, Buenos Aires.\n\n## Cómo cotizar\n\nGET con parámetros en la URL para una medida, POST para hasta 10 medidas juntas. Los dos devuelven el mismo precio, que es el que paga un cliente real.\n\n## Dos canales\n\n- De 500 a 1.000 m²: medidas estándar de catálogo, sin impresión, entrega más rápida. Se cotiza en /cajas y el pedido se cierra por WhatsApp\n- Desde 1.000 m²: producción a medida, con precio por m² que baja según el volumen\n\nLa respuesta incluye el campo `channel` indicando cuál corresponde.\n\n## Restricciones\n\n- Solo fabricamos para Argentina\n- Solo cartón corrugado\n- Mínimo de compra: 500 m² de cartón desplegado. Se mide en superficie, no en cantidad de cajas\n- Medida mínima por caja: 200 x 200 x 100 mm; ancho + alto no puede superar 1200 mm (rollo) y largo + ancho no puede superar 2000 mm (largo de plancha)\n- Cajas cuyo desarrollo de una pieza supera los 2050 mm se fabrican en dos mitades pegadas: el precio ya incluye ese proceso (material extra y 25% de recargo) y la respuesta lo indica en `boxes[].pieces` y `boxes[].pieces_note`\n- Precios en ARS (Peso Argentino) sin IVA\n\n## Rate Limiting\n\n- Sin API key: 10 requests/minuto\n- Con API key: 100 requests/minuto",
     "version": "1.1.0",
     "contact": {
       "name": "Quilmes Corrugados - Ventas",
@@ -171,7 +171,7 @@
                   "success": false,
                   "error": "Validation failed",
                   "errors": [
-                    "boxes[0].length_mm must be between 100 and 2000"
+                    "boxes[0].length_mm must be between 200 and 1800"
                   ]
                 }
               }
@@ -217,20 +217,20 @@
           {
             "name": "length_mm",
             "in": "query",
-            "description": "Largo en milímetros. Alternativa: length_cm (o largo_cm) en centímetros.",
-            "schema": { "type": "integer", "minimum": 100, "maximum": 2000, "example": 400 }
+            "description": "Largo en milímetros. Alternativa: length_cm (o largo_cm) en centímetros. Regla combinada: largo + ancho no puede superar 2000 mm.",
+            "schema": { "type": "integer", "minimum": 200, "maximum": 1800, "example": 400 }
           },
           {
             "name": "width_mm",
             "in": "query",
-            "description": "Ancho en milímetros. Alternativa: width_cm (o ancho_cm).",
-            "schema": { "type": "integer", "minimum": 100, "maximum": 2000, "example": 600 }
+            "description": "Ancho en milímetros. Alternativa: width_cm (o ancho_cm). Reglas combinadas: largo + ancho ≤ 2000 mm y ancho + alto ≤ 1200 mm.",
+            "schema": { "type": "integer", "minimum": 200, "maximum": 1100, "example": 600 }
           },
           {
             "name": "height_mm",
             "in": "query",
-            "description": "Alto en milímetros. Alternativa: height_cm (o alto_cm).",
-            "schema": { "type": "integer", "minimum": 50, "maximum": 1500, "example": 600 }
+            "description": "Alto en milímetros. Alternativa: height_cm (o alto_cm). Regla combinada: ancho + alto no puede superar 1200 mm.",
+            "schema": { "type": "integer", "minimum": 100, "maximum": 1000, "example": 600 }
           },
           {
             "name": "quantity",
@@ -291,21 +291,21 @@
         "properties": {
           "length_mm": {
             "type": "integer",
-            "minimum": 100,
-            "maximum": 2000,
-            "description": "Largo de la caja en milímetros"
+            "minimum": 200,
+            "maximum": 1800,
+            "description": "Largo de la caja en milímetros. Regla combinada: largo + ancho ≤ 2000 mm (largo máximo de plancha, incluso fabricando en dos mitades)."
           },
           "width_mm": {
             "type": "integer",
-            "minimum": 100,
-            "maximum": 2000,
-            "description": "Ancho de la caja en milímetros"
+            "minimum": 200,
+            "maximum": 1100,
+            "description": "Ancho de la caja en milímetros. Reglas combinadas: largo + ancho ≤ 2000 mm y ancho + alto ≤ 1200 mm (ancho del rollo)."
           },
           "height_mm": {
             "type": "integer",
-            "minimum": 50,
-            "maximum": 1500,
-            "description": "Alto de la caja en milímetros"
+            "minimum": 100,
+            "maximum": 1000,
+            "description": "Alto de la caja en milímetros. Regla combinada: ancho + alto ≤ 1200 mm."
           },
           "quantity": {
             "type": "integer",
@@ -505,7 +505,16 @@
           },
           "sheet_length_mm": {
             "type": "integer",
-            "description": "Largo de la plancha desplegada en mm"
+            "description": "Largo de CADA plancha en mm. Si pieces=1 es el desarrollo completo; si pieces=2 es el largo de cada mitad (medio perímetro más su solapa)."
+          },
+          "pieces": {
+            "type": "integer",
+            "enum": [1, 2],
+            "description": "1 = la caja sale de una plancha. 2 = se fabrica en dos mitades pegadas porque el desarrollo de una pieza supera el largo máximo de plancha (2050 mm); el precio ya incluye el material de la segunda solapa y un 25% por el pegado."
+          },
+          "pieces_note": {
+            "type": "string",
+            "description": "Solo presente cuando pieces=2: explicación en castellano del proceso de dos mitades, lista para mostrarle al cliente."
           },
           "sqm_per_box": {
             "type": "number",

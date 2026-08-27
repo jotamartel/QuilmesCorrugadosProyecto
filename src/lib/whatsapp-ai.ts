@@ -8,7 +8,7 @@ import {
   getActivePricingConfig,
   getPricePerM2,
 } from '@/lib/utils/pricing';
-import { MEDIDA_MINIMA, MEDIDA_MAXIMA } from '@/lib/utils/box-calculations';
+import { MEDIDA_MINIMA, MEDIDA_MAXIMA, LARGO_MAXIMO_PLANCHA } from '@/lib/utils/box-calculations';
 import { mensajeDeImpedimento } from '@/lib/cotizacion/motor';
 import { SITE_URL } from '@/lib/site';
 import { PAGO } from '@/lib/pagos/esquemas';
@@ -99,9 +99,15 @@ const KNOWLEDGE_PROMPT = `Sos el asistente de WhatsApp de Quilmes Corrugados, un
 ### Medidas y límites
 - Mínimo por caja: ${MEDIDA_MINIMA.largo} x ${MEDIDA_MINIMA.ancho} x ${MEDIDA_MINIMA.alto} mm
 - Máximo por caja: ${MEDIDA_MAXIMA.largo} x ${MEDIDA_MAXIMA.ancho} x ${MEDIDA_MAXIMA.alto} mm
+  (cada máximo se alcanza solo con la otra medida en el mínimo)
 - El ancho de plancha sale de sumar ancho + alto y no puede superar
-  ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho del rollo de cartón. El largo no
-  entra en esa cuenta
+  ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho del rollo de cartón
+- El largo de plancha tiene su propio tope: ${LARGO_MAXIMO_PLANCHA} mm. Hasta ahí la caja
+  sale de una pieza; si el desarrollo se pasa, se fabrica en DOS MITADES que se
+  pegan (la cotización del sistema ya lo incluye: material extra y un 25% por
+  el pegado — si la cotización trae "fabricacion", contalo en una frase, sin
+  sumarle nada). Como cada mitad también tiene que entrar en la plancha,
+  largo + ancho no puede superar ${LARGO_MAXIMO_PLANCHA - 50} mm: pasado eso no hay caja
 - Estos tres límites NO son mínimos de compra: una caja fuera de rango no se fabrica a
   ninguna cantidad. Si piden una así, decir por qué y ofrecer las medidas de catálogo
   más parecidas. NUNCA pedirles más cajas para "llegar al mínimo"
@@ -175,7 +181,7 @@ Qué hacer:
 1. NUNCA inventes precios exactos: los precios vienen de la cotización del sistema
 2. Si piden cotización con cantidad y medidas (ej: "1400 cajas 40x20x15", "30x40x60, 1700"): el sistema calcula automáticamente. Si no te dio el precio, invitalos a incluir cantidad + medidas en el mismo mensaje (ej: "500 cajas 400x300x200")
 3. NUNCA preguntes de nuevo por medidas o cantidad si el usuario YA los incluyó. Si corrigió un error (ej: "450 no 45" = la altura es 450), usá la corrección. Si dijo "450x380x450" y "1500 quiero", ya tiene todo. Dar la cotización directamente.
-4. Si piden el desplegado, plantilla PDF o PDF para diseñar: el sistema genera el PDF automáticamente. Indicá que las áreas verdes son donde cargar el diseño.
+4. Si piden el desplegado, plantilla PDF o PDF para diseñar: el sistema genera el PDF automáticamente. Indicá que las áreas verdes son donde cargar el diseño. EXCEPCIÓN: las cajas que van en dos mitades (largo + ancho grande, la herramienta lo avisa con sin_plantilla) no tienen PDF automático — decí que el desplegado se lo prepara la fábrica con la orden, y que el diseño lo puede mandar igual.
 5. Si es fuera de horario: mencioná que van a responder cuando abran
 6. Mantené el tono cercano pero profesional`;
 

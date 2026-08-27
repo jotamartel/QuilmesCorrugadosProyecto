@@ -99,7 +99,12 @@ export default function CajasMudanzaPage() {
                 rotulo: 'Precio',
                 valor: `De $${RETAIL_CONFIG.VOLUME_PRICE_PER_M2} a $${RETAIL_CONFIG.RETAIL_PRICE_PER_M2} por m² de cartón, según volumen`,
               },
-              { rotulo: 'Medidas', valor: 'A pedido, hasta 1.200 mm de ancho de plancha' },
+              {
+                rotulo: 'Medidas',
+                valor:
+                  'A pedido: hasta 1.200 mm de ancho de plancha, y largo + ancho hasta ' +
+                  '2.000 mm (las más grandes se fabrican en dos mitades pegadas)',
+              },
               { rotulo: 'Cartón', valor: 'Onda C para uso general, doble onda BC para apilar y frágiles' },
               { rotulo: 'Envío', valor: ENVIO.corto },
             ]}

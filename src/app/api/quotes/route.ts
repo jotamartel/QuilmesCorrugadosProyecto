@@ -11,6 +11,7 @@ import {
   calculateUnfolded,
   isOversized,
   calculateTotalM2,
+  RECARGO_DOS_MITADES,
 } from '@/lib/utils/box-calculations';
 import {
   getPricePerM2,
@@ -151,6 +152,7 @@ export async function POST(request: NextRequest) {
       total_m2: number;
       is_custom: boolean;
       is_oversized: boolean;
+      pieces: number;
     }> = [];
 
     let grandTotalM2 = 0;
@@ -158,7 +160,7 @@ export async function POST(request: NextRequest) {
     for (const item of body.items) {
       const { length_mm, width_mm, height_mm, quantity, box_id } = item;
 
-      const { unfoldedWidth, unfoldedLength, m2 } = calculateUnfolded(
+      const { unfoldedWidth, unfoldedLength, pieces, m2 } = calculateUnfolded(
         length_mm,
         width_mm,
         height_mm
@@ -179,14 +181,23 @@ export async function POST(request: NextRequest) {
         total_m2: totalM2,
         is_custom: !box_id,
         is_oversized: oversized,
+        pieces,
       });
 
       grandTotalM2 += totalM2;
     }
 
-    // Calcular totales
+    // Calcular totales. El recargo de dos mitades va por item, como en el
+    // motor: esas cajas pagan el pegado además del material.
     const pricePerM2 = getPricePerM2(grandTotalM2, config);
-    const subtotal = calculateSubtotal(grandTotalM2, pricePerM2);
+    const subtotal =
+      Math.round(
+        processedItems.reduce(
+          (s, i) =>
+            s + i.total_m2 * pricePerM2 * (i.pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1),
+          0,
+        ) * 100,
+      ) / 100;
     const printingCost = body.has_printing && !body.has_existing_polymer ? 0 : 0;
     const dieCutCost = body.die_cut_cost || 0;
     const shippingCost = body.shipping_cost || 0;
@@ -248,7 +259,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear items de cotización
-    const itemsToInsert = processedItems.map(item => ({
+    // `pieces` se usó para el subtotal pero no viaja a la base: quote_items
+    // no tiene esa columna (se deduce de las medidas cuando hace falta).
+    const itemsToInsert = processedItems.map(({ pieces: _pieces, ...item }) => ({
       quote_id: quote.id,
       ...item,
     }));

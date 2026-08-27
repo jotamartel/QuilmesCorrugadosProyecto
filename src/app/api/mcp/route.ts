@@ -23,7 +23,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calcularCotizacion, validarCajas, urlPlantilla } from '@/lib/cotizacion/motor';
 import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
-import { MEDIDA_MINIMA } from '@/lib/utils/box-calculations';
+import { MEDIDA_MINIMA, MEDIDA_MAXIMA, LARGO_MAXIMO_PLANCHA } from '@/lib/utils/box-calculations';
 import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG, MATERIAL, HORARIO, MINIMOS } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
@@ -70,14 +70,29 @@ const HERRAMIENTAS = [
       `resultado sería incorrecto. El mínimo de compra es ${RETAIL_CONFIG.MIN_M2_PEDIDO} m² de cartón, ` +
       `y cualquier caja a medida, troquelada o impresa arranca en ${RETAIL_CONFIG.MIN_M2_A_MEDIDA_PROPIA} m². ` +
       'La respuesta incluye ' +
-      'el precio por caja, el total, el plazo, el PDF de la plantilla de impresión y un link ' +
-      'de WhatsApp con el mensaje ya redactado para cerrar.',
+      'el precio por caja, el total, el plazo, un link de WhatsApp con el mensaje ya redactado ' +
+      'para cerrar y, en cajas de una plancha, el PDF de la plantilla de impresión (las cajas ' +
+      'grandes se fabrican en dos mitades pegadas — lo indica boxes[].pieces=2, con el recargo ' +
+      'ya incluido en el precio — y su desplegado lo prepara la fábrica, sin PDF automático).',
     inputSchema: {
       type: 'object',
       properties: {
-        largo_mm: { type: 'number', description: 'Largo de la caja en milímetros (100 a 2000)' },
-        ancho_mm: { type: 'number', description: 'Ancho de la caja en milímetros (100 a 2000)' },
-        alto_mm: { type: 'number', description: 'Alto de la caja en milímetros (50 a 1500)' },
+        largo_mm: {
+          type: 'number',
+          description:
+            `Largo de la caja en milímetros (${MEDIDA_MINIMA.largo} a ${MEDIDA_MAXIMA.largo}; ` +
+            `largo+ancho no puede superar ${LARGO_MAXIMO_PLANCHA - 50})`,
+        },
+        ancho_mm: {
+          type: 'number',
+          description:
+            `Ancho de la caja en milímetros (${MEDIDA_MINIMA.ancho} a ${MEDIDA_MAXIMA.ancho}; ` +
+            `ancho+alto no puede superar ${RETAIL_CONFIG.MAX_SHEET_WIDTH})`,
+        },
+        alto_mm: {
+          type: 'number',
+          description: `Alto de la caja en milímetros (${MEDIDA_MINIMA.alto} a ${MEDIDA_MAXIMA.alto})`,
+        },
         cantidad: { type: 'number', description: 'Cantidad de cajas (entero mayor o igual a 1)' },
         colores_impresion: {
           type: 'number',
@@ -245,6 +260,21 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
         true,
       );
     }
+    // La plantilla automática dibuja el desarrollo de UNA pieza. Una caja que
+    // supera el largo de plancha se fabrica en dos mitades y ese desarrollo
+    // no existe: devolver el PDF de una pieza sería entregar un troquel falso.
+    if (2 * (largo + ancho) + 50 > LARGO_MAXIMO_PLANCHA) {
+      registrar(req, nombre, 200, 'dos_mitades_sin_plantilla');
+      return resultado(
+        `La caja de ${largo}x${ancho}x${alto} mm se fabrica en dos mitades pegadas (su ` +
+          `desarrollo de una pieza supera el largo máximo de plancha de ${LARGO_MAXIMO_PLANCHA} mm), ` +
+          'así que no hay plantilla automática: el desplegado técnico lo prepara la fábrica ' +
+          `junto con la orden. El diseño se puede mandar igual a ${CONTACTO.email} o por ` +
+          `WhatsApp al ${CONTACTO.telefonoVisible}. La cotización de cotizar_cajas_carton ya ` +
+          'incluye el proceso de dos mitades en el precio.',
+        { sin_plantilla: true, fabricacion: 'dos_mitades' },
+      );
+    }
     const url = urlPlantilla(largo, ancho, alto);
     registrar(req, nombre, 200, 'plantilla');
     return resultado(
@@ -376,7 +406,13 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       '',
       cotizacion.channel_note,
       '',
-      `Plantilla de impresión (PDF, medidas ya calculadas): ${cotizacion.printing.template_pdf}`,
+      // En dos mitades no hay plantilla automática: se explica el proceso en
+      // vez de linkear un troquel que no existe.
+      ...(cotizacion.boxes[0]?.pieces === 2
+        ? [cotizacion.boxes[0].pieces_note ?? '']
+        : cotizacion.printing.template_pdf
+          ? [`Plantilla de impresión (PDF, medidas ya calculadas): ${cotizacion.printing.template_pdf}`]
+          : []),
       cotizacion.printing.price_note,
       '',
       'Para avanzar, pasale este link al usuario tal cual: ya lleva el mensaje escrito con las ' +

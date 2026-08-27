@@ -11,7 +11,12 @@ import {
   mensajeDeImpedimento,
 } from '@/lib/cotizacion/motor';
 import { RETAIL_CONFIG, MINIMOS, ENVIO, HORARIO, MATERIAL } from '@/lib/retail/config';
-import { MEDIDA_MINIMA, MEDIDA_MAXIMA } from '@/lib/utils/box-calculations';
+import {
+  MEDIDA_MINIMA,
+  MEDIDA_MAXIMA,
+  LARGO_MAXIMO_PLANCHA,
+  RECARGO_DOS_MITADES,
+} from '@/lib/utils/box-calculations';
 import { buscarConocimiento, anotarPreguntaSinRespuesta } from '@/lib/conocimiento';
 import { getBankDataForClient } from '@/lib/config/system';
 import { PAGO, SENA_PCT, SENA_SOBRE, repartirElPago } from '@/lib/pagos/esquemas';
@@ -313,6 +318,9 @@ export function crearHerramientas(ctx: ContextoAgente) {
       medidas_mm: `${largo_mm}x${ancho_mm}x${alto_mm}`,
       cantidad,
       colores_impresion: caja.printing_colors,
+      // Caja en dos mitades: el precio de abajo YA incluye el recargo y la
+      // solapa extra. Contáselo en una frase, sin sumarle nada más.
+      ...(caja.pieces === 2 ? { fabricacion: caja.pieces_note } : {}),
       precio_por_caja: precioUnitarioARS(caja.unit_price),
       subtotal_sin_iva: Math.round(q.subtotal),
       iva_21: Math.round(q.tax_amount),
@@ -374,10 +382,14 @@ export function crearHerramientas(ctx: ContextoAgente) {
                 'ítem. Pero el polímero lo cotiza LA FÁBRICA con su gráfica: NUNCA mandes a ' +
                 'la persona a cotizarlo por su cuenta ni le digas "pasáselo a quien te lo ' +
                 `cotice". Pedile el diseño —por este mismo chat o a ${CONTACTO.email}— y ` +
-                'decile que lo mandamos a cotizar y le pasamos el precio apenas esté. Y llamá ' +
-                'a plantilla_impresion con estas medidas: el PDF del desplegado ' +
-                'se manda adjunto y es lo que el diseñador necesita para armar el arte sobre ' +
-                'la medida real.',
+                'decile que lo mandamos a cotizar y le pasamos el precio apenas esté. ' +
+                (caja.pieces === 2
+                  ? 'NO llames a plantilla_impresion: esta caja se fabrica en dos mitades y ' +
+                    'no hay desplegado automático. Decile que el desplegado técnico se lo ' +
+                    'prepara la fábrica junto con la orden.'
+                  : 'Y llamá a plantilla_impresion con estas medidas: el PDF del desplegado ' +
+                    'se manda adjunto y es lo que el diseñador necesita para armar el arte ' +
+                    'sobre la medida real.'),
             }
           : q.printing.available
             ? {
@@ -564,11 +576,18 @@ export function crearHerramientas(ctx: ContextoAgente) {
         // el cliente que pregunta eso esta por decidir si nos sirve o no.
         medida_maxima_mm: `${MEDIDA_MAXIMA.largo}x${MEDIDA_MAXIMA.ancho}x${MEDIDA_MAXIMA.alto}`,
         ancho_mas_alto_max_mm: RETAIL_CONFIG.MAX_SHEET_WIDTH,
+        largo_mas_ancho_max_mm: LARGO_MAXIMO_PLANCHA - 50,
         motivo:
-          `El ancho de plancha sale de sumar ancho y alto y no puede pasar de ` +
-          `${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho del rollo de cartón. El largo no ` +
-          `entra en esa cuenta, pero igual tiene el tope de la medida máxima. Los dos límites ` +
-          `valen a la vez: una caja tiene que cumplir los dos.`,
+          `Dos límites de plancha, y una caja tiene que cumplir los dos a la vez. (1) El ancho ` +
+          `de plancha sale de sumar ancho y alto y no puede pasar de ` +
+          `${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho del rollo de cartón. (2) El largo ` +
+          `de plancha tiene un tope de ${LARGO_MAXIMO_PLANCHA} mm: hasta ahí la caja sale de una ` +
+          `pieza; si el desarrollo se pasa, se fabrica en DOS MITADES que se pegan (con un ` +
+          `${Math.round(RECARGO_DOS_MITADES * 100)}% de recargo y la solapa extra, ya incluidos ` +
+          `en el precio que da cotizar_cajas), y como cada mitad también tiene que entrar en la ` +
+          `plancha, largo más ancho no puede superar los ${LARGO_MAXIMO_PLANCHA - 50} mm. Más de ` +
+          `dos planchas no se unen. Las medidas máximas por eje se alcanzan solo con la otra ` +
+          `medida en el mínimo.`,
       },
       envio: ENVIO.largo,
       plazos: c
@@ -610,6 +629,19 @@ export function crearHerramientas(ctx: ContextoAgente) {
     additionalProperties: false,
   },
   run: async ({ largo_mm, ancho_mm, alto_mm }) => {
+    // La plantilla automática dibuja el desarrollo de UNA pieza. Una caja que
+    // se fabrica en dos mitades no tiene ese desarrollo: mandar ese PDF es
+    // darle al diseñador una plancha que no existe.
+    if (2 * (largo_mm + ancho_mm) + 50 > LARGO_MAXIMO_PLANCHA) {
+      return JSON.stringify({
+        sin_plantilla: true,
+        instruccion:
+          'Esta caja se fabrica en dos mitades pegadas y la plantilla automática solo ' +
+          'dibuja cajas de una plancha: NO hay PDF para mandar. Decile que el desplegado ' +
+          'técnico se lo prepara la fábrica junto con la orden, y que el diseño (logo, ' +
+          'arte) lo puede mandar igual por acá o por mail.',
+      });
+    }
     return JSON.stringify({
       pdf: urlPlantilla(largo_mm, ancho_mm, alto_mm),
       max_colores: RETAIL_CONFIG.MAX_PRINTING_COLORS,

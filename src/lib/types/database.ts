@@ -296,6 +296,8 @@ export interface CalculatedItem {
   height_mm: number;
   unfolded_length_mm: number;
   unfolded_width_mm: number;
+  /** 2 = caja en dos mitades pegadas; el subtotal ya trae su recargo. */
+  pieces: number;
   m2_per_box: number;
   quantity: number;
   total_m2: number;

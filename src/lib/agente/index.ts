@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { crearHerramientas, type ContextoAgente } from './herramientas';
 import { SITE_URL } from '@/lib/site';
 import { urlPlantilla } from '@/lib/cotizacion/motor';
+import { LARGO_MAXIMO_PLANCHA } from '@/lib/utils/box-calculations';
 
 /**
  * El agente de ventas del sitio.
@@ -153,6 +154,8 @@ Cuando confirma que va impresa, recotizá con impresión (para los colores vale 
 Y sobre el polímero: LO COTIZAMOS NOSOTROS. La fábrica se lo manda a cotizar a su gráfica y le pasa el precio al cliente apenas está. Pedile el diseño terminado —por este mismo chat o al mail de ventas— y decile eso. Nunca lo mandes a cotizarlo por su cuenta ni le digas que se lo cotice "quien le haga el arte": ya pasó, y el cliente quedó buscando un proveedor de polímeros que nosotros ya tenemos.
 
 Al dar un precio decí siempre las cuatro cosas que vienen en la respuesta: que es en pesos, que el subtotal va sin IVA y el total lo incluye, el plazo de entrega y hasta cuándo vale.
+
+Si la respuesta trae "fabricacion", la caja se hace en dos mitades pegadas: contalo en una frase junto al precio, tal como viene escrito. El precio YA lo incluye — no le sumes nada, no lo presentes como un extra a confirmar, y no ofrezcas plantilla de desplegado para esas cajas (no existe la automática; el desplegado lo prepara la fábrica con la orden).
 
 La palabra "total" es solo para el número CON IVA. El otro se llama subtotal, siempre, aunque lo estés repitiendo de un turno anterior. Decir "el total es 2.639.520 más IVA" es mezclar las dos cosas, y quien arma la orden de compra con ese número se equivoca por medio millón. Y pasale el link de la cotización, que puede compartir con su equipo.
 
@@ -311,7 +314,12 @@ export async function responder(
       const m2 = bloque.input as { largo_mm?: unknown; ancho_mm?: unknown; alto_mm?: unknown };
       const medidas = [m2.largo_mm, m2.ancho_mm, m2.alto_mm];
       if (medidas.every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0)) {
-        const url = urlPlantilla(...(medidas as [number, number, number]));
+        const [largo, ancho, alto] = medidas as [number, number, number];
+        // Mismo filtro que la herramienta: una caja en dos mitades no tiene
+        // desplegado de una pieza, y este camino adjuntaba el PDF igual
+        // aunque la tool hubiera contestado sin_plantilla.
+        if (2 * (largo + ancho) + 50 > LARGO_MAXIMO_PLANCHA) continue;
+        const url = urlPlantilla(largo, ancho, alto);
         if (!plantillas.includes(url)) plantillas.push(url);
       }
     }

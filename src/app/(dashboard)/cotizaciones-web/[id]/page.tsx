@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LARGO_MAXIMO_PLANCHA } from '@/lib/utils/box-calculations';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { LoadingPage } from '@/components/ui/loading';
@@ -325,7 +326,12 @@ export default function CotizacionWebDetailPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-500">Medida plancha</p>
+                      <p className="text-sm text-gray-500">
+                        {2 * ((quote.length_mm ?? 0) + (quote.width_mm ?? 0)) + 50 >
+                        LARGO_MAXIMO_PLANCHA
+                          ? 'Medida de cada plancha (2 mitades pegadas)'
+                          : 'Medida plancha'}
+                      </p>
                       <p className="font-medium">{quote.sheet_width_mm} x {quote.sheet_length_mm} mm</p>
                     </div>
                     <div>

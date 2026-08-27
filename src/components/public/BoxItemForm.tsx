@@ -3,7 +3,14 @@
 import { Trash2, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { BoxTemplateDownload } from './BoxTemplateDownload';
 import { DesignUploader } from './DesignUploader';
-import { calculateUnfolded, calculateTotalM2, excedeMedidaMaxima, MEDIDA_MAXIMA } from '@/lib/utils/box-calculations';
+import {
+  calculateUnfolded,
+  calculateTotalM2,
+  excedeMedidaMaxima,
+  MEDIDA_MAXIMA,
+  LARGO_MAXIMO_PLANCHA,
+  RECARGO_DOS_MITADES,
+} from '@/lib/utils/box-calculations';
 import { getPricePerM2 } from '@/lib/utils/pricing';
 import type { PricingConfig } from '@/lib/types/database';
 
@@ -74,26 +81,34 @@ export function calculateBoxItem(box: BoxItemData, pricingConfig?: PricingConfig
     return null;
   }
 
-  // Tope de fabricacion: 2000x2000x1500. Estaba faltando y por eso una caja de
-  // 2500x900x400 salia cotizada sin que la fabrica pueda producirla. La
-  // constante y el helper viven en box-calculations para no duplicar el tope
-  // —ya paso una vez, y quedo un valor viejo escrito en otro lado—.
+  // Tope de fabricacion por eje (1800x1100x1000). La constante y el helper
+  // viven en box-calculations para no duplicar el tope —ya paso una vez, y
+  // quedo un valor viejo escrito en otro lado—.
   if (excedeMedidaMaxima(length_mm, width_mm, height_mm)) {
+    return null;
+  }
+
+  // Regla combinada del largo de plancha: incluso en dos mitades, cada una
+  // (L+A+50) tiene que entrar en los 2.050 mm del largo maximo.
+  if (length_mm + width_mm > LARGO_MAXIMO_PLANCHA - 50) {
     return null;
   }
 
   const unfolded = calculateUnfolded(length_mm, width_mm, height_mm);
   const totalSqm = calculateTotalM2(unfolded.m2, quantity);
-  
+
   // REQUERIDO: La configuración de precios debe venir siempre desde la base de datos
   // No usar valores por defecto hardcodeados
   if (!pricingConfig) {
     return null; // No calcular si no hay configuración
   }
-  
+
   const pricePerM2 = getPricePerM2(totalSqm, pricingConfig);
-  
-  const subtotal = Math.round(totalSqm * pricePerM2 * 100) / 100;
+
+  // Dos mitades: mismo recargo que el motor, para que el numero que la
+  // persona ve en el formulario sea el mismo que despues guarda el lead.
+  const factorMitades = unfolded.pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1;
+  const subtotal = Math.round(totalSqm * pricePerM2 * factorMitades * 100) / 100;
   const unitPrice = quantity > 0 ? Math.round((subtotal / quantity) * 100) / 100 : 0;
   // El umbral que importa acá es el de producción a medida, no el escalón de
   // precio: este cotizador fabrica la medida que le pidan, y eso arranca en
@@ -141,8 +156,21 @@ export function validateBoxDimensions(box: BoxItemData): { isValid: boolean; err
   if (excedeMedidaMaxima(box.length_mm, box.width_mm, box.height_mm)) {
     return {
       isValid: false,
-      error: `Fabricamos hasta ${MEDIDA_MAXIMA.largo}×${MEDIDA_MAXIMA.ancho}×${MEDIDA_MAXIMA.alto} mm. Con esta medida ` +
+      error: `Fabricamos hasta ${MEDIDA_MAXIMA.largo}×${MEDIDA_MAXIMA.ancho}×${MEDIDA_MAXIMA.alto} mm ` +
+        `(cada máximo, con las otras medidas en el mínimo). Con esta medida ` +
         `(${box.length_mm}×${box.width_mm}×${box.height_mm}) no llegamos.`
+    };
+  }
+
+  // La otra regla combinada: el largo de plancha. Hasta 2.050 mm la caja sale
+  // de una pieza; pasado eso va en dos mitades, y cada mitad tambien tiene
+  // que entrar en la plancha — largo + ancho no puede superar 2.000 mm.
+  if (box.length_mm + box.width_mm > LARGO_MAXIMO_PLANCHA - 50) {
+    return {
+      isValid: false,
+      error: `La suma de Largo + Ancho no puede superar ${LARGO_MAXIMO_PLANCHA - 50}mm ` +
+        `(actual: ${box.length_mm + box.width_mm}mm): la caja no entra en el largo de ` +
+        `plancha ni fabricándola en dos mitades.`
     };
   }
   return { isValid: true };
@@ -355,12 +383,21 @@ export function BoxItemForm({
                 </select>
               </div>
 
-              {/* Descargar plantilla PDF */}
-              <BoxTemplateDownload
-                length={box.length_mm}
-                width={box.width_mm}
-                height={box.height_mm}
-              />
+              {/* Descargar plantilla PDF — solo para cajas de una pieza: en
+                  dos mitades no hay desplegado automático y el endpoint
+                  devuelve 400. El desplegado de esas lo prepara la fábrica. */}
+              {2 * (box.length_mm + box.width_mm) + 50 <= LARGO_MAXIMO_PLANCHA ? (
+                <BoxTemplateDownload
+                  length={box.length_mm}
+                  width={box.width_mm}
+                  height={box.height_mm}
+                />
+              ) : (
+                <p className="text-sm text-gray-600">
+                  Esta caja se fabrica en dos mitades pegadas: el desplegado técnico lo
+                  prepara la fábrica junto con la orden.
+                </p>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

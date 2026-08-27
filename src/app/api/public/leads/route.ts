@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
+import { calculateUnfolded, calculateTotalM2, RECARGO_DOS_MITADES } from '@/lib/utils/box-calculations';
 import { getPricePerM2, calculateSubtotal } from '@/lib/utils/pricing';
 import { sendNotification } from '@/lib/notifications';
 import { notifyNewRetailLead } from '@/lib/telegram/notifications';
@@ -115,13 +115,25 @@ export async function POST(request: NextRequest) {
         design_preview_url: box.design_preview_url || null,
         sheetWidth: unfolded.unfoldedWidth,
         sheetLength: unfolded.unfoldedLength,
+        pieces: unfolded.pieces,
         sqmPerBox: unfolded.m2,
         totalSqm,
       };
     });
 
     const pricePerM2 = getPricePerM2(totalSqmAll, config);
-    const totalSubtotal = calculateSubtotal(totalSqmAll, pricePerM2);
+    // El recargo de dos mitades es POR CAJA, no por pedido: el m² de esas
+    // cajas ya trae la solapa extra y acá se les cobra el pegado, igual que
+    // en el motor. Sin esto el lead quedaba guardado 25% más barato que lo
+    // que el mismo pedido cotiza por la API o el bot.
+    const totalSubtotal =
+      Math.round(
+        boxCalculations.reduce(
+          (s, b) =>
+            s + b.totalSqm * pricePerM2 * (b.pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1),
+          0,
+        ) * 100,
+      ) / 100;
 
     // ═══════════════════════════════════════════════════════════
     // CAPTURAR METADATA

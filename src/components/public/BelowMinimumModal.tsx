@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { X, AlertCircle, Loader2, Send, CheckCircle } from 'lucide-react';
 import { trackEvent } from '@/lib/utils/tracking';
 import { formatCurrency } from '@/lib/utils/pricing';
-import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
+import { calculateUnfolded, calculateTotalM2, RECARGO_DOS_MITADES } from '@/lib/utils/box-calculations';
 import { ARGENTINE_PROVINCES } from '@/lib/types/database';
 import type { BuenosAiresCity } from '@/lib/types/database';
 
@@ -71,8 +71,10 @@ export function BelowMinimumModal({
   // Validar datos de entrega requeridos
   const isDeliveryDataValid = province && city.trim() && address.trim();
 
-  // Calcular precio con recargo
-  const subtotal = totalSqm * pricePerM2BelowMinimum;
+  // Calcular precio con recargo (el de bajo mínimo, más el de dos mitades si
+  // la caja no entra en una plancha — espejo de lo que cobra el endpoint).
+  const factorMitades = unfolded.pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1;
+  const subtotal = totalSqm * pricePerM2BelowMinimum * factorMitades;
   const unitPrice = subtotal / quantity;
 
   // Cargar ciudades cuando la provincia es Buenos Aires o CABA

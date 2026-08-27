@@ -18,6 +18,8 @@ import {
   isUndersized,
   MEDIDA_MAXIMA,
   MEDIDA_MINIMA,
+  LARGO_MAXIMO_PLANCHA,
+  RECARGO_DOS_MITADES,
 } from '@/lib/utils/box-calculations';
 import { getPricePerM2, getProductionDays } from '@/lib/utils/pricing';
 import { SITE_URL } from '@/lib/site';
@@ -101,7 +103,16 @@ export interface BoxResult {
   has_printing: boolean;
   printing_colors: number;
   sheet_width_mm: number;
+  /** De CADA plancha: el desarrollo entero si pieces=1, la mitad si pieces=2. */
   sheet_length_mm: number;
+  /**
+   * 1 = una plancha. 2 = la caja se fabrica en dos mitades pegadas porque el
+   * desarrollo entero no entra en el largo máximo de plancha; el precio ya
+   * incluye la solapa extra de material y el recargo por pegado, y
+   * `pieces_note` lo explica en castellano para quien consuma la API.
+   */
+  pieces: number;
+  pieces_note?: string;
   sqm_per_box: number;
   total_sqm: number;
   /**
@@ -116,8 +127,13 @@ export interface BoxResult {
   price_per_m2: number | null;
   unit_price: number | null;
   subtotal: number | null;
-  /** PDF con las líneas de corte, plegado y las áreas donde va el diseño */
-  template_pdf: string;
+  /**
+   * PDF con las líneas de corte, plegado y las áreas donde va el diseño.
+   * Null cuando pieces=2: la plantilla automática dibuja el desarrollo de UNA
+   * pieza y para una caja en dos mitades ese troquel no existe — el
+   * desplegado lo prepara la fábrica con la orden.
+   */
+  template_pdf: string | null;
 }
 
 /**
@@ -408,8 +424,11 @@ interface QuoteBase {
     price_note: string;
     /** Lo único de la impresión que se cobra aparte. */
     polymer_note: string;
-    /** Plantilla de la primera medida. Cada caja trae la suya en boxes[].template_pdf */
-    template_pdf: string;
+    /**
+     * Plantilla de la primera medida; cada caja trae la suya en
+     * boxes[].template_pdf. Null cuando esa caja va en dos mitades.
+     */
+    template_pdf: string | null;
     how_it_works: string;
   };
 }
@@ -498,6 +517,19 @@ export function porQueNoSeFabrica(box: BoxInput): string[] {
     motivos.push(
       `el ancho de la plancha sale de sumar ancho y alto, y ahí dan ${plancha} mm ` +
         `cuando el rollo de cartón mide ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm`,
+    );
+  }
+
+  // El largo de plancha tiene su propio tope: 2.050 mm. Pasado eso la caja se
+  // hace en dos mitades (eso no es un rechazo, lo cotiza el motor con su
+  // recargo) — pero cada mitad es largo+ancho+50 y TAMBIÉN tiene que entrar
+  // en la plancha. Más de dos planchas no se pegan: ahí sí no hay caja.
+  const mitad = box.length_mm + box.width_mm + 50;
+  if (mitad > LARGO_MAXIMO_PLANCHA) {
+    motivos.push(
+      `el largo de plancha máximo es ${LARGO_MAXIMO_PLANCHA} mm y esta caja no entra ni ` +
+        `partida en dos mitades: cada mitad sería de ${mitad} mm (largo + ancho + solapa). ` +
+        `Largo más ancho no puede superar los ${LARGO_MAXIMO_PLANCHA - 50} mm`,
     );
   }
 
@@ -779,9 +811,17 @@ export function calcularCotizacion(
     const impresionIncluida = boxTotalSqm >= config.printing_included_min_m2;
     const recargoPorColor = impresionIncluida ? 0 : config.printing_surcharge_per_color;
 
-    const adjustedPricePerM2 = llevaImpresion && printingColors > 0
+    const conRecargoDeColor = llevaImpresion && printingColors > 0
       ? pricePerM2 * (1 + printingColors * recargoPorColor)
       : pricePerM2;
+
+    // Caja en dos mitades: el material extra (la segunda solapa) ya viene en
+    // los m² que calculó calculateUnfolded; esto es lo OTRO que cuesta, el
+    // pegado y su mano de obra. Regla de la fábrica (27-08-2026): 25% sobre el
+    // material de esa caja.
+    const adjustedPricePerM2 = unfolded.pieces === 2
+      ? conRecargoDeColor * (1 + RECARGO_DOS_MITADES)
+      : conRecargoDeColor;
 
     // El subtotal sale del precio por caja YA REDONDEADO, no de los m² por el
     // precio del m².
@@ -809,12 +849,26 @@ export function calcularCotizacion(
       printing_colors: llevaImpresion ? printingColors : 0,
       sheet_width_mm: unfolded.unfoldedWidth,
       sheet_length_mm: unfolded.unfoldedLength,
+      pieces: unfolded.pieces,
+      ...(unfolded.pieces === 2
+        ? {
+            pieces_note:
+              `El desarrollo de una pieza (${2 * (box.length_mm + box.width_mm) + 50} mm) supera el ` +
+              `largo máximo de plancha (${LARGO_MAXIMO_PLANCHA} mm), así que la caja se fabrica en ` +
+              `dos mitades de ${unfolded.unfoldedLength} mm que se pegan. El precio ya lo incluye ` +
+              `todo: el material de la segunda solapa y un ${Math.round(RECARGO_DOS_MITADES * 100)}% ` +
+              `por el pegado y la mano de obra.`,
+          }
+        : {}),
       sqm_per_box: unfolded.m2,
       total_sqm: boxTotalSqm,
       price_per_m2: adjustedPricePerM2,
       unit_price: precioPorCaja,
       subtotal,
-      template_pdf: urlPlantilla(box.length_mm, box.width_mm, box.height_mm),
+      template_pdf:
+        unfolded.pieces === 2
+          ? null
+          : urlPlantilla(box.length_mm, box.width_mm, box.height_mm),
     });
   }
 
@@ -882,11 +936,13 @@ export function calcularCotizacion(
       )
       .join('. ');
 
-    // La ayuda solo aplica si el ÚNICO problema es el ancho de la plancha. Si
-    // además se pasa del largo máximo, bajar el ancho no alcanza y decirlo
-    // manda a la persona a pedir dos veces lo mismo.
+    // La ayuda solo aplica si el ÚNICO problema es el ANCHO de la plancha (el
+    // rollo). El startsWith no es capricho: el motivo nuevo del largo también
+    // dice "plancha", y con un includes() la caja rechazada por largo+ancho
+    // recibía "Bajando el ancho o el alto entra; el largo no tiene ese
+    // límite" — falso dos veces para ese caso.
     const soloEsLaPlancha = noFabricables.every(
-      (x) => x.porque.length === 1 && x.porque[0].includes('plancha'),
+      (x) => x.porque.length === 1 && x.porque[0].startsWith('el ancho de la plancha'),
     );
 
     impedimento = {
@@ -1173,7 +1229,13 @@ export function calcularCotizacion(
         const recargoNuevo = m2Nuevos >= config.printing_included_min_m2
           ? 0
           : config.printing_surcharge_per_color;
-        const ajustadoNuevo = colores > 0 ? precioNuevo * (1 + colores * recargoNuevo) : precioNuevo;
+        // El recargo de dos mitades no desaparece por cruzar un umbral de
+        // volumen: es geometría. Sin este factor, la comparación era
+        // precio-viejo-con-25% contra precio-nuevo-sin-25% y el "ahorro"
+        // prometido incluía un descuento que no existe.
+        const factorMitades = boxResults[0].pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1;
+        const ajustadoNuevo =
+          (colores > 0 ? precioNuevo * (1 + colores * recargoNuevo) : precioNuevo) * factorMitades;
         const porCajaNueva = Math.round((m2Nuevos * ajustadoNuevo / cantidadNueva) * 100) / 100;
         const subtotalNuevo = Math.round(porCajaNueva * cantidadNueva * 100) / 100;
 
@@ -1182,9 +1244,10 @@ export function calcularCotizacion(
         const ahorroSinIva = Math.round(totalSubtotal - subtotalNuevo);
         const nuevoTotalConIva = Math.round(subtotalNuevo * (1 + IVA));
         const ahorroConIva = Math.round(totalSubtotal * (1 + IVA)) - nuevoTotalConIva;
+        const ajustadoNuevoRedondeado = Math.round(ajustadoNuevo * 100) / 100;
         const gana =
           `Con ${cajasExtra} cajas más llega a ${umbral.toLocaleString('es-AR')} m² y el precio ` +
-          `del pedido entero pasa de $${boxResults[0].price_per_m2} a $${precioNuevo} por m². ` +
+          `del pedido entero pasa de $${boxResults[0].price_per_m2} a $${ajustadoNuevoRedondeado} por m². ` +
           `Se lleva ${cajasExtra} cajas más y el total con IVA baja a ` +
           `$${nuevoTotalConIva.toLocaleString('es-AR')}: paga ` +
           `$${ahorroConIva.toLocaleString('es-AR')} menos con IVA ` +
@@ -1193,7 +1256,7 @@ export function calcularCotizacion(
         return {
           m2_faltantes: Math.round(faltan * 10) / 10,
           cajas_aproximadas: cajasExtra,
-          nuevo_precio_por_m2: precioNuevo,
+          nuevo_precio_por_m2: ajustadoNuevoRedondeado,
           nuevo_subtotal: subtotalNuevo,
           ahorro_sin_iva: ahorroSinIva,
           ahorro_con_iva: ahorroConIva,
@@ -1244,10 +1307,18 @@ export function calcularCotizacion(
           : `Cada color suma ${Math.round(config.printing_surcharge_per_color * 100)}% al precio por m², hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. Desde ${config.printing_included_min_m2.toLocaleString('es-AR')} m² el costo queda incluido y no se cobra recargo. ${NOTA_POLIMERO}`,
       /** Qué se cobra aparte y qué no. Es la pregunta que sigue al precio. */
       polymer_note: NOTA_POLIMERO,
-      template_pdf: urlPlantilla(b0.length_mm, b0.width_mm, b0.height_mm),
-      how_it_works: impresionDisponible
-        ? 'Descargá el PDF de la plantilla: trae la caja desplegada con las líneas de corte, las de plegado y las áreas donde puede ir el diseño. Ubicá tu arte sobre esas áreas y mandá el archivo a ventas@quilmescorrugados.com.ar o por WhatsApp, y se produce con eso. No hace falta pedir la plantilla: se genera sola con las medidas.'
-        : 'Para imprimir hay que producir a medida. Si el pedido llega al mínimo, la plantilla se descarga de template_pdf.',
+      template_pdf:
+        boxResults[0]?.pieces === 2
+          ? null
+          : urlPlantilla(b0.length_mm, b0.width_mm, b0.height_mm),
+      how_it_works:
+        boxResults[0]?.pieces === 2
+          ? 'Esta caja se fabrica en dos mitades pegadas y no tiene plantilla automática: el ' +
+            'desplegado técnico lo prepara la fábrica junto con la orden. El diseño (logo, arte) ' +
+            'se manda igual a ventas@quilmescorrugados.com.ar o por WhatsApp.'
+          : impresionDisponible
+            ? 'Descargá el PDF de la plantilla: trae la caja desplegada con las líneas de corte, las de plegado y las áreas donde puede ir el diseño. Ubicá tu arte sobre esas áreas y mandá el archivo a ventas@quilmescorrugados.com.ar o por WhatsApp, y se produce con eso. No hace falta pedir la plantilla: se genera sola con las medidas.'
+            : 'Para imprimir hay que producir a medida. Si el pedido llega al mínimo, la plantilla se descarga de template_pdf.',
     },
     total_m2: totalM2,
     tax_rate: IVA,

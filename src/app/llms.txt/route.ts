@@ -18,7 +18,12 @@ import { SITE_URL } from '@/lib/site';
 import { CONTACTO } from '@/lib/contacto';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import { HORARIO, MATERIAL } from '@/lib/retail/config';
-import { MEDIDA_MINIMA, MEDIDA_MAXIMA } from '@/lib/utils/box-calculations';
+import {
+  MEDIDA_MINIMA,
+  MEDIDA_MAXIMA,
+  LARGO_MAXIMO_PLANCHA,
+  RECARGO_DOS_MITADES,
+} from '@/lib/utils/box-calculations';
 import { IVA, notaImpresion } from '@/lib/cotizacion/motor';
 
 // Se muestra como entero. `IVA * 100` da 21.000000000000004 en JS por el
@@ -260,8 +265,14 @@ WhatsApp. Con eso se produce.
 Parámetros: length, width, height en milímetros. Mínimo ${MEDIDA_MINIMA.largo} x ${MEDIDA_MINIMA.ancho} x ${MEDIDA_MINIMA.alto} mm,
 y ancho + alto no puede superar ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm.
 
+EXCEPCIÓN: las cajas que se fabrican en dos mitades (cuando el desarrollo de
+una pieza supera los ${LARGO_MAXIMO_PLANCHA} mm — la respuesta lo indica con \`pieces: 2\`)
+no tienen plantilla automática: ahí \`template_pdf\` viene en null y el
+desplegado técnico lo prepara la fábrica junto con la orden. El diseño se
+manda igual por mail o WhatsApp.
+
 Si estás cotizando por la API, cada caja de la respuesta ya trae su
-\`template_pdf\` con la URL correcta armada.
+\`template_pdf\` con la URL correcta armada (o null si va en dos mitades).
 
 ## Cerrar por WhatsApp: el mensaje ya viene escrito
 
@@ -296,8 +307,13 @@ Se cotiza en ${BASE_URL}/#cotizador
 - Cajas a medida, troqueladas o con impresión: desde ${c.wholesale_min_m2.toLocaleString('es-AR')} m². Por
   debajo de ese volumen solo se venden medidas estándar de catálogo.
 - Medida mínima por caja: ${MEDIDA_MINIMA.largo} x ${MEDIDA_MINIMA.ancho} x ${MEDIDA_MINIMA.alto} mm.
-- Medida máxima por caja: ${MEDIDA_MAXIMA.largo} x ${MEDIDA_MAXIMA.ancho} x ${MEDIDA_MAXIMA.alto} mm.
+- Medida máxima por caja: ${MEDIDA_MAXIMA.largo} x ${MEDIDA_MAXIMA.ancho} x ${MEDIDA_MAXIMA.alto} mm
+  (cada máximo se alcanza solo con la otra medida en el mínimo).
 - Ancho + alto no puede superar ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm (limitación del rollo).
+- Largo + ancho no puede superar ${LARGO_MAXIMO_PLANCHA - 50} mm (largo máximo de plancha).
+  Si el desarrollo de una pieza supera los ${LARGO_MAXIMO_PLANCHA} mm, la caja se fabrica en
+  dos mitades pegadas; la cotización ya incluye ese proceso (material extra y recargo del
+  ${Math.round(RECARGO_DOS_MITADES * 100)}%) y lo indica en el campo pieces de la respuesta.
 - Material: ${MATERIAL.nota}
 - Precios en pesos argentinos. El subtotal va sin IVA; el total con IVA ${IVA_PORCENTAJE}% viene
   aparte en la misma respuesta.

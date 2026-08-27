@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { CheckCircle2, Package, Clock, MessageCircle, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
+import { LARGO_MAXIMO_PLANCHA } from '@/lib/utils/box-calculations';
 import { BelowMinimumModal } from '@/components/public/BelowMinimumModal';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { precioUnitarioARS, VARIACION_PRODUCCION_PCT } from '@/lib/cotizacion/motor';
@@ -217,7 +218,14 @@ export default function QuoteConfirmationPage() {
                   )}
                   <hr className="my-3" />
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Medida plancha:</span>
+                    {/* Dos mitades se deduce de las medidas: sheet_length_mm
+                        guarda el largo de CADA plancha y sin esta aclaración
+                        el cliente lee la mitad como si fuera el desarrollo. */}
+                    <span className="text-gray-500">
+                      {2 * (quote.length_mm + quote.width_mm) + 50 > LARGO_MAXIMO_PLANCHA
+                        ? 'Medida de cada plancha (2 mitades pegadas):'
+                        : 'Medida plancha:'}
+                    </span>
                     <span className="font-medium">{quote.sheet_width_mm} x {quote.sheet_length_mm} mm</span>
                   </div>
                   <div className="flex justify-between">

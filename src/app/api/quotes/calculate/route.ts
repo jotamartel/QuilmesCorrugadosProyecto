@@ -12,6 +12,7 @@ import {
   calculateMinimumQuantity,
   calculateTotalM2,
   meetsMinimum,
+  RECARGO_DOS_MITADES,
 } from '@/lib/utils/box-calculations';
 import {
   getPricePerM2,
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Calcular medidas desplegadas
-      const { unfoldedWidth, unfoldedLength, m2 } = calculateUnfolded(
+      const { unfoldedWidth, unfoldedLength, pieces, m2 } = calculateUnfolded(
         length_mm,
         width_mm,
         height_mm
@@ -124,6 +125,7 @@ export async function POST(request: NextRequest) {
         height_mm,
         unfolded_length_mm: unfoldedLength,
         unfolded_width_mm: unfoldedWidth,
+        pieces,
         m2_per_box: m2,
         quantity,
         total_m2: totalM2,
@@ -137,9 +139,18 @@ export async function POST(request: NextRequest) {
       grandTotalM2 += totalM2;
     }
 
-    // Calcular precio según volumen
+    // Calcular precio según volumen. El recargo de dos mitades va por item:
+    // esas cajas pagan su pegado además del material (que ya viene con la
+    // solapa extra en m2_per_box), igual que en el motor.
     const pricePerM2 = getPricePerM2(grandTotalM2, config);
-    const subtotal = calculateSubtotal(grandTotalM2, pricePerM2);
+    const subtotal =
+      Math.round(
+        calculatedItems.reduce(
+          (s, i) =>
+            s + i.total_m2 * pricePerM2 * (i.pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1),
+          0,
+        ) * 100,
+      ) / 100;
 
     // Calcular costo de impresión (solo polímero si es diseño nuevo)
     let printingCost = 0;

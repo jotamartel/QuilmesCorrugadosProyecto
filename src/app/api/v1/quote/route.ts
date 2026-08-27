@@ -14,8 +14,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
-import { getPricePerM2, calculateSubtotal, getProductionDays } from '@/lib/utils/pricing';
+// El cálculo vive ENTERO en el motor (calcularCotizacion): acá no se importa
+// nada de box-calculations ni de pricing a propósito, para que no vuelva a
+// crecer un cálculo paralelo en este archivo. Los límites que se publican en
+// la autodocumentación sí salen de las constantes.
+import {
+  MEDIDA_MINIMA,
+  MEDIDA_MAXIMA,
+  LARGO_MAXIMO_PLANCHA,
+} from '@/lib/utils/box-calculations';
 import { sendNotification } from '@/lib/notifications';
 import { detectLLM, getSourceType } from '@/lib/utils/ai-agents';
 import { SITE_URL } from '@/lib/site';
@@ -582,9 +589,9 @@ export async function GET(request: NextRequest) {
         note: 'Devuelve el precio real, el mismo que ve un cliente en el sitio. No requiere API key ni registro.',
       },
       parameters: {
-        length_mm: 'Largo en mm (100-2000). Alias: largo_cm, l',
-        width_mm: 'Ancho en mm (100-2000). Alias: ancho_cm, w',
-        height_mm: 'Alto en mm (50-1500). Alias: alto_cm, h',
+        length_mm: `Largo en mm (${MEDIDA_MINIMA.largo}-${MEDIDA_MAXIMA.largo}; largo+ancho no puede superar ${LARGO_MAXIMO_PLANCHA - 50}). Alias: largo_cm, l`,
+        width_mm: `Ancho en mm (${MEDIDA_MINIMA.ancho}-${MEDIDA_MAXIMA.ancho}; ancho+alto no puede superar ${RETAIL_CONFIG.MAX_SHEET_WIDTH}). Alias: ancho_cm, w`,
+        height_mm: `Alto en mm (${MEDIDA_MINIMA.alto}-${MEDIDA_MAXIMA.alto}). Alias: alto_cm, h`,
         quantity: 'Cantidad de cajas (entero ≥ 1). Alias: cantidad, qty',
         printing_colors: `Colores de impresión (0-${RETAIL_CONFIG.MAX_PRINTING_COLORS}, opcional). La impresión está incluida en el precio por m²; aparte solo se cobra el polímero`,
       },

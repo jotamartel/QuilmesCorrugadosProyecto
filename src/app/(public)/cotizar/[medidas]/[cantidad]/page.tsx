@@ -6,6 +6,7 @@ import { LandingFooter } from '@/components/public/LandingFooter';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calcularCotizacion, validarCajas } from '@/lib/cotizacion/motor';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
+import { MEDIDA_MINIMA, LARGO_MAXIMO_PLANCHA } from '@/lib/utils/box-calculations';
 import { SITE_URL } from '@/lib/site';
 import { CONTACTO } from '@/lib/contacto';
 import type { PricingConfig } from '@/lib/types/database';
@@ -247,9 +248,12 @@ export default async function CotizarPage({ params }: Props) {
             ))}
           </ul>
           <p className="text-gray-700">
-            Los límites son: largo 100 a 2000 mm, ancho 100 a 2000 mm, alto 50 a 1500 mm, y
-            ancho + alto no puede superar {RETAIL_CONFIG.MAX_SHEET_WIDTH} mm, que es el ancho
-            de la bobina de cartón. Si necesitás algo fuera de eso, escribinos por{' '}
+            Los límites son: mínimo {MEDIDA_MINIMA.largo}×{MEDIDA_MINIMA.ancho}×
+            {MEDIDA_MINIMA.alto} mm; ancho + alto no puede superar{' '}
+            {RETAIL_CONFIG.MAX_SHEET_WIDTH} mm (el ancho de la bobina de cartón) y largo +
+            ancho no puede superar {LARGO_MAXIMO_PLANCHA - 50} mm (el largo máximo de
+            plancha, incluso fabricando la caja en dos mitades). Si necesitás algo fuera de
+            eso, escribinos por{' '}
             <a
               href={CONTACTO.whatsapp}
               className="text-[#002E55] underline underline-offset-2"
@@ -461,12 +465,14 @@ export default async function CotizarPage({ params }: Props) {
           >
             Avanzar por WhatsApp
           </a>
-          <a
-            href={q.printing.template_pdf}
-            className="rounded-lg border-2 border-[#002E55] px-5 py-3 font-medium text-[#002E55] transition-colors hover:bg-[#002E55] hover:text-white"
-          >
-            Descargar la plantilla de impresión
-          </a>
+          {q.printing.template_pdf && (
+            <a
+              href={q.printing.template_pdf}
+              className="rounded-lg border-2 border-[#002E55] px-5 py-3 font-medium text-[#002E55] transition-colors hover:bg-[#002E55] hover:text-white"
+            >
+              Descargar la plantilla de impresión
+            </a>
+          )}
         </div>
 
         <section className="border-t border-gray-200 pt-6 text-sm text-gray-600">
@@ -478,6 +484,7 @@ export default async function CotizarPage({ params }: Props) {
             unidades suman {q.total_m2.toLocaleString('es-AR')} m². A ese volumen le corresponde{' '}
             {ars(b.price_per_m2)} por m². El precio por caja y el por m² son sin IVA.
           </p>
+          {b.pieces === 2 && b.pieces_note && <p className="mb-4">{b.pieces_note}</p>}
           <p>
             Podés{' '}
             <Link href="/precios" className="text-[#002E55] underline underline-offset-2">

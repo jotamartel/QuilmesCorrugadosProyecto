@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateBoxTemplate } from '@/lib/box-template-generator';
 import { porQueNoSeFabrica } from '@/lib/cotizacion/motor';
+import { LARGO_MAXIMO_PLANCHA } from '@/lib/utils/box-calculations';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -26,6 +27,24 @@ export async function GET(request: NextRequest) {
   if (noSeFabrica.length > 0) {
     return NextResponse.json(
       { error: `Esa caja no se puede fabricar: ${noSeFabrica.join('; y ')}.` },
+      { status: 400 }
+    );
+  }
+
+  // El generador dibuja el desarrollo de UNA pieza. Una caja fabricable en
+  // dos mitades pasa el chequeo de arriba, pero su plancha de una pieza no
+  // existe: el PDF saldría con una plancha más larga que el rollo y sin la
+  // segunda solapa, y ese dibujo va derecho al diseñador.
+  if (2 * (length + width) + 50 > LARGO_MAXIMO_PLANCHA) {
+    return NextResponse.json(
+      {
+        error:
+          `La caja de ${length}x${width}x${height} mm se fabrica en dos mitades pegadas ` +
+          `(su desarrollo supera el largo máximo de plancha de ${LARGO_MAXIMO_PLANCHA} mm), ` +
+          'así que no tiene plantilla automática: el desplegado técnico lo prepara la ' +
+          'fábrica junto con la orden.',
+        fabricacion: 'dos_mitades',
+      },
       { status: 400 }
     );
   }

@@ -266,20 +266,20 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
                 <tr className="border-b">
                   <td className="py-2 font-mono text-gray-900">length_mm</td>
                   <td className="py-2 text-gray-600">integer</td>
-                  <td className="py-2 text-gray-600">100-2000</td>
-                  <td className="py-2 text-gray-600">Largo de la caja en mm</td>
+                  <td className="py-2 text-gray-600">200-1800</td>
+                  <td className="py-2 text-gray-600">Largo de la caja en mm. Largo + ancho no puede superar 2000 mm</td>
                 </tr>
                 <tr className="border-b">
                   <td className="py-2 font-mono text-gray-900">width_mm</td>
                   <td className="py-2 text-gray-600">integer</td>
-                  <td className="py-2 text-gray-600">100-2000</td>
-                  <td className="py-2 text-gray-600">Ancho de la caja en mm</td>
+                  <td className="py-2 text-gray-600">200-1100</td>
+                  <td className="py-2 text-gray-600">Ancho de la caja en mm. Largo + ancho ≤ 2000 y ancho + alto ≤ 1200</td>
                 </tr>
                 <tr className="border-b">
                   <td className="py-2 font-mono text-gray-900">height_mm</td>
                   <td className="py-2 text-gray-600">integer</td>
-                  <td className="py-2 text-gray-600">50-1500</td>
-                  <td className="py-2 text-gray-600">Alto de la caja en mm</td>
+                  <td className="py-2 text-gray-600">100-1000</td>
+                  <td className="py-2 text-gray-600">Alto de la caja en mm. Ancho + alto no puede superar 1200 mm</td>
                 </tr>
                 <tr className="border-b">
                   <td className="py-2 font-mono text-gray-900">quantity</td>
@@ -361,6 +361,13 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
               </li>
               <li>
                 <strong className="text-gray-900">valid_until</strong>: Fecha hasta la cual el precio cotizado es válido.
+              </li>
+              <li>
+                <strong className="text-gray-900">boxes[].pieces</strong>: 1 si la caja sale de una plancha; 2 si
+                se fabrica en dos mitades pegadas (el desarrollo supera el largo máximo de plancha de 2050 mm).
+                Con <code className="bg-gray-100 px-1 rounded">pieces=2</code> el precio ya incluye el material de
+                la segunda solapa y un 25% por el pegado, <code className="bg-gray-100 px-1 rounded">pieces_note</code>{' '}
+                lo explica en castellano, y no hay plantilla PDF automática (el desplegado lo prepara la fábrica).
               </li>
             </ul>
           </div>

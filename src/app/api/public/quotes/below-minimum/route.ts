@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
+import { calculateUnfolded, calculateTotalM2, RECARGO_DOS_MITADES } from '@/lib/utils/box-calculations';
 import { sendNotification } from '@/lib/notifications';
 import type { PricingConfig } from '@/lib/types/database';
 
@@ -106,8 +106,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calcular precio con recargo
-    const subtotal = totalSqm * pricePerM2BelowMinimum;
+    // Calcular precio con recargo (el de bajo mínimo, y el de dos mitades si
+    // la caja no entra en una plancha — el m² ya trae la solapa extra).
+    const factorMitades = unfolded.pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1;
+    const subtotal = totalSqm * pricePerM2BelowMinimum * factorMitades;
     const unitPrice = subtotal / body.requested_quantity;
 
     // Crear o actualizar la cotización como pedido menor al mínimo

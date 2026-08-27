@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { DATA_START_DATE } from '@/lib/utils/constants';
-import { calculateUnfolded, calculateTotalM2 } from '@/lib/utils/box-calculations';
+import { calculateUnfolded, calculateTotalM2, RECARGO_DOS_MITADES } from '@/lib/utils/box-calculations';
 import { getPricePerM2, calculateSubtotal, calculateTotal, getProductionDays, getActivePricingConfig } from '@/lib/utils/pricing';
 import { calculateDeliveryDate, toISODateString } from '@/lib/utils/dates';
 import { porQueNoSeFabrica, IVA } from '@/lib/cotizacion/motor';
@@ -150,7 +150,12 @@ export async function POST(request: NextRequest) {
 
     const itemsConGeometria = body.items.map((item) => {
       const u = calculateUnfolded(item.length_mm, item.width_mm, item.height_mm);
-      return { ...item, m2_per_box: u.m2, total_m2: calculateTotalM2(u.m2, item.quantity) };
+      return {
+        ...item,
+        m2_per_box: u.m2,
+        pieces: u.pieces,
+        total_m2: calculateTotalM2(u.m2, item.quantity),
+      };
     });
     const totalM2 = Math.round(itemsConGeometria.reduce((s, i) => s + i.total_m2, 0) * 10000) / 10000;
 
@@ -181,7 +186,17 @@ export async function POST(request: NextRequest) {
         );
       }
       const pricePerM2 = getPricePerM2(totalM2, config);
-      subtotal = calculateSubtotal(totalM2, pricePerM2);
+      // Recargo de dos mitades por item, como en el motor: sin esto una orden
+      // a precio "motor" con una caja grande salía 25% abajo de lo que el
+      // propio motor cotiza para el mismo pedido.
+      subtotal =
+        Math.round(
+          itemsConGeometria.reduce(
+            (s, i) =>
+              s + i.total_m2 * pricePerM2 * (i.pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1),
+            0,
+          ) * 100,
+        ) / 100;
       printingCost = 0; // el polímero se carga aparte cuando se cotiza
       dieCutCost = 0;
       shippingCost = 0;

@@ -1,5 +1,5 @@
 import { RETAIL_CONFIG, type RetailConfig } from './config';
-import { calculateUnfolded } from '@/lib/utils/box-calculations';
+import { calculateUnfolded, RECARGO_DOS_MITADES } from '@/lib/utils/box-calculations';
 
 export interface PrecioResult {
   precioUnitario: number;
@@ -8,6 +8,8 @@ export interface PrecioResult {
   m2PerBox: number;
   totalM2: number;
   isMayorista: boolean;
+  /** 2 = caja en dos mitades pegadas; el precio ya trae el recargo. */
+  pieces: 1 | 2;
 }
 
 /**
@@ -35,16 +37,20 @@ export function calcularPrecioMinorista(
 ): PrecioResult {
 
   const volumen = largo * ancho * alto; // mm³
-  const { m2: m2PerBox } = calculateUnfolded(largo, ancho, alto);
+  const { m2: m2PerBox, pieces } = calculateUnfolded(largo, ancho, alto);
   const totalM2 = m2PerBox * cantidad;
 
   // Supera el tope del canal de stock: hay que derivar al mayorista.
   const isMayorista = totalM2 >= config.WHOLESALE_THRESHOLD_M2;
 
-  const precioUnitario = Math.round(m2PerBox * config.RETAIL_PRICE_PER_M2);
+  // El m2PerBox ya trae la solapa extra cuando la caja va en dos mitades;
+  // esto cobra lo otro, el pegado — misma regla que el motor mayorista, para
+  // que la misma medida no salga 25% más barata por este canal.
+  const factorMitades = pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1;
+  const precioUnitario = Math.round(m2PerBox * config.RETAIL_PRICE_PER_M2 * factorMitades);
   const subtotal = precioUnitario * cantidad;
 
-  return { precioUnitario, subtotal, volumen, m2PerBox, totalM2, isMayorista };
+  return { precioUnitario, subtotal, volumen, m2PerBox, totalM2, isMayorista, pieces };
 }
 
 export function formatPrecio(valor: number): string {

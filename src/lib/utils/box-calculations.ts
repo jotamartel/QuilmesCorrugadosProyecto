@@ -3,9 +3,32 @@
  * Quilmes Corrugados
  */
 
+/**
+ * El largo máximo de una plancha de cartón: 2.050 mm.
+ *
+ * Una caja cuyo desarrollo de una pieza (2·(L+A)+50) se pasa de esto no se
+ * rechaza: se fabrica en DOS MITADES que se pegan. Cada mitad lleva su propia
+ * solapa de pegado de 50 mm —por eso el material suma 100 mm en vez de 50— y
+ * el pegado extra tiene mano de obra: el precio de esas cajas lleva el
+ * recargo de RECARGO_DOS_MITADES. Regla confirmada por la fábrica el
+ * 27-08-2026, con ejemplo: 600x400x400 da 2.050 justo y va de una pieza;
+ * 600x500x500 da 2.250, va en dos mitades de 1.150 mm.
+ *
+ * Como máximo se unen DOS planchas: cada mitad (L+A+50) también tiene que
+ * entrar en los 2.050 mm, o sea largo+ancho ≤ 2.000. No hay caja de tres
+ * planchas.
+ */
+export const LARGO_MAXIMO_PLANCHA = 2050;
+
+/** Recargo sobre el precio del material de una caja en dos mitades (pegado + mano de obra). */
+export const RECARGO_DOS_MITADES = 0.25;
+
 export interface UnfoldedDimensions {
   unfoldedWidth: number;  // mm
+  /** Largo de CADA plancha: el desarrollo completo si va de una pieza, la mitad si va en dos. */
   unfoldedLength: number; // mm
+  /** 1 = una plancha; 2 = dos mitades pegadas (el precio lleva RECARGO_DOS_MITADES). */
+  pieces: 1 | 2;
   m2: number;
 }
 
@@ -45,15 +68,23 @@ export function calculateUnfolded(
   const unfoldedWidth = height + width;
 
   // Largo de plancha = 2 Largos + 2 Anchos + 50mm (chapetón y refile)
-  const unfoldedLength = (2 * length) + (2 * width) + 50;
+  const unaPieza = (2 * length) + (2 * width) + 50;
 
-  // m² por caja = (ancho × largo) / 1.000.000
-  const m2Raw = (unfoldedWidth * unfoldedLength) / 1_000_000;
+  // Si el desarrollo de una pieza no entra en el largo máximo de plancha, la
+  // caja se hace en dos mitades: cada una es medio perímetro con SU solapa de
+  // 50 (L+A+50). El material total pasa de 2(L+A)+50 a 2(L+A)+100 — la
+  // solapa extra es real y se cobra; el 25% del pegado lo aplica el motor.
+  const pieces: 1 | 2 = unaPieza <= LARGO_MAXIMO_PLANCHA ? 1 : 2;
+  const unfoldedLength = pieces === 1 ? unaPieza : length + width + 50;
+
+  // m² por caja = material de TODAS las planchas / 1.000.000
+  const m2Raw = (pieces * unfoldedWidth * unfoldedLength) / 1_000_000;
   const m2 = Math.round(m2Raw * 10000) / 10000; // 4 decimales
 
   return {
     unfoldedWidth,
     unfoldedLength,
+    pieces,
     m2,
   };
 }
@@ -93,8 +124,17 @@ export const MEDIDA_MINIMA = { largo: 200, ancho: 200, alto: 100 } as const;
  * que el motor de cotización no la conocía: una caja de 2500x900x400 la
  * rechazaba la API pública —que sí valida— pero salía cotizada por la
  * herramienta del agente, que no.
+ *
+ * Los topes por eje SALEN de los límites de plancha, no son caprichos:
+ * - largo: 1800 = 2000 (largo+ancho máx en dos mitades) − 200 (ancho mínimo)
+ * - ancho: 1100 = 1200 (rollo, ancho+alto) − 100 (alto mínimo)
+ * - alto:  1000 = 1200 (rollo) − 200 (ancho mínimo)
+ * Son techos ALCANZABLES solo con la otra medida en el mínimo: la regla real
+ * es combinada (largo+ancho ≤ 2000 y ancho+alto ≤ 1200) y vive en
+ * porQueNoSeFabrica() del motor. Los valores viejos (2000x2000x1500) eran
+ * imposibles hasta de a pares y hacían prometer cajas infabricables.
  */
-export const MEDIDA_MAXIMA = { largo: 2000, ancho: 2000, alto: 1500 } as const;
+export const MEDIDA_MAXIMA = { largo: 1800, ancho: 1100, alto: 1000 } as const;
 
 export function excedeMedidaMaxima(length: number, width: number, height: number): boolean {
   return (

@@ -211,16 +211,20 @@ export const MINIMOS = {
  * unicamente": afirmar exclusividad sobre algo que esta por dejar de ser
  * exclusivo es fabricar una contradiccion con fecha.
  */
+// El gramaje decía "100 libras" pero el estándar que cotiza la web es de 90:
+// lo confirmó Julián el 26-08-2026, después de que Florencia se lo dijera a un
+// cliente por WhatsApp y los dos números quedaran conviviendo.
 export const MATERIAL = {
-  gramaje: '100 libras',
+  gramaje: '90 libras',
   /** Frase completa, para una lista de condiciones. */
-  descripcion: 'Cartón corrugado kraft de 100 libras.',
+  descripcion: 'Cartón corrugado kraft de 90 libras, onda simple.',
   /** Solo el papel, para meter en una oración que ya dijo "cartón corrugado". */
-  detalle: 'kraft de 100 libras',
+  detalle: 'kraft de 90 libras, onda simple',
   /** Deja la puerta abierta sin prometer nada que hoy no exista. */
   nota:
-    'Hoy trabajamos cartón kraft de 100 libras. Si necesitás otro gramaje, ' +
-    'consultanos y lo vemos.',
+    'El estándar que cotiza la web es cartón kraft de 90 libras, onda simple. ' +
+    'También trabajamos materiales reforzados (onda triple y otras calidades), ' +
+    'que se cotizan aparte: consultanos y lo vemos.',
 } as const;
 
 /**

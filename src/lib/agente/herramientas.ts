@@ -345,7 +345,25 @@ export function crearHerramientas(ctx: ContextoAgente) {
       // contra ningun umbral: lee "que_hacer" y lo hace. Cual de los tres es
       // lo decide el motor, que es el unico que conoce los m² del pedido.
       impresion:
-        caja.printing_colors > 0
+        // PIDIO impresion y el volumen no la habilita: el motor cotizo la caja
+        // LISA (por eso caja.printing_colors llega en 0). Es la unica rama en
+        // la que callarse hace danio: la persona pidio un precio con impresion
+        // y el numero de arriba es de la caja sin imprimir.
+        colores_impresion > 0 && !q.printing.available
+          ? {
+              lleva: false,
+              pidio_impresion: true,
+              se_puede: false,
+              por_que: q.printing.price_note,
+              que_hacer:
+                'La persona PIDIÓ impresión y este pedido no llega al volumen desde el que ' +
+                'se imprime, así que el precio de arriba es el de la caja LISA, sin imprimir. ' +
+                'Decíselo explícitamente en el mismo mensaje del precio, con el motivo de ' +
+                'por_que: si no lo aclarás va a creer que ese precio incluye la impresión ' +
+                'que pidió. por_que ya dice cuántas cajas hacen falta para poder imprimir: ' +
+                'si le sirve esa cantidad, recotizá con ella.',
+            }
+          : caja.printing_colors > 0
           ? {
               lleva: true,
               como_se_cobra: q.printing.price_note,

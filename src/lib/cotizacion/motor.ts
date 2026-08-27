@@ -93,6 +93,11 @@ export interface BoxResult {
   width_mm: number;
   height_mm: number;
   quantity: number;
+  /**
+   * Lo COTIZADO, no lo pedido: si pidió impresión y el pedido no llega al
+   * volumen que la habilita, acá viene false/0 —la cotización es de caja
+   * lisa— y `printing.price_note` explica por qué.
+   */
   has_printing: boolean;
   printing_colors: number;
   sheet_width_mm: number;
@@ -718,17 +723,47 @@ export function calcularCotizacion(
   medidasEnStock: Array<{ length_mm: number; width_mm: number; height_mm: number; stock: number }> = [],
 ): QuoteResult {
   const boxResults: BoxResultConPrecio[] = [];
-  let totalM2 = 0;
   let totalSubtotal = 0;
   let maxEstimatedDays = 0;
 
-  for (const box of boxes) {
-    const printingColors = box.printing_colors || 0;
-    const boxHasPrinting = box.has_printing || printingColors > 0;
-
+  // Los desarrollos se miden ANTES de ponerle precio a nada: la impresión se
+  // habilita por los m² del pedido ENTERO, así que hasta no sumar todas las
+  // cajas no se sabe cómo cotizar cada una.
+  const desarrollos = boxes.map((box) => {
     const unfolded = calculateUnfolded(box.length_mm, box.width_mm, box.height_mm);
-    const boxTotalSqm = calculateTotalM2(unfolded.m2, box.quantity);
-    totalM2 += boxTotalSqm;
+    return { box, unfolded, boxTotalSqm: calculateTotalM2(unfolded.m2, box.quantity) };
+  });
+  const totalM2 =
+    Math.round(desarrollos.reduce((suma, d) => suma + d.boxTotalSqm, 0) * 100) / 100;
+
+  // La impresion pide UNA sola cosa: llegar al volumen.
+  //
+  // Estuvo mal implementada. Habia una segunda condicion —que la medida no
+  // estuviera en el catalogo— que salio de leer "no se puede imprimir cajas
+  // estandar" como "ninguna medida del catalogo se imprime nunca". No es eso.
+  //
+  // Lo que no se imprime es lo que sale DE STOCK: una caja ya fabricada que
+  // esta en el deposito, que es lo que se vende por debajo de este umbral. Una
+  // medida del catalogo pedida por 3.000 m² no sale del deposito: se produce
+  // una tirada para ese pedido, y esa tirada se puede imprimir como cualquier
+  // otra. Con la condicion vieja, 2.000 cajas de 600x400x400 impresas —un
+  // pedido perfectamente normal— salian rechazadas.
+  const impresionDisponible = totalM2 >= config.printing_min_m2;
+
+  // Pedir impresion por debajo de ese volumen NO cambia la cotizacion: se
+  // cotiza la caja lisa, que es lo que la fabrica vende de verdad en ese
+  // rango, y printing.price_note explica por que salio sin imprimir. Antes el
+  // pedido salia con los dias de produccion de impresion —y con el recargo por
+  // color, cuando lo habia— para una impresion que no se iba a hacer nunca.
+  const impresionPedida = boxes.some((b) => b.has_printing || (b.printing_colors || 0) > 0);
+  const cotizadaSinImpresion = impresionPedida && !impresionDisponible;
+
+  for (const { box, unfolded, boxTotalSqm } of desarrollos) {
+    const printingColors = box.printing_colors || 0;
+    // Lo que pidio, filtrado por lo que el volumen permite: por debajo del
+    // minimo de impresion la caja se cotiza y se describe LISA.
+    const llevaImpresion =
+      (box.has_printing || printingColors > 0) && impresionDisponible;
 
     const pricePerM2 = getPricePerM2(boxTotalSqm, config);
 
@@ -744,7 +779,7 @@ export function calcularCotizacion(
     const impresionIncluida = boxTotalSqm >= config.printing_included_min_m2;
     const recargoPorColor = impresionIncluida ? 0 : config.printing_surcharge_per_color;
 
-    const adjustedPricePerM2 = boxHasPrinting && printingColors > 0
+    const adjustedPricePerM2 = llevaImpresion && printingColors > 0
       ? pricePerM2 * (1 + printingColors * recargoPorColor)
       : pricePerM2;
 
@@ -762,7 +797,7 @@ export function calcularCotizacion(
     const subtotal = Math.round(precioPorCaja * box.quantity * 100) / 100;
     totalSubtotal += subtotal;
 
-    const estimatedDays = getProductionDays(boxHasPrinting, config);
+    const estimatedDays = getProductionDays(llevaImpresion, config);
     if (estimatedDays > maxEstimatedDays) maxEstimatedDays = estimatedDays;
 
     boxResults.push({
@@ -770,8 +805,8 @@ export function calcularCotizacion(
       width_mm: box.width_mm,
       height_mm: box.height_mm,
       quantity: box.quantity,
-      has_printing: boxHasPrinting,
-      printing_colors: printingColors,
+      has_printing: llevaImpresion,
+      printing_colors: llevaImpresion ? printingColors : 0,
       sheet_width_mm: unfolded.unfoldedWidth,
       sheet_length_mm: unfolded.unfoldedLength,
       sqm_per_box: unfolded.m2,
@@ -783,7 +818,6 @@ export function calcularCotizacion(
     });
   }
 
-  totalM2 = Math.round(totalM2 * 100) / 100;
   totalSubtotal = Math.round(totalSubtotal * 100) / 100;
 
   // ¿Se puede tomar este pedido?
@@ -1032,21 +1066,14 @@ export function calcularCotizacion(
       : sePuedeComprarOnline
         ? `Se vende de stock, entrega inmediata, se compra online en ${SITIO}/cajas.`
         : `${motivoNoOnline ?? 'Se coordina directamente.'}`) +
+    // Un asistente que lee solo el summary tiene que enterarse igual: un
+    // precio al lado de un pedido CON impresion, sin esta frase, se lee como
+    // el precio de la caja impresa.
+    (cotizadaSinImpresion
+      ? ` Va cotizado sin imprimir: la impresión se hace desde ` +
+        `${config.printing_min_m2.toLocaleString('es-AR')} m² y este pedido no llega.`
+      : '') +
     ` Fábrica en ${CONTACTO.direccion}. WhatsApp ${CONTACTO.telefonoVisible}.`;
-
-  // La impresion pide UNA sola cosa: llegar al volumen.
-  //
-  // Estuvo mal implementada. Habia una segunda condicion —que la medida no
-  // estuviera en el catalogo— que salio de leer "no se puede imprimir cajas
-  // estandar" como "ninguna medida del catalogo se imprime nunca". No es eso.
-  //
-  // Lo que no se imprime es lo que sale DE STOCK: una caja ya fabricada que
-  // esta en el deposito, que es lo que se vende por debajo de este umbral. Una
-  // medida del catalogo pedida por 3.000 m² no sale del deposito: se produce
-  // una tirada para ese pedido, y esa tirada se puede imprimir como cualquier
-  // otra. Con la condicion vieja, 2.000 cajas de 600x400x400 impresas —un
-  // pedido perfectamente normal— salian rechazadas.
-  const impresionDisponible = totalM2 >= config.printing_min_m2;
 
   // A partir de aca ya estan los dos impedimentos calculados, asi que recien
   // ahora se puede decidir si este pedido tiene precio.
@@ -1098,6 +1125,10 @@ export function calcularCotizacion(
     (esDeStock ? `Corresponde al canal de stock.\n` : `Produccion a medida, ${maxEstimatedDays} dias habiles.\n`) +
     `\n¿Me confirman disponibilidad y como seguimos?`;
 
+  // Cuantas cajas de esta medida habilitan la impresion, ya calculado para
+  // decirlo con el numero puesto cuando pidio imprimir y el volumen no llega.
+  const cajasParaImprimir = cajasPara(config.printing_min_m2);
+
   // La parte que no depende de si hay precio. Las dos ramas de abajo la
   // comparten y solo difieren en la plata, que es todo el punto de la union.
   const base = {
@@ -1133,7 +1164,12 @@ export function calcularCotizacion(
         const cantidadNueva = b0i.quantity + cajasExtra;
         const m2Nuevos = calculateTotalM2(m2PorCaja, cantidadNueva);
         const precioNuevo = getPricePerM2(m2Nuevos, config);
-        const colores = boxResults[0].printing_colors;
+        // Los colores PEDIDOS, no los cotizados: si el pedido de hoy salio
+        // liso por falta de volumen, cruzar el umbral habilita la impresion y
+        // el precio nuevo tiene que ser el impreso, que es lo que esa persona
+        // pagaria de verdad.
+        const coloresPedidos = boxes[0].printing_colors || 0;
+        const colores = m2Nuevos >= config.printing_min_m2 ? coloresPedidos : 0;
         const recargoNuevo = m2Nuevos >= config.printing_included_min_m2
           ? 0
           : config.printing_surcharge_per_color;
@@ -1192,7 +1228,17 @@ export function calcularCotizacion(
        * sorpresa aparece recién en la factura.
        */
       price_note: !impresionDisponible
-        ? `La impresión se hace desde ${config.printing_min_m2.toLocaleString('es-AR')} m². Este pedido son ${totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m² y no llega a ese volumen: por debajo se vende de stock, que va sin imprimir.`
+        ? `La impresión se hace desde ${config.printing_min_m2.toLocaleString('es-AR')} m². Este pedido son ${totalM2.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m² y no llega a ese volumen: por debajo se vende de stock, que va sin imprimir.` +
+          // Si ademas pidio impresion y el pedido tiene precio, ese precio es
+          // el de la caja lisa y se dice aca, que es donde quien consume busca
+          // que paso con la impresion. Con cuantas cajas se llega va calculado:
+          // un asistente que tiene que deducirlo alguna vez lo deduce mal.
+          (cotizable && cotizadaSinImpresion
+            ? ` Por eso esta cotización va sin impresión: el precio es el de la caja lisa.` +
+              (cajasParaImprimir
+                ? ` Para imprimir esta medida hacen falta ${cajasParaImprimir.toLocaleString('es-AR')} cajas.`
+                : '')
+            : '')
         : impresionIncluidaEnElPedido
           ? `Desde ${config.printing_included_min_m2.toLocaleString('es-AR')} m² el costo de impresión ya está incluido en el precio por m², hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. ${NOTA_POLIMERO}`
           : `Cada color suma ${Math.round(config.printing_surcharge_per_color * 100)}% al precio por m², hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. Desde ${config.printing_included_min_m2.toLocaleString('es-AR')} m² el costo queda incluido y no se cobra recargo. ${NOTA_POLIMERO}`,

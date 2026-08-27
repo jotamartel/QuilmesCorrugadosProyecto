@@ -241,7 +241,7 @@
           {
             "name": "printing_colors",
             "in": "query",
-            "description": "Colores de impresión, hasta 3. No suma al precio por m²: la impresión está incluida y aparte solo se cobra el polímero.",
+            "description": "Colores de impresión, hasta 3. No suma al precio por m²: la impresión está incluida y aparte solo se cobra el polímero. Si el pedido no llega al volumen mínimo de impresión, se cotiza igual pero sin imprimir, y quote.printing.price_note lo explica.",
             "schema": { "type": "integer", "minimum": 0, "maximum": 3, "default": 0 }
           }
         ],
@@ -322,7 +322,7 @@
             "minimum": 0,
             "maximum": 3,
             "default": 0,
-            "description": "Cantidad de colores de impresión (0-3). La impresión está incluida en el precio por m²; aparte solo se cobra el polímero"
+            "description": "Cantidad de colores de impresión (0-3). La impresión está incluida en el precio por m²; aparte solo se cobra el polímero. Si el pedido no llega al volumen mínimo de impresión, se cotiza igual pero sin imprimir, y quote.printing.price_note lo explica"
           }
         }
       },

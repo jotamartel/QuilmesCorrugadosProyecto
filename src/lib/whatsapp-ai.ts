@@ -532,7 +532,13 @@ async function tryQuoteFromConversation(
     ? ` (${Math.round(parsed.length / 10)}x${Math.round(parsed.width / 10)}x${Math.round(parsed.height / 10)} cm → mm)`
     : '';
 
-  const quoteText = `Cotización para ${parsed.quantity.toLocaleString('es-AR')} cajas ${parsed.length}x${parsed.width}x${parsed.height} mm${dimNote}${hasPrinting ? ' con impresión' : ''}:
+  // Lo COTIZADO, no lo pedido: si pidio impresion y el pedido no llega al
+  // volumen que la habilita, el motor cotiza la caja lisa. Etiquetar ese
+  // precio "con impresión" —o mandar el desplegado para un arte que no se va
+  // a imprimir— es prometer lo que el precio no incluye.
+  const impresionCotizada = cotizacion.boxes[0].printing_colors > 0;
+
+  const quoteText = `Cotización para ${parsed.quantity.toLocaleString('es-AR')} cajas ${parsed.length}x${parsed.width}x${parsed.height} mm${dimNote}${impresionCotizada ? ' con impresión' : ''}:
 
 • Precio por caja: ${precioUnitarioARS(cotizacion.boxes[0].unit_price)} + IVA
 • Subtotal: ${ars(cotizacion.subtotal)} + IVA
@@ -540,12 +546,12 @@ async function tryQuoteFromConversation(
 • Superficie total: ${m2Formatted} m²
 • Entrega estimada: ~${cotizacion.estimated_days} días hábiles
 
-${cotizacion.channel_note}
+${cotizacion.channel_note}${hasPrinting && !impresionCotizada ? `\n\n${cotizacion.printing.price_note}` : ''}
 
 Podés verla y compartirla acá: ${SITE_URL}/cotizar/${parsed.length}x${parsed.width}x${parsed.height}/${parsed.quantity}`;
 
   // Con impresión: ofrecer el desplegado PDF inmediatamente para que carguen el diseño
-  if (hasPrinting) {
+  if (impresionCotizada) {
     return {
       response: `${quoteText}
 
@@ -560,7 +566,11 @@ Acá te envío el desplegado de la caja para que puedas incorporar tu diseño. L
     };
   }
 
-  return `${quoteText} ¿Querés agregar impresión, cambiar cantidad o que te contacte un asesor?`;
+  // Si pidio impresion y salio lisa, ofrecerle "agregar impresión" es dar la
+  // vuelta entera: la nota de arriba ya dijo cuantas cajas hacen falta.
+  return hasPrinting && !impresionCotizada
+    ? `${quoteText} ¿Querés cambiar cantidad o que te contacte un asesor?`
+    : `${quoteText} ¿Querés agregar impresión, cambiar cantidad o que te contacte un asesor?`;
 }
 
 /** Inferir segmento desde path para personalizar respuestas (campaña SEM) */

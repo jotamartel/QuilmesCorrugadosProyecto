@@ -48,21 +48,24 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 /**
  * Etiqueta del canal de una orden, para el badge del panel.
  *
- * Fernando pidio "diferenciar manual de web": DOS categorias. Por eso
- * {manual, whatsapp, email} se agrupan como 'Manual' — todos entraron por una
- * persona — y 'Web' va solo. El dato granular sigue en la columna: si algun
- * dia hace falta abrirlo en cuatro, se cambia aca y en ningun otro lado.
+ * Fernando pidio "diferenciar manual de web" (dos categorias) y por eso
+ * {manual, whatsapp, email} se agrupaban como 'Manual'. Tenia sentido
+ * mientras 'whatsapp' era una orden que igual habia cargado una persona.
+ * Desde ago-2026 el canal real del lead viaja hasta la orden y Julian pidio
+ * medir cuanto vende el bot: WhatsApp tiene badge propio. Email sigue
+ * agrupado en 'Manual' — entra por una persona, como entonces. El dato
+ * granular sigue en la columna: abrirlo mas es cambiar solo este mapa.
  */
 export const CHANNEL_BADGE_LABELS: Record<Channel, string> = {
   manual: 'Manual',
-  whatsapp: 'Manual',
+  whatsapp: 'WhatsApp',
   email: 'Manual',
   web: 'Web',
 };
 
 export const CHANNEL_BADGE_COLORS: Record<Channel, string> = {
   manual: 'bg-amber-100 text-amber-800',
-  whatsapp: 'bg-amber-100 text-amber-800',
+  whatsapp: 'bg-green-100 text-green-800',
   email: 'bg-amber-100 text-amber-800',
   web: 'bg-sky-100 text-sky-800',
 };

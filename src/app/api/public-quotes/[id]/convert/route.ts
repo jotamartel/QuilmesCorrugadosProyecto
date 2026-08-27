@@ -146,7 +146,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           quote_number: quoteNumber,
           client_id: clientId,
           status: 'draft',
-          channel: 'web',
+          // El canal hereda el origen REAL del lead. Antes quedaba 'web'
+          // hardcodeado, y como /api/quotes/[id]/convert copia quote.channel a
+          // la orden, toda orden nacida de un chat de WhatsApp figuraba como
+          // "web" en los reportes: imposible responder cuántas órdenes trajo
+          // el bot. El cliente ya heredaba bien (clientSource, más arriba);
+          // la cotización era la que mentía.
+          channel: publicQuote.source === 'whatsapp' ? 'whatsapp' : 'web',
           total_m2: publicQuote.total_sqm,
           price_per_m2: publicQuote.price_per_m2,
           subtotal: publicQuote.subtotal,

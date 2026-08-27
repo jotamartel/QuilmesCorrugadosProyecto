@@ -8,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateDeliveryDate, toISODateString } from '@/lib/utils/dates';
 import { repartirElPago, baseDeLaSena } from '@/lib/pagos/esquemas';
 import { IVA } from '@/lib/cotizacion/motor';
+import { reportarVentaAMeta } from '@/lib/marketing/conversiones';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -158,6 +159,43 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (updateError) {
       console.error('Error updating quote:', updateError);
+    }
+
+    // Cerrar el loop publicitario. Si esta cotización nació de un lead del
+    // cotizador o del bot (public_quotes), ESTE es el momento de la venta:
+    // la orden existe, con su monto real. El único otro disparo de
+    // reportarVentaAMeta vive en el PATCH de public_quotes, que el circuito
+    // B2B no usa — por eso las ventas que cerraban por acá nunca volvían
+    // como señal a las plataformas. El event_id se arma con el id del lead,
+    // así Meta deduplica si algún día los dos caminos disparan por el mismo
+    // pedido. Es telemetría: nunca puede voltear la conversión.
+    try {
+      const { data: leadOrigen } = await supabase
+        .from('public_quotes')
+        .select('id, quote_number, requester_email, requester_phone, gclid, fbclid, created_at')
+        .eq('converted_to_quote_id', id)
+        .maybeSingle();
+
+      if (leadOrigen) {
+        const resultado = await reportarVentaAMeta({
+          quoteId: leadOrigen.id,
+          quoteNumber: leadOrigen.quote_number,
+          monto: Number(quote.total),
+          email: leadOrigen.requester_email,
+          telefono: leadOrigen.requester_phone,
+          gclid: leadOrigen.gclid ?? null,
+          fbclid: leadOrigen.fbclid ?? null,
+          cotizadoEn: leadOrigen.created_at,
+          cerradoEn: new Date().toISOString(),
+        });
+        console.log(
+          '[Convert] venta reportada a Meta (lead %s): %s',
+          leadOrigen.quote_number,
+          resultado.detalle,
+        );
+      }
+    } catch (e) {
+      console.error('[Convert] no se pudo reportar la venta a Meta:', e);
     }
 
     // Registrar comunicación

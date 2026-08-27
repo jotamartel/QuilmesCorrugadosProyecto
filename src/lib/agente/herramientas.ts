@@ -48,11 +48,13 @@ export interface ContextoAgente {
   /** E.164 sin el prefijo whatsapp:, cuando el canal lo trae. */
   telefono?: string;
   /**
-   * Si esta conversación ya dejó un mail o un teléfono.
+   * Si ya sabemos quién es esta persona, en el sentido del canal: en la web,
+   * que dejó un mail o un teléfono; por WhatsApp, que conocemos su NOMBRE
+   * (el número viene solo, pero el nombre hay que pedirlo).
    *
-   * Solo aplica al chat del sitio: por WhatsApp el número viene solo. Lo
-   * resuelve el endpoint mirando la conversación guardada, y con eso las
-   * herramientas deciden si corresponde pedirlo — el modelo no tiene que
+   * Lo resuelve el endpoint —mirando la conversación guardada en la web, el
+   * contact_profile del teléfono en WhatsApp— y con eso las herramientas
+   * deciden si corresponde pedir el dato que falta. El modelo no tiene que
    * acordarse de si ya lo pidió tres mensajes atrás, que es justo lo que
    * termina en pedirlo dos veces o no pedirlo nunca.
    */
@@ -85,30 +87,43 @@ async function leerCatalogoDeStock() {
  */
 export function crearHerramientas(ctx: ContextoAgente) {
   /**
-   * Si en ESTA respuesta corresponde pedirle un mail o un teléfono.
+   * Si en ESTA respuesta corresponde pedirle un dato de contacto, y cuál.
    *
    * POR QUE LO DECIDE EL MOTOR Y NO EL PROMPT
    *
    * Porque depende de un estado que el modelo no tiene: si esta persona ya
-   * dejó un contacto en algún mensaje anterior. Dejárselo a él termina en
+   * dejó ese dato en algún mensaje anterior. Dejárselo a él termina en
    * una de las dos formas de embromarla —pedírselo de nuevo a quien ya lo
    * dio, o no pedírselo nunca— y las dos las vimos.
    *
-   * POR WHATSAPP NO VA NUNCA: el número ya lo tenemos, pedirlo es raro.
+   * LO QUE FALTA CAMBIA SEGÚN EL CANAL. En la web la persona es anónima:
+   * falta un mail o teléfono (y el nombre viene con eso). Por WhatsApp el
+   * número viene solo, pero el NOMBRE no: una conversación entera se cerró
+   * con cotización, impresión y muestra sin saber cómo se llamaba el
+   * cliente — se enteró Florencia, por teléfono. Lo que se pide ahí es el
+   * nombre (y empresa), nunca el teléfono, que sería raro.
    *
    * Y VA DESPUES DE RESOLVER, NO ANTES. Una puerta antes de dar el precio
    * se lleva puesta a la persona que entró justamente a ver un precio, y esa
    * que se va no queda registrada en ningún lado: no se puede ni medir.
-   * Acá el dato se pide a cambio de algo —te lo mando por escrito— y recién
-   * cuando ya se demostró que servimos.
+   * Acá el dato se pide a cambio de algo —te lo mando por escrito, te
+   * preparo la cotización a tu nombre— y recién cuando ya se demostró que
+   * servimos.
    */
-  const pedirContactoSiCorresponde = () =>
-    ctx.canal === 'web' && !ctx.yaTenemosContacto
-      ? {
-          pedile_un_contacto:
-            'Cerrá con UNA sola frase pidiéndole un mail (o un teléfono) y su nombre, ofreciéndole algo a cambio: mandarle esto por escrito para que lo tenga y lo pueda compartir con quien decide. Es la única forma de volver a hablarle: acá es anónimo y cuando cierra la pestaña se terminó. Pedilo UNA vez y en el mismo mensaje de la respuesta, nunca en uno aparte. Si no lo deja o cambia de tema, NO insistas y seguí atendiendo igual. Y si lo deja, guardalo con guardar_lead.',
-        }
-      : {};
+  const pedirContactoSiCorresponde = () => {
+    if (ctx.yaTenemosContacto) return {};
+    if (ctx.canal === 'web') {
+      return {
+        pedile_un_contacto:
+          'Cerrá con UNA sola frase pidiéndole un mail (o un teléfono) y su nombre, ofreciéndole algo a cambio: mandarle esto por escrito para que lo tenga y lo pueda compartir con quien decide. Es la única forma de volver a hablarle: acá es anónimo y cuando cierra la pestaña se terminó. Pedilo UNA vez y en el mismo mensaje de la respuesta, nunca en uno aparte. Si no lo deja o cambia de tema, NO insistas y seguí atendiendo igual. Y si lo deja, guardalo con guardar_lead.',
+      };
+    }
+    // WhatsApp: el teléfono ya lo tenemos; lo que no sabemos es quién es.
+    return {
+      pedile_un_contacto:
+        'Todavía no sabemos el nombre de esta persona. Cerrá tu respuesta preguntándoselo con naturalidad y con un motivo —"¿A nombre de quién te preparo la cotización?"— y si suena a empresa, también el nombre de la empresa. UNA vez, en el mismo mensaje, nunca en uno aparte, y NUNCA le pidas el teléfono: ya está escribiendo desde él. Si no contesta o cambia de tema, no insistas y seguí atendiendo. Cuando lo diga, guardalo con guardar_lead (nombre y empresa) así queda en la ficha y no se le vuelve a preguntar.',
+    };
+  };
   const cotizarCajas = betaTool({
   name: 'cotizar_cajas',
   description:
@@ -130,7 +145,9 @@ export function crearHerramientas(ctx: ContextoAgente) {
         description:
           'Cantidad de colores de impresión flexográfica, de 0 a 3. Usá 0 si la ' +
           'persona no pidió impresión o dijo que la quiere lisa. Si pidió ' +
-          'impresión pero no dijo cuántos colores, preguntale antes de llamar.',
+          'impresión pero no definió los colores, NO la frenes preguntando: ' +
+          'llamá con 1 y explicá después lo que diga impresion.como_se_cobra ' +
+          '(cuando viene incluida, de 1 a 3 colores el precio es el mismo).',
       },
     },
     required: ['largo_mm', 'ancho_mm', 'alto_mm', 'cantidad', 'colores_impresion'],

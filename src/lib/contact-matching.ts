@@ -77,6 +77,36 @@ export async function findClientByEmail(email: string): Promise<string | null> {
 }
 
 /**
+ * El perfil guardado para un teléfono, o null si nunca dejó datos.
+ * Es lo que le permite al agente saber si ya conocemos el nombre de quien
+ * escribe por WhatsApp, para pedirlo una sola vez y nunca de nuevo.
+ */
+export async function getContactProfileByPhone(phoneNumber: string): Promise<{
+  displayName: string | null;
+  companyName: string | null;
+  email: string | null;
+} | null> {
+  try {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from('contact_profiles')
+      .select('display_name, company_name, email')
+      .eq('phone_number', phoneNumber)
+      .limit(1)
+      .maybeSingle();
+    if (!data) return null;
+    return {
+      displayName: data.display_name ?? null,
+      companyName: data.company_name ?? null,
+      email: data.email ?? null,
+    };
+  } catch (error) {
+    console.error('[ContactMatching] Error leyendo perfil:', error);
+    return null;
+  }
+}
+
+/**
  * Upsert contact_profiles y retorna el client_id si hay match
  */
 export async function upsertContactProfile(params: {
@@ -97,19 +127,23 @@ export async function upsertContactProfile(params: {
     }
   }
 
+  // Solo se escriben los campos que VIENEN. Antes la fila entera se mandaba
+  // con `|| null`, y una segunda llamada sin nombre (por ejemplo, guardar la
+  // cotización después de haber guardado el contacto) pisaba con null el
+  // nombre que la persona ya había dado: el dato se pedía bien y se perdía
+  // igual.
+  const fila: Record<string, unknown> = {
+    phone_number: params.phoneNumber,
+    client_id: clientId,
+    updated_at: new Date().toISOString(),
+  };
+  if (params.email) fila.email = params.email;
+  if (params.displayName) fila.display_name = params.displayName;
+  if (params.companyName) fila.company_name = params.companyName;
+
   const { data: profile, error } = await supabase
     .from('contact_profiles')
-    .upsert(
-      {
-        phone_number: params.phoneNumber,
-        email: params.email || null,
-        display_name: params.displayName || null,
-        company_name: params.companyName || null,
-        client_id: clientId,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'phone_number', ignoreDuplicates: false }
-    )
+    .upsert(fila, { onConflict: 'phone_number', ignoreDuplicates: false })
     .select('id')
     .single();
 

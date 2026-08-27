@@ -49,6 +49,7 @@ import type { PricingConfig } from '@/lib/types/database';
 import {
   upsertContactProfile,
   linkConversationToClient,
+  getContactProfileByPhone,
 } from '@/lib/contact-matching';
 import {
   generateConversationalResponse,
@@ -482,9 +483,15 @@ export async function POST(request: NextRequest) {
     if (!entrante.tieneMedia && !enFlujoViejo && agenteDisponible()) {
       try {
         const historial = await getRecentConversationHistory(phoneNumber, 10);
+        // El teléfono viene solo, pero el nombre no: si el perfil del contacto
+        // todavía no lo tiene, las herramientas le van a indicar al agente que
+        // lo pida (una vez, después de resolver). Una conversación entera se
+        // cerró con cotización y muestra sin saber cómo se llamaba el cliente.
+        const perfil = await getContactProfileByPhone(phoneNumber);
         const r = await responder(body, historial, {
           canal: 'whatsapp',
           telefono: phoneNumber,
+          yaTenemosContacto: !!perfil?.displayName,
         });
         if (r.texto) {
           console.log(

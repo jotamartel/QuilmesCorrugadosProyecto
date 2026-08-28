@@ -265,14 +265,14 @@ WhatsApp. Con eso se produce.
 Parámetros: length, width, height en milímetros. Mínimo ${MEDIDA_MINIMA.largo} x ${MEDIDA_MINIMA.ancho} x ${MEDIDA_MINIMA.alto} mm,
 y ancho + alto no puede superar ${RETAIL_CONFIG.MAX_SHEET_WIDTH} mm.
 
-EXCEPCIÓN: las cajas que se fabrican en dos mitades (cuando el desarrollo de
-una pieza supera los ${LARGO_MAXIMO_PLANCHA} mm — la respuesta lo indica con \`pieces: 2\`)
-no tienen plantilla automática: ahí \`template_pdf\` viene en null y el
-desplegado técnico lo prepara la fábrica junto con la orden. El diseño se
-manda igual por mail o WhatsApp.
+Las cajas que se fabrican en dos mitades (cuando el desarrollo de una pieza
+supera los ${LARGO_MAXIMO_PLANCHA} mm — la respuesta lo indica con \`pieces: 2\`) también
+tienen plantilla: el PDF dibuja el desplegado como si fuera de una pieza y una
+nota aclara que es la referencia para ubicar el diseño. El despiece real en
+dos mitades lo prepara la fábrica junto con la orden.
 
 Si estás cotizando por la API, cada caja de la respuesta ya trae su
-\`template_pdf\` con la URL correcta armada (o null si va en dos mitades).
+\`template_pdf\` con la URL correcta armada.
 
 ## Cerrar por WhatsApp: el mensaje ya viene escrito
 

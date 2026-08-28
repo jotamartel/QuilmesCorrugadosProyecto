@@ -382,7 +382,18 @@ export function QuoterForm() {
       const result = await response.json();
       setLeadId(result.id);
       setPriceRevealed(true);
-      
+
+      // Llevar la vista al precio. En desktop la vista 3D se esconde y el
+      // precio pasa a ocupar su lugar, arriba de la columna sticky; en mobile
+      // el resumen queda más abajo en la misma columna, así que sin este
+      // scroll la persona apretaba "Ver cotización" y no veía nada cambiar.
+      setTimeout(() => {
+        document.getElementById('quote-price-summary')?.scrollIntoView({
+          behavior: 'smooth',
+          block: window.innerWidth < 1024 ? 'start' : 'nearest',
+        });
+      }, 150);
+
       // Este es el momento en que el visitante deja de ser anonimo: ya dio
       // nombre, mail y telefono a cambio de ver el precio. Identificarlo aca
       // hace que todo lo que haga despues —incluso si vuelve dentro de una
@@ -506,6 +517,11 @@ export function QuoterForm() {
 
   // Caja seleccionada para mostrar en 3D
   const selectedBox = boxes[selectedBoxIndex] || boxes[0];
+
+  // La vista 3D se esconde cuando la cotización ya está a la vista en el paso
+  // 2, para que el precio ocupe su lugar. Si la persona vuelve al paso 1 a
+  // editar cajas, la vista vuelve: ahí es donde sirve mirar la caja.
+  const mostrarVista3D = !(priceRevealed && step === 2);
 
   return (
     <div className="space-y-4">
@@ -1031,7 +1047,7 @@ export function QuoterForm() {
         data-lenis-prevent
       >
         {/* Selector de caja para vista 3D */}
-        {boxes.length > 1 && (
+        {mostrarVista3D && boxes.length > 1 && (
           <div className="flex gap-2 flex-wrap">
             {boxes.map((box, index) => (
               <button
@@ -1049,29 +1065,36 @@ export function QuoterForm() {
           </div>
         )}
 
-        {/* Vista 3D */}
-        <BoxPreview3D
-          length={selectedBox.length_mm}
-          width={selectedBox.width_mm}
-          height={selectedBox.height_mm}
-          autoRotate={true}
-          designUrl={selectedBox.design_preview_url || undefined}
-        />
+        {/* Vista 3D. Con la cotización revelada se esconde y su espacio lo
+            ocupa el precio: quedaba abajo de la caja girando, fuera del campo
+            visual, y la persona apretaba "Ver cotización" sin ver el precio
+            (pedido de Julián, 27-08-2026). La caja ya se miró en el paso 1. */}
+        {mostrarVista3D && (
+          <BoxPreview3D
+            length={selectedBox.length_mm}
+            width={selectedBox.width_mm}
+            height={selectedBox.height_mm}
+            autoRotate={true}
+            designUrl={selectedBox.design_preview_url || undefined}
+          />
+        )}
 
         {/* Resumen de precio - solo muestra precios cuando se reveló */}
-        <PriceSummary
-          boxes={boxes}
-          boxCalculations={boxCalculations}
-          estimatedDays={totals.estimatedDays}
-          isFreeShipping={clientData.distance_km !== null ? isFreeShipping : undefined}
-          distanceKm={clientData.distance_km}
-          showPrice={priceRevealed}
-          onRequestContact={priceRevealed ? handleSubmit : undefined}
-          submitting={submitting}
-          stockMaxM2={wholesaleMinM2}
-          volumeThresholdM2={pricingConfig?.volume_threshold_m2 ?? 5000}
-          pisoMinM2={minM2Pedido}
-        />
+        <div id="quote-price-summary" className="scroll-mt-24">
+          <PriceSummary
+            boxes={boxes}
+            boxCalculations={boxCalculations}
+            estimatedDays={totals.estimatedDays}
+            isFreeShipping={clientData.distance_km !== null ? isFreeShipping : undefined}
+            distanceKm={clientData.distance_km}
+            showPrice={priceRevealed}
+            onRequestContact={priceRevealed ? handleSubmit : undefined}
+            submitting={submitting}
+            stockMaxM2={wholesaleMinM2}
+            volumeThresholdM2={pricingConfig?.volume_threshold_m2 ?? 5000}
+            pisoMinM2={minM2Pedido}
+          />
+        </div>
       </div>
       </div>
 

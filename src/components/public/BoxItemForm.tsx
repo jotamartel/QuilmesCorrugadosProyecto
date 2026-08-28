@@ -386,19 +386,20 @@ export function BoxItemForm({
                 </select>
               </div>
 
-              {/* Descargar plantilla PDF — solo para cajas de una pieza: en
-                  dos mitades no hay desplegado automático y el endpoint
-                  devuelve 400. El desplegado de esas lo prepara la fábrica. */}
-              {2 * (box.length_mm + box.width_mm) + 50 <= LARGO_MAXIMO_PLANCHA ? (
-                <BoxTemplateDownload
-                  length={box.length_mm}
-                  width={box.width_mm}
-                  height={box.height_mm}
-                />
-              ) : (
-                <p className="text-sm text-gray-600">
-                  Esta caja se fabrica en dos mitades pegadas: el desplegado técnico lo
-                  prepara la fábrica junto con la orden.
+              {/* Descargar plantilla PDF. También en dos mitades: el PDF sale
+                  como desplegado de una pieza, con una nota que aclara que es
+                  la referencia para ubicar el diseño (el despiece real lo arma
+                  la fábrica con la orden). */}
+              <BoxTemplateDownload
+                length={box.length_mm}
+                width={box.width_mm}
+                height={box.height_mm}
+              />
+              {2 * (box.length_mm + box.width_mm) + 50 > LARGO_MAXIMO_PLANCHA && (
+                <p className="text-xs text-gray-500">
+                  Esta caja se fabrica en dos mitades pegadas: el PDF es el desplegado de
+                  referencia para ubicar el diseño; el despiece real lo prepara la fábrica
+                  con la orden.
                 </p>
               )}
 

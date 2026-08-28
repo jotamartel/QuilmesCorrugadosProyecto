@@ -260,23 +260,12 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
         true,
       );
     }
-    // La plantilla automática dibuja el desarrollo de UNA pieza. Una caja que
-    // supera el largo de plancha se fabrica en dos mitades y ese desarrollo
-    // no existe: devolver el PDF de una pieza sería entregar un troquel falso.
-    if (2 * (largo + ancho) + 50 > LARGO_MAXIMO_PLANCHA) {
-      registrar(req, nombre, 200, 'dos_mitades_sin_plantilla');
-      return resultado(
-        `La caja de ${largo}x${ancho}x${alto} mm se fabrica en dos mitades pegadas (su ` +
-          `desarrollo de una pieza supera el largo máximo de plancha de ${LARGO_MAXIMO_PLANCHA} mm), ` +
-          'así que no hay plantilla automática: el desplegado técnico lo prepara la fábrica ' +
-          `junto con la orden. El diseño se puede mandar igual a ${CONTACTO.email} o por ` +
-          `WhatsApp al ${CONTACTO.telefonoVisible}. La cotización de cotizar_cajas_carton ya ` +
-          'incluye el proceso de dos mitades en el precio.',
-        { sin_plantilla: true, fabricacion: 'dos_mitades' },
-      );
-    }
+    // También para las cajas en dos mitades: el PDF sale como desplegado de
+    // una pieza con la nota de que es referencia para el diseño. Antes esta
+    // rama contestaba sin_plantilla (pedido de Julián, 27-08-2026).
+    const dosMitades = 2 * (largo + ancho) + 50 > LARGO_MAXIMO_PLANCHA;
     const url = urlPlantilla(largo, ancho, alto);
-    registrar(req, nombre, 200, 'plantilla');
+    registrar(req, nombre, 200, dosMitades ? 'plantilla_dos_mitades' : 'plantilla');
     return resultado(
       `Plantilla lista para ${largo}x${ancho}x${alto} mm: ${url}\n\n` +
         'Es un PDF con la caja desplegada: trae las líneas de corte, las de plegado y las áreas ' +
@@ -284,8 +273,13 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
         `mandarlo a ${CONTACTO.email} o por WhatsApp al ${CONTACTO.telefonoVisible}. ` +
         `Se imprime hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores y el costo ya está ` +
           'incluido en el precio por m². Solo se cobra aparte el polímero, una matriz por ' +
-          'color, que va a cargo del comprador. Por debajo de ese volumen se vende de stock, que va sin imprimir.',
-      { template_pdf: url, max_colores: RETAIL_CONFIG.MAX_PRINTING_COLORS },
+          'color, que va a cargo del comprador. Por debajo de ese volumen se vende de stock, que va sin imprimir.' +
+        (dosMitades
+          ? ' OJO: esta caja se fabrica en dos mitades pegadas; el PDF dibuja el desplegado ' +
+            'como si fuera de una pieza y es la referencia para ubicar el diseño (el propio ' +
+            'PDF lo aclara). El despiece real en dos mitades lo prepara la fábrica con la orden.'
+          : ''),
+      { template_pdf: url, max_colores: RETAIL_CONFIG.MAX_PRINTING_COLORS, ...(dosMitades ? { fabricacion: 'dos_mitades' } : {}) },
     );
   }
 
@@ -406,13 +400,10 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       '',
       cotizacion.channel_note,
       '',
-      // En dos mitades no hay plantilla automática: se explica el proceso en
-      // vez de linkear un troquel que no existe.
-      ...(cotizacion.boxes[0]?.pieces === 2
-        ? [cotizacion.boxes[0].pieces_note ?? '']
-        : cotizacion.printing.template_pdf
-          ? [`Plantilla de impresión (PDF, medidas ya calculadas): ${cotizacion.printing.template_pdf}`]
-          : []),
+      // En dos mitades van las dos cosas: el proceso explicado y la plantilla,
+      // que ahora existe como desplegado de referencia con su nota.
+      ...(cotizacion.boxes[0]?.pieces === 2 ? [cotizacion.boxes[0].pieces_note ?? ''] : []),
+      `Plantilla de impresión (PDF, medidas ya calculadas): ${cotizacion.printing.template_pdf}`,
       cotizacion.printing.price_note,
       '',
       'Para avanzar, pasale este link al usuario tal cual: ya lleva el mensaje escrito con las ' +

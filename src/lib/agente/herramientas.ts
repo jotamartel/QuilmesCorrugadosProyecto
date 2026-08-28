@@ -383,13 +383,15 @@ export function crearHerramientas(ctx: ContextoAgente) {
                 'la persona a cotizarlo por su cuenta ni le digas "pasáselo a quien te lo ' +
                 `cotice". Pedile el diseño —por este mismo chat o a ${CONTACTO.email}— y ` +
                 'decile que lo mandamos a cotizar y le pasamos el precio apenas esté. ' +
+                'Y llamá a plantilla_impresion con estas medidas: el PDF del desplegado ' +
+                'se manda adjunto y es lo que el diseñador necesita para armar el arte ' +
+                'sobre la medida real.' +
                 (caja.pieces === 2
-                  ? 'NO llames a plantilla_impresion: esta caja se fabrica en dos mitades y ' +
-                    'no hay desplegado automático. Decile que el desplegado técnico se lo ' +
-                    'prepara la fábrica junto con la orden.'
-                  : 'Y llamá a plantilla_impresion con estas medidas: el PDF del desplegado ' +
-                    'se manda adjunto y es lo que el diseñador necesita para armar el arte ' +
-                    'sobre la medida real.'),
+                  ? ' Como esta caja se fabrica en dos mitades pegadas, aclarale que ese ' +
+                    'PDF es el desplegado de referencia —dibuja la caja como si fuera de ' +
+                    'una pieza, para ubicar el diseño— y que el despiece real en dos ' +
+                    'mitades lo prepara la fábrica con la orden.'
+                  : ''),
             }
           : q.printing.available
             ? {
@@ -629,25 +631,23 @@ export function crearHerramientas(ctx: ContextoAgente) {
     additionalProperties: false,
   },
   run: async ({ largo_mm, ancho_mm, alto_mm }) => {
-    // La plantilla automática dibuja el desarrollo de UNA pieza. Una caja que
-    // se fabrica en dos mitades no tiene ese desarrollo: mandar ese PDF es
-    // darle al diseñador una plancha que no existe.
-    if (2 * (largo_mm + ancho_mm) + 50 > LARGO_MAXIMO_PLANCHA) {
-      return JSON.stringify({
-        sin_plantilla: true,
-        instruccion:
-          'Esta caja se fabrica en dos mitades pegadas y la plantilla automática solo ' +
-          'dibuja cajas de una plancha: NO hay PDF para mandar. Decile que el desplegado ' +
-          'técnico se lo prepara la fábrica junto con la orden, y que el diseño (logo, ' +
-          'arte) lo puede mandar igual por acá o por mail.',
-      });
-    }
+    // También para las cajas en dos mitades: el PDF sale como desplegado de
+    // una pieza con una nota que dice que es la referencia para el diseño.
+    // Antes esta rama devolvía sin_plantilla y la persona se quedaba sin nada
+    // que llevarle al diseñador (pedido de Julián, 27-08-2026).
+    const dosMitades = 2 * (largo_mm + ancho_mm) + 50 > LARGO_MAXIMO_PLANCHA;
     return JSON.stringify({
       pdf: urlPlantilla(largo_mm, ancho_mm, alto_mm),
       max_colores: RETAIL_CONFIG.MAX_PRINTING_COLORS,
       como_funciona:
         'Las áreas verdes marcan dónde va el diseño. Se puede mandar el arte terminado ' +
-        'en PDF, AI o EPS por WhatsApp o por mail.',
+        'en PDF, AI o EPS por WhatsApp o por mail.' +
+        (dosMitades
+          ? ' OJO: esta caja se fabrica en dos mitades pegadas. El PDF dibuja el ' +
+            'desplegado como si fuera de una pieza y es la REFERENCIA para ubicar el ' +
+            'diseño (el propio PDF lo aclara); el despiece real en dos mitades lo ' +
+            'prepara la fábrica con la orden. Decíselo al pasarle la plantilla.'
+          : ''),
     });
   },
 });

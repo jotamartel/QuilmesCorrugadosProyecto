@@ -366,8 +366,9 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
                 <strong className="text-gray-900">boxes[].pieces</strong>: 1 si la caja sale de una plancha; 2 si
                 se fabrica en dos mitades pegadas (el desarrollo supera el largo máximo de plancha de 2050 mm).
                 Con <code className="bg-gray-100 px-1 rounded">pieces=2</code> el precio ya incluye el material de
-                la segunda solapa y un 25% por el pegado, <code className="bg-gray-100 px-1 rounded">pieces_note</code>{' '}
-                lo explica en castellano, y no hay plantilla PDF automática (el desplegado lo prepara la fábrica).
+                la segunda solapa y un 25% por el pegado, y <code className="bg-gray-100 px-1 rounded">pieces_note</code>{' '}
+                lo explica en castellano. La plantilla PDF existe igual: dibuja el desplegado como si fuera de una
+                pieza, como referencia para ubicar el diseño (el despiece real lo prepara la fábrica).
               </li>
             </ul>
           </div>

@@ -4,10 +4,18 @@ interface BoxDimensions {
   length: number;  // Largo (L) en mm
   width: number;   // Ancho (A) en mm
   height: number;  // Alto (H) en mm
+  /**
+   * La caja se fabrica en dos mitades pegadas (su desarrollo de una pieza no
+   * entra en el rollo). El desplegado se dibuja IGUAL, de una pieza: es la
+   * referencia para ubicar el diseño, y el PDF lo dice con una nota. El
+   * despiece real en dos mitades lo prepara la fábrica con la orden — cómo se
+   * pega es proceso interno, no algo que el diseñador tenga que resolver.
+   */
+  dosMitades?: boolean;
 }
 
 export async function generateBoxTemplate(dimensions: BoxDimensions): Promise<Uint8Array> {
-  const { length: L, width: A, height: H } = dimensions;
+  const { length: L, width: A, height: H, dosMitades } = dimensions;
 
   // ═══════════════════════════════════════════════════════════
   // CONSTANTES Y CÁLCULOS
@@ -324,6 +332,24 @@ export async function generateBoxTemplate(dimensions: BoxDimensions): Promise<Ui
   drawText(`Medidas: ${L} × ${A} × ${H} mm`, infoBoxX + 5, infoBoxY + 28, { size: 7 });
   drawText(`Plancha: ${totalWidth.toFixed(0)} × ${totalHeight.toFixed(0)} mm`, infoBoxX + 5, infoBoxY + 38, { size: 7 });
   drawText(`Escala: ${scale === 1 ? '1:1' : (scale * 100).toFixed(0) + '%'}`, infoBoxX + 5, infoBoxY + 48, { size: 7, color: scale < 1 ? orange : black });
+
+  // Nota de dos mitades: va ARRIBA, donde el diseñador mira primero, y en el
+  // color de advertencia. Sin esto el PDF promete una plancha entera que la
+  // fábrica va a cortar en dos, y la sorpresa aparece con el troquel hecho.
+  if (dosMitades) {
+    drawText('CAJA EN DOS MITADES PEGADAS — DESPLEGADO DE REFERENCIA', 0, -32, {
+      size: 10,
+      bold: true,
+      color: orange,
+    });
+    drawText(
+      'Este plano sirve para ubicar el diseño como si la caja fuera de una pieza. ' +
+        'El despiece real en dos mitades lo prepara la fábrica junto con la orden.',
+      0,
+      -24,
+      { size: 7, color: gray },
+    );
+  }
 
   // ═══════════════════════════════════════════════════════════
   // 7. LEYENDA

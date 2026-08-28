@@ -31,26 +31,16 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // El generador dibuja el desarrollo de UNA pieza. Una caja fabricable en
-  // dos mitades pasa el chequeo de arriba, pero su plancha de una pieza no
-  // existe: el PDF saldría con una plancha más larga que el rollo y sin la
-  // segunda solapa, y ese dibujo va derecho al diseñador.
-  if (2 * (length + width) + 50 > LARGO_MAXIMO_PLANCHA) {
-    return NextResponse.json(
-      {
-        error:
-          `La caja de ${length}x${width}x${height} mm se fabrica en dos mitades pegadas ` +
-          `(su desarrollo supera el largo máximo de plancha de ${LARGO_MAXIMO_PLANCHA} mm), ` +
-          'así que no tiene plantilla automática: el desplegado técnico lo prepara la ' +
-          'fábrica junto con la orden.',
-        fabricacion: 'dos_mitades',
-      },
-      { status: 400 }
-    );
-  }
+  // Una caja que se fabrica en dos mitades TAMBIÉN tiene plantilla. Acá hubo
+  // un 400 ("no hay plantilla automática") que dejaba al cliente sin nada que
+  // llevarle al diseñador. Pedido de Julián (27-08-2026): el desplegado se
+  // dibuja igual, de una pieza, como REFERENCIA para ubicar el diseño — el PDF
+  // lo aclara con una nota — y el despiece real en dos mitades lo prepara la
+  // fábrica con la orden. Cómo se pega es proceso interno.
+  const dosMitades = 2 * (length + width) + 50 > LARGO_MAXIMO_PLANCHA;
 
   try {
-    const pdfBytes = await generateBoxTemplate({ length, width, height });
+    const pdfBytes = await generateBoxTemplate({ length, width, height, dosMitades });
 
     // Convertir Uint8Array a Buffer para NextResponse
     const buffer = Buffer.from(pdfBytes);

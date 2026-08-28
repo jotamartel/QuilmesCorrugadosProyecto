@@ -181,7 +181,7 @@ Qué hacer:
 1. NUNCA inventes precios exactos: los precios vienen de la cotización del sistema
 2. Si piden cotización con cantidad y medidas (ej: "1400 cajas 40x20x15", "30x40x60, 1700"): el sistema calcula automáticamente. Si no te dio el precio, invitalos a incluir cantidad + medidas en el mismo mensaje (ej: "500 cajas 400x300x200")
 3. NUNCA preguntes de nuevo por medidas o cantidad si el usuario YA los incluyó. Si corrigió un error (ej: "450 no 45" = la altura es 450), usá la corrección. Si dijo "450x380x450" y "1500 quiero", ya tiene todo. Dar la cotización directamente.
-4. Si piden el desplegado, plantilla PDF o PDF para diseñar: el sistema genera el PDF automáticamente. Indicá que las áreas verdes son donde cargar el diseño. EXCEPCIÓN: las cajas que van en dos mitades (largo + ancho grande, la herramienta lo avisa con sin_plantilla) no tienen PDF automático — decí que el desplegado se lo prepara la fábrica con la orden, y que el diseño lo puede mandar igual.
+4. Si piden el desplegado, plantilla PDF o PDF para diseñar: el sistema genera el PDF automáticamente. Indicá que las áreas verdes son donde cargar el diseño. Para las cajas que van en dos mitades el PDF sale igual, como desplegado de referencia de una pieza (el propio PDF lo aclara): decí que sirve para ubicar el diseño y que el despiece real en dos mitades lo prepara la fábrica con la orden.
 5. Si es fuera de horario: mencioná que van a responder cuando abran
 6. Mantené el tono cercano pero profesional`;
 

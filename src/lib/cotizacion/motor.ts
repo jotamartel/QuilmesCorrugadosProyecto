@@ -129,11 +129,12 @@ export interface BoxResult {
   subtotal: number | null;
   /**
    * PDF con las líneas de corte, plegado y las áreas donde va el diseño.
-   * Null cuando pieces=2: la plantilla automática dibuja el desarrollo de UNA
-   * pieza y para una caja en dos mitades ese troquel no existe — el
-   * desplegado lo prepara la fábrica con la orden.
+   * Cuando pieces=2 el PDF existe igual: dibuja el desarrollo como si fuera
+   * de una pieza y lo dice con una nota — es la REFERENCIA para ubicar el
+   * diseño (pedido de Julián, 27-08-2026). El despiece real en dos mitades lo
+   * prepara la fábrica con la orden; cómo se pega es proceso interno.
    */
-  template_pdf: string | null;
+  template_pdf: string;
 }
 
 /**
@@ -868,10 +869,8 @@ export function calcularCotizacion(
       price_per_m2: adjustedPricePerM2,
       unit_price: precioPorCaja,
       subtotal,
-      template_pdf:
-        unfolded.pieces === 2
-          ? null
-          : urlPlantilla(box.length_mm, box.width_mm, box.height_mm),
+      // También para pieces=2: el PDF sale con la nota de que es referencia.
+      template_pdf: urlPlantilla(box.length_mm, box.width_mm, box.height_mm),
     });
   }
 
@@ -1310,15 +1309,14 @@ export function calcularCotizacion(
           : `Cada color suma ${Math.round(config.printing_surcharge_per_color * 100)}% al precio por m², hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS} colores. Desde ${config.printing_included_min_m2.toLocaleString('es-AR')} m² el costo queda incluido y no se cobra recargo. ${NOTA_POLIMERO}`,
       /** Qué se cobra aparte y qué no. Es la pregunta que sigue al precio. */
       polymer_note: NOTA_POLIMERO,
-      template_pdf:
-        boxResults[0]?.pieces === 2
-          ? null
-          : urlPlantilla(b0.length_mm, b0.width_mm, b0.height_mm),
+      template_pdf: urlPlantilla(b0.length_mm, b0.width_mm, b0.height_mm),
       how_it_works:
         boxResults[0]?.pieces === 2
-          ? 'Esta caja se fabrica en dos mitades pegadas y no tiene plantilla automática: el ' +
-            'desplegado técnico lo prepara la fábrica junto con la orden. El diseño (logo, arte) ' +
-            'se manda igual a ventas@quilmescorrugados.com.ar o por WhatsApp.'
+          ? 'Esta caja se fabrica en dos mitades pegadas, y el PDF de la plantilla sale igual: ' +
+            'dibuja el desplegado como si fuera de una pieza, con las áreas donde va el diseño, ' +
+            'y una nota que aclara que es la referencia para ubicar el arte. El despiece real en ' +
+            'dos mitades lo prepara la fábrica con la orden. Ubicá tu diseño sobre esas áreas y ' +
+            'mandá el archivo a ventas@quilmescorrugados.com.ar o por WhatsApp.'
           : impresionDisponible
             ? 'Descargá el PDF de la plantilla: trae la caja desplegada con las líneas de corte, las de plegado y las áreas donde puede ir el diseño. Ubicá tu arte sobre esas áreas y mandá el archivo a ventas@quilmescorrugados.com.ar o por WhatsApp, y se produce con eso. No hace falta pedir la plantilla: se genera sola con las medidas.'
             : 'Para imprimir hay que producir a medida. Si el pedido llega al mínimo, la plantilla se descarga de template_pdf.',

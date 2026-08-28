@@ -941,6 +941,47 @@ Queres cotizar? Escribi "cotizar" para empezar.`;
 }
 
 /**
+ * Si el mensaje es SOLO un saludo o cortesía, sin contenido propio.
+ *
+ * Existe porque el flujo guiado arrancaba con includes('hola'): alguien que
+ * saludaba Y preguntaba algo concreto en el mismo mensaje —"Hola, ¿venden
+ * cartones de 2,5mm?"— caía igual en "¿Sos particular o empresa?" y su
+ * pregunta se ignoraba entera. Pasó tal cual el 27-08-2026, con el aviso de
+ * fuera de horario pegado arriba para rematarla. El saludo abre el embudo
+ * solo cuando no trae nada más que responder.
+ *
+ * La vara es conservadora a propósito: ante la duda devuelve false y el
+ * mensaje va a la clasificación de intención, que sabe qué hacer con él.
+ */
+// Sin "gracias" ni "saludos" a propósito: solos son un CIERRE de conversación
+// ("gracias!" después de una respuesta), y meterlos acá reiniciaba el embudo
+// con "¿Sos particular o empresa?" justo cuando la persona se despedía. De
+// los cierres se ocupa la clasificación de intención.
+const PALABRAS_DE_SALUDO = new Set([
+  'hola', 'holaa', 'holaaa', 'holis', 'hey', 'ey',
+  'buenas', 'buenos', 'buen', 'dia', 'dias', 'tarde', 'tardes', 'noche', 'noches',
+  'que', 'tal', 'como', 'esta', 'estas', 'estan', 'andan', 'va', 'todo', 'bien', 'muy',
+  'y', 'senor', 'senora', 'don', 'quilmes', 'corrugados', 'equipo', 'gente',
+]);
+
+export function esSoloUnSaludo(texto: string): boolean {
+  const palabras = texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    // Solo letras: los numeros y simbolos son contenido, no saludo.
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+
+  // Sin ninguna letra ("1200", un emoji) no es un saludo: que lo mire la
+  // clasificacion.
+  if (palabras.length === 0) return false;
+
+  return palabras.every((p) => PALABRAS_DE_SALUDO.has(p));
+}
+
+/**
  * Genera mensaje fuera de horario
  */
 export function getOutOfHoursMessage(): string {

@@ -201,6 +201,12 @@ export interface AIContext {
   companyName?: string;
   lastQuoteTotal?: number;
   lastQuoteM2?: number;
+  /**
+   * Si AHORA es fuera del horario de atención. El modelo no tiene reloj: la
+   * regla del prompt "si es fuera de horario, avisá" no se cumplía nunca
+   * porque nadie le decía qué hora era.
+   */
+  fueraDeHorario?: boolean;
   /** Página de origen (ej: /cajas-ecommerce) - para personalizar respuesta */
   landingPage?: string;
   /** Segmento inferido de la landing (ecommerce, alimentos, mayorista, mudanza) */
@@ -340,6 +346,7 @@ CONTEXTO ACTUAL:
 ${ctx.clientName ? `- Nombre del contacto: ${ctx.clientName}` : ''}
 ${ctx.companyName ? `- Empresa: ${ctx.companyName}` : ''}
 ${ctx.lastQuoteTotal ? `- Última cotización: $${ctx.lastQuoteTotal.toLocaleString('es-AR')} (${ctx.lastQuoteM2?.toLocaleString('es-AR')} m²)` : ''}
+${ctx.fueraDeHorario ? `- AHORA ES FUERA DE HORARIO: respondé la consulta igual, y cerrá aclarando que el equipo lo confirma cuando abra (${HORARIO.corto}).` : ''}
 ${pricing ? bloqueDePrecios(pricing) : ''}`;
 
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [

@@ -23,6 +23,7 @@ import {
   isWithinBusinessHours,
   getPhoneQuoteHistory,
   detectarOpcion,
+  esSoloUnSaludo,
   asistentePausado,
   pausarAsistente,
   PAUSA_TRAS_DERIVAR_MS,
@@ -934,14 +935,17 @@ Ejemplo: 400x300x300`;
 3 - Hablar con un asesor`;
         }
       }
-      // Inicio de conversacion
-      else if (
-        state.step === 'initial' ||
-        bodyLower.includes('hola') ||
-        bodyLower.includes('cotizar') ||
-        bodyLower.includes('buenos dias') ||
-        bodyLower.includes('buenas tardes')
-      ) {
+      // Inicio de conversacion: SOLO cuando piden cotizar o cuando el mensaje
+      // es un saludo pelado y no hay nada más que responder.
+      //
+      // Antes bastaba que el texto incluyera "hola" —o que fuera el primer
+      // mensaje, con cualquier contenido— para caer en "¿Sos particular o
+      // empresa?". Alguien preguntó "Hola, ¿venden cartones de 2,5mm?" a las
+      // 17:45 y recibió el aviso de fuera de horario pegado con "---" al
+      // embudo de cotización: la pregunta se ignoró entera y la conversación
+      // murió ahí (27-08-2026). Un mensaje con contenido va a la clasificación
+      // de intención de abajo, que sabe contestar preguntas.
+      else if (bodyLower.includes('cotizar') || esSoloUnSaludo(body)) {
         // Verificar si es cliente repetido
         const history = await getPhoneQuoteHistory(phoneNumber);
         const isReturning = history.totalQuotes > 0;
@@ -970,6 +974,11 @@ Ejemplo: 400x300x300`;
                 const history = await getPhoneQuoteHistory(phoneNumber);
                 await updateConversationState(phoneNumber, { step: 'waiting_client_type' });
                 responseMessage = getWelcomeMessage(history.totalQuotes > 0, history.lastQuote);
+                // Mismo aviso que la rama del saludo pelado: primer mensaje
+                // fuera de horario lleva el horario adelante.
+                if (!isWithinBusinessHours() && state.step === 'initial') {
+                  responseMessage = getOutOfHoursMessage() + '\n\n---\n\n' + responseMessage;
+                }
                 break;
               }
 
@@ -1004,10 +1013,15 @@ Quilmes Corrugados - ${HORARIO.corto}`;
                     companyName: state.companyName,
                     lastQuoteTotal: state.lastQuoteTotal,
                     lastQuoteM2: state.lastQuoteM2,
+                    // La IA no tiene reloj: sin esto la regla "si es fuera de
+                    // horario, avisá" del prompt no se cumplia nunca.
+                    fueraDeHorario: !isWithinBusinessHours(),
                   });
                 } else {
                   responseMessage = classification.intent === 'question_shipping'
-                    ? getShippingMessage(state.step === 'quoted')
+                    // Aca el paso ya no puede ser 'quoted': esa rama se
+                    // consumio arriba, asi que la pregunta llega sin cotizar.
+                    ? getShippingMessage(false)
                     : `No entendi tu mensaje. Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
                 }
                 break;
@@ -1018,6 +1032,7 @@ Quilmes Corrugados - ${HORARIO.corto}`;
                     conversationState: state.step,
                     clientName: state.clientName,
                     companyName: state.companyName,
+                    fueraDeHorario: !isWithinBusinessHours(),
                   });
                 } else {
                   responseMessage = `No entendi tu mensaje.
@@ -1029,13 +1044,25 @@ Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
             console.error('[WhatsApp] Error con Groq:', error);
             if (isWhatsAppAIEnabled()) {
               try {
-                responseMessage = await generateConversationalResponse(body, phoneNumber);
+                responseMessage = await generateConversationalResponse(body, phoneNumber, {
+                  conversationState: state.step,
+                  fueraDeHorario: !isWithinBusinessHours(),
+                });
               } catch {
                 responseMessage = 'Escribe "cotizar" para empezar una nueva cotizacion.';
               }
             } else {
               responseMessage = 'Escribe "cotizar" para empezar una nueva cotizacion.';
             }
+          }
+        } else if (state.step === 'initial') {
+          // Sin Groq no hay clasificacion: el primer mensaje cae al embudo,
+          // como caia antes, en vez de a un "escribe cotizar" pelado.
+          const history = await getPhoneQuoteHistory(phoneNumber);
+          await updateConversationState(phoneNumber, { step: 'waiting_client_type' });
+          responseMessage = getWelcomeMessage(history.totalQuotes > 0, history.lastQuote);
+          if (!isWithinBusinessHours()) {
+            responseMessage = getOutOfHoursMessage() + '\n\n---\n\n' + responseMessage;
           }
         } else {
           responseMessage = 'Escribe "cotizar" para empezar una nueva cotizacion.';

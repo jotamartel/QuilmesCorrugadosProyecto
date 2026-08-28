@@ -120,7 +120,10 @@ export function PriceSummary({
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100 space-y-3">
+    // flex-col + h-full: cuando el contenedor lo estira (paso 2 con el precio
+    // revelado, a la altura del card de datos), el bloque del total baja al
+    // fondo con su mt-auto. En flujo normal la altura es auto y no cambia nada.
+    <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100 flex flex-col gap-3 h-full">
       {/* Encabezado */}
       <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
         <Package className="w-5 h-5 text-[#002E55]" />
@@ -239,8 +242,10 @@ export function PriceSummary({
           {/* Ya vio el precio de stock: ahora se lo invita a comprarlo online */}
           {esPedidoDeStock && panelStock}
 
-          {/* Total */}
-          <div className="border-t border-gray-100 pt-4">
+          {/* Total. El mt-auto lo ancla al fondo del card cuando este va
+              estirado a la altura del formulario; con altura natural no hace
+              nada. */}
+          <div className="border-t border-gray-100 pt-4 mt-auto">
             {/* Con una sola medida el unitario es directo y es lo que la
                 persona compara. Con varias no tiene sentido un promedio. */}
             {boxes.length === 1 && boxes[0].quantity > 0 && (

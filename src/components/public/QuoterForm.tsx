@@ -1041,9 +1041,19 @@ export function QuoterForm() {
         )}
       </div>
 
-      {/* Columna derecha: Vista 3D y resumen - scroll independiente para no interferir con Lenis snap */}
+      {/* Columna derecha: Vista 3D y resumen - scroll independiente para no interferir con Lenis snap.
+          Con la cotización revelada deja de ser sticky y se estira a la altura
+          de la columna del formulario: el sticky top-24 la dejaba "flotando"
+          96px por debajo del card de datos al scrollear, y el resumen solo,
+          corto, quedaba tirado en un mar de blanco (pedido de Julián,
+          27-08-2026). El card del precio acompaña la altura del de "Tus datos"
+          con el total y el botón anclados abajo. */}
       <div
-        className="space-y-6 lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+        className={
+          mostrarVista3D
+            ? 'space-y-6 lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]'
+            : 'lg:self-stretch'
+        }
         data-lenis-prevent
       >
         {/* Selector de caja para vista 3D */}
@@ -1080,7 +1090,7 @@ export function QuoterForm() {
         )}
 
         {/* Resumen de precio - solo muestra precios cuando se reveló */}
-        <div id="quote-price-summary" className="scroll-mt-24">
+        <div id="quote-price-summary" className="scroll-mt-24 h-full">
           <PriceSummary
             boxes={boxes}
             boxCalculations={boxCalculations}

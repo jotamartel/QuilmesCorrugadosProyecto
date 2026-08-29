@@ -167,6 +167,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     },
     {
+      // El portal que junta API, OpenAPI, MCP y llms.txt. Con el nombre en
+      // inglés porque es el que developers y auditores prueban a ciegas.
+      url: `${BASE_URL}/developers`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    {
       url: `${BASE_URL}/privacidad`,
       lastModified: now,
       changeFrequency: 'yearly',

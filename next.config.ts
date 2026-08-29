@@ -77,6 +77,27 @@ const nextConfig: NextConfig = {
         destination: `${DOMINIO_PROPIO}/:path`,
         permanent: true,
       },
+
+      // Los nombres en inglés de las páginas de confianza. Los auditores de
+      // agentes (y varios asistentes) prueban /about, /privacy, /contact y
+      // /terms a ciegas para verificar que el negocio es real; sin esto
+      // recibían un 404 y el sitio parecía no tener esas páginas, que existen
+      // con su nombre en castellano. El JSON-LD de la API ya enlazaba /terms.
+      { source: "/about", destination: "/nosotros", permanent: true },
+      { source: "/privacy", destination: "/privacidad", permanent: true },
+      { source: "/contact", destination: "/contacto", permanent: true },
+      { source: "/terms", destination: "/terminos", permanent: true },
+      { source: "/docs", destination: "/api/v1/docs", permanent: true },
+    ];
+  },
+  async rewrites() {
+    return [
+      // Alias en la raíz de los dos recursos que los agentes buscan por
+      // convención. Rewrites y no redirects a propósito: el MCP recibe POSTs
+      // de clientes que no siempre siguen redirecciones, y el OpenAPI en la
+      // URL predecible responde 200 directo.
+      { source: "/openapi.json", destination: "/api/v1/openapi.json" },
+      { source: "/mcp", destination: "/api/mcp" },
     ];
   },
 };

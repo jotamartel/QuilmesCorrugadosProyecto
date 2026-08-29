@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
+import { elegirFormato } from '@/lib/agentes/negociacion';
 
 /**
  * Compuerta de acceso del sitio.
@@ -56,6 +57,10 @@ const PUBLICO: Array<{ patron: RegExp; metodos?: string[]; nota: string }> = [
   // Servidor MCP: lo llama el asistente de otra persona, no hay sesion posible.
   // Es de solo lectura y usa el mismo rate limit que la API publica.
   { patron: /^\/api\/mcp$/, nota: 'servidor MCP, publico como la API' },
+  // La cara markdown de las paginas publicas (acceptmarkdown.com). Normalmente
+  // se llega por la reescritura de mas abajo; abierta tambien al acceso directo
+  // porque es el mismo contenido publico.
+  { patron: /^\/api\/markdown(\/|$)/, nota: 'paginas en markdown para agentes (Accept: text/markdown)' },
 
   // Leer el precio es público —lo necesita el cotizador—; escribirlo no.
   // Este es el motivo por el que la lista distingue métodos: sin eso,
@@ -159,6 +164,51 @@ async function estaAutorizado(email: string, ahora: number): Promise<boolean> {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // ── Negociación de formato de las páginas (acceptmarkdown.com) ───────────
+  //
+  // Un agente que manda `Accept: text/markdown` recibe la MISMA URL en
+  // markdown; un navegador (text/html, */*) pasa como siempre. Solo GET/HEAD
+  // de rutas de página: el matcher ya excluye /_next y los archivos con punto
+  // (llms.txt, sitemap.xml), /api tiene su propio trato abajo, y /mcp queda
+  // afuera porque es el alias del servidor MCP y sus clientes negocian
+  // JSON/SSE, no páginas. Es puro cálculo sobre una cabecera: no toca la red.
+  if (
+    !pathname.startsWith('/api/') &&
+    pathname !== '/mcp' &&
+    (request.method === 'GET' || request.method === 'HEAD')
+  ) {
+    const formato = elegirFormato(request.headers.get('accept'));
+
+    if (formato === 'markdown') {
+      const url = request.nextUrl.clone();
+      url.pathname = pathname === '/' ? '/api/markdown' : `/api/markdown${pathname}`;
+      return NextResponse.rewrite(url);
+    }
+
+    if (formato === 'inaceptable') {
+      // RFC 9110: el cliente dijo explicitamente que no acepta nada de lo que
+      // servimos. El cuerpo va en markdown con la salida senalizada.
+      return new NextResponse(
+        `# 406 Not Acceptable\n\nEste sitio sirve text/html y text/markdown (negociado por Accept).\n` +
+          `Guia para agentes: ${request.nextUrl.origin}/llms.txt\n`,
+        {
+          status: 406,
+          headers: { 'Content-Type': 'text/markdown; charset=utf-8', Vary: 'Accept' },
+        },
+      );
+    }
+
+    // HTML, como siempre. El Vary: Accept se INTENTA sumar acá, pero Next
+    // recalcula el Vary del render (rsc, next-router-*) y este puede no
+    // sobrevivir — verificado en next start. No es grave: la spec lo exige en
+    // la respuesta NEGOCIADA (la de markdown, que sí lo lleva), y como esta
+    // negociación corre antes de cualquier caché, un caché nunca ve el formato
+    // equivocado para guardar.
+    const respuesta = NextResponse.next();
+    respuesta.headers.set('Vary', 'Accept');
+    return respuesta;
+  }
+
   // Salir antes de tocar Supabase en todo lo que es público: si no, cada
   // visita al sitio pagaría una ida de red que no necesita.
   if (!necesitaSesion(pathname, request.method)) {
@@ -199,9 +249,11 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Solo la API. Antes el matcher abarcaba todo el sitio y descartaba assets
-  // con una expresión larga; acotarlo acá es más simple, más barato —no corre
-  // en ninguna página ni imagen— y hace imposible que esto interfiera con una
-  // navegación.
-  matcher: ['/api/:path*'],
+  // Dos trabajos, dos matchers. El primero es la compuerta de auth de la API,
+  // que es la función original de este archivo. El segundo existe solo para la
+  // negociación de markdown de las páginas: excluye /_next y todo lo que tiene
+  // un punto (llms.txt, sitemap.xml, favicon, imágenes), y su rama de arriba
+  // no toca la red — un navegador pide text/html y sale por NextResponse.next()
+  // sin enterarse de que esto corrió.
+  matcher: ['/api/:path*', '/((?!api|_next|.*\\..*).*)'],
 };

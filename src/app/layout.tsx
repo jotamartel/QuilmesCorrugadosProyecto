@@ -118,6 +118,18 @@ const jsonLdBusiness = {
     postalCode: "B1878",
     addressCountry: "AR",
   },
+  // Aparte de telephone/email sueltos: los validadores de agentes buscan un
+  // ContactPoint con contactType para confirmar que el negocio es contactable.
+  contactPoint: [
+    {
+      "@type": "ContactPoint",
+      contactType: "sales",
+      telephone: CONTACTO.telefonoVisible,
+      email: CONTACTO.email,
+      availableLanguage: ["es"],
+      areaServed: "AR",
+    },
+  ],
   geo: {
     "@type": "GeoCoordinates",
     latitude: -34.7232,

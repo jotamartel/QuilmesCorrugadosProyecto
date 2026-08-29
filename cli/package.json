@@ -1,0 +1,41 @@
+{
+  "name": "quilmes-corrugados",
+  "version": "0.1.0",
+  "description": "CLI oficial de Quilmes Corrugados: cotizá cajas de cartón corrugado a medida en Argentina desde la terminal, con el precio real de fábrica. Sin registro.",
+  "type": "module",
+  "bin": {
+    "quilmes-corrugados": "bin/quilmes-corrugados.js"
+  },
+  "files": [
+    "bin/",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test test/cli.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "cajas",
+    "carton",
+    "corrugado",
+    "packaging",
+    "embalaje",
+    "cotizacion",
+    "argentina",
+    "quilmes",
+    "cardboard",
+    "boxes",
+    "quote",
+    "cli"
+  ],
+  "author": "Quilmes Corrugados S.A. (https://www.quilmescorrugados.com.ar)",
+  "license": "MIT",
+  "homepage": "https://www.quilmescorrugados.com.ar/developers",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jotamartel/QuilmesCorrugadosProyecto.git",
+    "directory": "cli"
+  }
+}

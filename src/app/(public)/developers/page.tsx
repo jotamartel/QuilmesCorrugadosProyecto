@@ -118,7 +118,15 @@ export default function DevelopersPage() {
               ))}
             </div>
             <p className="text-sm text-gray-600 mt-4">
-              Además: la plantilla del troquel en PDF se genera sola con las medidas (
+              Además: hay un{' '}
+              <a
+                href="https://www.npmjs.com/package/quilmes-corrugados"
+                className="text-[#002E55] underline underline-offset-2"
+              >
+                CLI oficial en npm
+              </a>{' '}
+              (<code className="bg-gray-100 px-1 rounded">npx quilmes-corrugados cotizar 400x600x600 3000</code>),
+              la plantilla del troquel en PDF se genera sola con las medidas (
               <code className="bg-gray-100 px-1 rounded">/api/box-template?length=…&width=…&height=…</code>
               ), la documentación vive en{' '}
               <Link href="/api/v1/docs" className="text-[#002E55] underline underline-offset-2">

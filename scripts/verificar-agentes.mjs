@@ -182,6 +182,7 @@ console.log('\n— Developers y recursos —');
   ok('llms.txt tiene la sección de cuándo usarnos', cuerpo.includes('Cuándo usarnos (when to use)'));
   ok('llms.txt lista /developers', cuerpo.includes('/developers'));
   ok('llms.txt lista el descubrimiento MCP', cuerpo.includes('/.well-known/mcp.json'));
+  ok('llms.txt lista el CLI de npm', cuerpo.includes('npmjs.com/package/quilmes-corrugados'));
 }
 
 // ── 5. Páginas de confianza con nombre en inglés ────────────────────────────

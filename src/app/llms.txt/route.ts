@@ -370,6 +370,8 @@ producción.
 - Portal de desarrolladores: ${BASE_URL}/developers
 - Servidor MCP: ${BASE_URL}/api/mcp (alias: ${BASE_URL}/mcp) — descubrimiento en
   ${BASE_URL}/.well-known/mcp.json y ${BASE_URL}/.well-known/mcp
+- CLI oficial (npm): https://www.npmjs.com/package/quilmes-corrugados —
+  \`npx quilmes-corrugados cotizar 400x600x600 3000\`
 - Preguntas frecuentes: ${BASE_URL}/faq
 
 Todas las páginas públicas del sitio también responden su versión markdown en

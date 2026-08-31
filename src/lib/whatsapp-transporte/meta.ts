@@ -30,6 +30,8 @@
 import crypto from 'node:crypto';
 import {
   normalizarTelefono,
+  type MediaDescargada,
+  type MediaEntrante,
   type MensajeEntrante,
   type PlantillaAEnviar,
   type Transporte,
@@ -130,6 +132,45 @@ export function verificarFirmaMeta(
   return crypto.timingSafeEqual(a, b);
 }
 
+/**
+ * Cómo llama Meta a cada tipo de adjunto, y cómo lo llamamos nosotros.
+ *
+ * Las notas de voz llegan como type "audio" con la marca `voice: true` adentro,
+ * pero "voice" está en la lista igual por si algún día llega suelto: perder una
+ * nota de voz por un nombre es el error más barato de prevenir.
+ */
+const TIPOS_DE_MEDIA: Record<string, MediaEntrante['tipo']> = {
+  image: 'imagen',
+  audio: 'audio',
+  voice: 'audio',
+  video: 'video',
+  document: 'documento',
+  sticker: 'sticker',
+};
+
+/** El adjunto de un mensaje de Meta, o null si el mensaje no trae uno. */
+function comoMediaEntrante(mensaje: Record<string, unknown>, tipo: string): MediaEntrante | null {
+  const nuestro = TIPOS_DE_MEDIA[tipo];
+  if (!nuestro) return null;
+
+  // El detalle viaja bajo una clave que se llama como el tipo: mensaje.image,
+  // mensaje.audio, mensaje.document...
+  const detalle = mensaje[tipo] as Record<string, unknown> | undefined;
+  const id = detalle?.id ? String(detalle.id) : '';
+  // Sin id no hay forma de descargarlo: se reporta que hubo media (tieneMedia
+  // sale del tipo, no de esto) pero no se promete un archivo que no se puede ir
+  // a buscar.
+  if (!id) return null;
+
+  return {
+    id,
+    tipo: nuestro,
+    mime: detalle?.mime_type ? String(detalle.mime_type) : null,
+    caption: detalle?.caption ? String(detalle.caption).trim() : null,
+    nombreDeArchivo: detalle?.filename ? String(detalle.filename) : null,
+  };
+}
+
 /** Un mensaje del payload de Meta, o null si no trae de quien viene. */
 function comoMensajeEntrante(mensaje: Record<string, unknown>): MensajeEntrante | null {
   const tipo = String(mensaje?.type || '');
@@ -148,11 +189,14 @@ function comoMensajeEntrante(mensaje: Record<string, unknown>): MensajeEntrante 
             )
           : '';
 
+  const media = comoMediaEntrante(mensaje, tipo);
   const entrante: MensajeEntrante = {
     telefono: normalizarTelefono(String(mensaje?.from || '')),
     texto: texto.trim(),
     tieneMedia: ['audio', 'image', 'video', 'document', 'sticker', 'voice'].includes(tipo),
     id: mensaje?.id ? String(mensaje.id) : null,
+    // Solo cuando hay: ver el comentario del campo en tipos.ts.
+    ...(media ? { media } : {}),
   };
   return entrante.telefono ? entrante : null;
 }
@@ -264,6 +308,51 @@ export const transporteMeta: Transporte = {
         filename: nombreDelArchivo(urlDelArchivo),
       },
     });
+  },
+
+  /**
+   * Son dos pedidos, no uno: el id primero se canjea por una URL efímera —dura
+   * unos cinco minutos— y recién esa URL entrega los bytes. Los dos van con el
+   * mismo token: la URL del CDN sin el Bearer devuelve 404, no 401, y ese 404
+   * despista.
+   */
+  async descargarMedia(id): Promise<MediaDescargada | null> {
+    if (!TOKEN) {
+      console.log('[whatsapp:meta] sin credenciales, no se descarga media');
+      return null;
+    }
+    try {
+      const r = await fetch(`https://graph.facebook.com/${VERSION}/${encodeURIComponent(id)}`, {
+        headers: { Authorization: `Bearer ${TOKEN}` },
+      });
+      if (!r.ok) {
+        console.error('[whatsapp:meta] no se pudo resolver la media %s:', id, r.status, (await r.text()).slice(0, 300));
+        return null;
+      }
+      const meta = (await r.json()) as { url?: string; mime_type?: string; file_size?: number };
+      if (!meta.url) {
+        console.error('[whatsapp:meta] la media %s vino sin URL de descarga', id);
+        return null;
+      }
+      // El mismo tope que /api/upload: más grande que esto no se guarda en el
+      // bucket, así que descargarlo sería pagar el ancho de banda para nada.
+      if (meta.file_size && meta.file_size > 20 * 1024 * 1024) {
+        console.error('[whatsapp:meta] la media %s pesa %d bytes, no se descarga', id, meta.file_size);
+        return null;
+      }
+      const d = await fetch(meta.url, { headers: { Authorization: `Bearer ${TOKEN}` } });
+      if (!d.ok) {
+        console.error('[whatsapp:meta] no se pudo descargar la media %s:', id, d.status);
+        return null;
+      }
+      return {
+        datos: new Uint8Array(await d.arrayBuffer()),
+        mime: meta.mime_type || d.headers.get('content-type') || 'application/octet-stream',
+      };
+    } catch (error) {
+      console.error('[whatsapp:meta] error descargando la media %s:', id, error);
+      return null;
+    }
   },
 
   // La firma de Meta es un HMAC sobre el cuerpo crudo: no depende de

@@ -22,6 +22,33 @@
  * un minuto. Cuando Meta esté estable, se borra la implementación de Twilio.
  */
 
+/**
+ * Un archivo que vino adjunto en un mensaje: la referencia para descargarlo,
+ * no los bytes. El proveedor guarda el archivo un tiempo (Meta, 30 días) y lo
+ * entrega recién cuando se le pide con el id.
+ */
+export interface MediaEntrante {
+  /** El id con que el proveedor guarda el archivo, para pedírselo después. */
+  id: string;
+  /**
+   * Los stickers van aparte de las imágenes a propósito: son webp con otra
+   * intención —un saludo, un ok— y quien los procese puede decidir distinto.
+   */
+  tipo: 'imagen' | 'audio' | 'video' | 'documento' | 'sticker';
+  /** Como lo reporta el proveedor, p. ej. "audio/ogg; codecs=opus". */
+  mime: string | null;
+  /** El texto que acompaña una foto o un documento, si la persona escribió uno. */
+  caption: string | null;
+  /** Solo documentos: el nombre con que la persona mandó el archivo. */
+  nombreDeArchivo: string | null;
+}
+
+/** Los bytes de un archivo ya descargado del proveedor. */
+export interface MediaDescargada {
+  datos: Uint8Array;
+  mime: string;
+}
+
 /** Un mensaje entrante, ya sin las particularidades del proveedor. */
 export interface MensajeEntrante {
   /**
@@ -37,6 +64,16 @@ export interface MensajeEntrante {
   /** El texto del mensaje. Vacío cuando el cliente mandó solo un audio o una foto. */
   texto: string;
   tieneMedia: boolean;
+  /**
+   * El adjunto del mensaje, si trajo uno. Un mensaje de WhatsApp lleva a lo
+   * sumo un archivo —mandar tres fotos son tres mensajes—, así que acá va uno
+   * solo; el webhook junta los del lote.
+   *
+   * Es opcional y solo está cuando hay adjunto, a propósito: las pruebas de
+   * los transportes comparan el mensaje entero contra el esperado, y un campo
+   * que aparece en todos los mensajes de texto las obliga a saberlo.
+   */
+  media?: MediaEntrante;
   /**
    * El id que le puso el proveedor a este mensaje.
    *
@@ -74,6 +111,19 @@ export interface Transporte {
 
   enviarTexto(telefono: string, texto: string): Promise<boolean>;
   enviarDocumento(telefono: string, urlDelArchivo: string): Promise<boolean>;
+
+  /**
+   * Trae los bytes de un adjunto a partir del id que vino en el mensaje.
+   *
+   * Devuelve null si no se pudo: sin credenciales, archivo vencido, o más
+   * grande que el límite. Quien llama decide qué decirle al cliente en ese
+   * caso; acá solo se registra el motivo.
+   *
+   * Es opcional porque Twilio entrega la media de otra forma —una URL con
+   * basic auth en el propio webhook— y no vale la pena traducirla para un
+   * proveedor que estamos por dejar. Ver el comentario de enviarPlantilla.
+   */
+  descargarMedia?(id: string): Promise<MediaDescargada | null>;
 
   /**
    * Manda una plantilla aprobada por Meta.

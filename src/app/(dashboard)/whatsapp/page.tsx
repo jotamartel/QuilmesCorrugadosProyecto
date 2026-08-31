@@ -697,6 +697,16 @@ export default function WhatsAppPage() {
                   // mandó el bot o alguien de la fábrica.
                   const dePersona = msg.direction === 'outbound' && !!msg.metadata?.humano;
                   const saliente = msg.direction === 'outbound';
+                  // Los adjuntos que sí se pudieron guardar. Los que tienen url
+                  // en null existieron pero la descarga falló: para esos vale
+                  // el aviso de "se ve en WhatsApp" de abajo.
+                  const adjuntos = (Array.isArray(msg.metadata?.media) ? (msg.metadata.media as Array<Record<string, unknown>>) : [])
+                    .filter((a) => typeof a.url === 'string' && a.url)
+                    .map((a) => ({
+                      tipo: String(a.tipo || ''),
+                      url: String(a.url),
+                      nombre: a.nombre ? String(a.nombre) : null,
+                    }));
                   return (
                     <div
                       key={msg.id}
@@ -718,16 +728,44 @@ export default function WhatsAppPage() {
                               : 'Asistente'}
                           </p>
                         )}
-                        {/* Un audio o una foto llegan sin texto: sin esto la
-                            burbuja quedaba vacía y quien atiende no se enteraba
-                            de que el cliente había mandado algo. */}
-                        {!msg.content?.trim() && msg.metadata?.hasMedia ? (
+                        {/* Los adjuntos guardados se muestran acá mismo: la
+                            foto se ve, el audio se escucha, el documento se
+                            abre. Antes solo decía "se ve en WhatsApp", que
+                            obligaba a ir a buscar el teléfono. */}
+                        {adjuntos.map((a) => (
+                          <div key={a.url} className="mb-2">
+                            {a.tipo === 'imagen' || a.tipo === 'sticker' ? (
+                              <a href={a.url} target="_blank" rel="noopener noreferrer">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={a.url} alt="Adjunto del mensaje" className="rounded max-h-48 max-w-full" />
+                              </a>
+                            ) : a.tipo === 'audio' ? (
+                              <audio controls src={a.url} className="max-w-full" />
+                            ) : a.tipo === 'video' ? (
+                              <video controls src={a.url} className="rounded max-h-48 max-w-full" />
+                            ) : (
+                              <a
+                                href={a.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm underline break-all"
+                              >
+                                {a.nombre || 'Ver archivo adjunto'}
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                        {/* Un adjunto que no se pudo descargar llega sin url y
+                            sin texto: sin esto la burbuja quedaba vacía y quien
+                            atiende no se enteraba de que el cliente había
+                            mandado algo. */}
+                        {!msg.content?.trim() && adjuntos.length === 0 && msg.metadata?.hasMedia ? (
                           <p className="text-sm italic opacity-80">
                             Mandó un audio o una imagen — se ve en WhatsApp
                           </p>
-                        ) : (
+                        ) : msg.content?.trim() ? (
                           <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                        )}
+                        ) : null}
                         <p
                           className={`text-xs mt-1 ${
                             dePersona ? 'text-blue-200' : saliente ? 'text-green-200' : 'text-gray-400'

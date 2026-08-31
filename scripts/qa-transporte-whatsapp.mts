@@ -97,6 +97,72 @@ const audio = JSON.stringify({
 });
 verificar('audio marca media', uno(transporteMeta.leerEntrantes(audio, pedido('https://x/y')))?.tieneMedia, true);
 
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\nMeta — adjuntos: la referencia para descargarlos');
+
+// Antes el adjunto se reducia a un booleano y el id se tiraba: el archivo
+// llegaba al webhook y no habia forma de ir a buscarlo. Ahora el id, el mime y
+// el caption viajan en el mensaje.
+const fotoConCaption = JSON.stringify({
+  entry: [{ changes: [{ value: { messages: [{
+    from: '5491133334444', id: 'wm1', type: 'image',
+    image: { id: 'MEDIA-1', mime_type: 'image/jpeg', sha256: 'x', caption: '  Necesito una asi  ' },
+  }] } }] }],
+});
+verificar('foto con caption', uno(transporteMeta.leerEntrantes(fotoConCaption, pedido('https://x/y')))?.media, {
+  id: 'MEDIA-1',
+  tipo: 'imagen',
+  mime: 'image/jpeg',
+  caption: 'Necesito una asi',
+  nombreDeArchivo: null,
+});
+
+// Las notas de voz llegan como type audio con voice adentro.
+const notaDeVoz = JSON.stringify({
+  entry: [{ changes: [{ value: { messages: [{
+    from: '5491133334444', id: 'wm2', type: 'audio',
+    audio: { id: 'MEDIA-2', mime_type: 'audio/ogg; codecs=opus', voice: true },
+  }] } }] }],
+});
+verificar('nota de voz', uno(transporteMeta.leerEntrantes(notaDeVoz, pedido('https://x/y')))?.media, {
+  id: 'MEDIA-2',
+  tipo: 'audio',
+  mime: 'audio/ogg; codecs=opus',
+  caption: null,
+  nombreDeArchivo: null,
+});
+
+const documento = JSON.stringify({
+  entry: [{ changes: [{ value: { messages: [{
+    from: '5491133334444', id: 'wm3', type: 'document',
+    document: { id: 'MEDIA-3', mime_type: 'application/pdf', filename: 'orden-de-compra.pdf' },
+  }] } }] }],
+});
+verificar('documento trae su nombre', uno(transporteMeta.leerEntrantes(documento, pedido('https://x/y')))?.media, {
+  id: 'MEDIA-3',
+  tipo: 'documento',
+  mime: 'application/pdf',
+  caption: null,
+  nombreDeArchivo: 'orden-de-compra.pdf',
+});
+
+// Sin id no se promete un archivo que no se puede ir a buscar: tieneMedia
+// avisa que hubo algo, media no viene.
+const mediaSinId = JSON.stringify({
+  entry: [{ changes: [{ value: { messages: [{
+    from: '5491133334444', id: 'wm4', type: 'image', image: { mime_type: 'image/jpeg' },
+  }] } }] }],
+});
+const sinId = uno(transporteMeta.leerEntrantes(mediaSinId, pedido('https://x/y')));
+verificar('sin id: tieneMedia igual', sinId?.tieneMedia, true);
+verificar('sin id: media no viene', 'media' in (sinId ?? {}), false);
+
+// Y en un mensaje de texto el campo directamente no existe: las pruebas de
+// arriba comparan el objeto entero y lo verian aparecer.
+verificar('texto no trae media',
+  'media' in (uno(transporteMeta.leerEntrantes(mensajeDeTexto, pedido('https://x/y'))) ?? {}),
+  false);
+
 const boton = JSON.stringify({
   entry: [{ changes: [{ value: { messages: [{
     from: '5491133334444', id: 'w3', type: 'interactive',

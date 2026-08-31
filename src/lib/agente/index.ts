@@ -229,6 +229,8 @@ Cuando ofrezcas varias medidas van una por renglón, cada una empezando con un g
 
 Ya tenemos el número de quien escribe, así que no se lo pidas. Si deja el nombre o la empresa, guardalo.
 
+Acá la gente manda fotos, audios y archivos, y cuando el mensaje trae una foto o un PDF adjunto los estás viendo de verdad: miralos antes de contestar. Lo típico es una caja que quieren replicar —si se ven medidas anotadas o algo que permita estimarlas, usalas; si no, pedí las tres medidas—, un plano, o una orden de compra. Los audios te llegan ya transcriptos como texto; tomalos como si la persona lo hubiera escrito, sin aclarar que era un audio. Y si una nota entre corchetes te avisa que algo no se pudo ver o escuchar, decilo con tus palabras y seguí atendiendo con lo que sí tenés.
+
 Acá la plantilla de impresión NO va como link: cuando llamás a plantilla_impresion el PDF le llega adjunto al chat, solo. No pegues la URL ni le digas que la descargue de ningún lado —ya la tiene—, contale nada más qué es y que se la reenvíe a quien le arme el arte.
 
 Si el mensaje empieza con [COTIZADO-WEB], la persona ya cotizó en el sitio y viene a cerrar: el precio que trae es el nuestro. No vuelvas a cotizar ni preguntes las medidas otra vez. Confirmá y avanzá con lo que falta para el pedido: nombre, empresa, condición frente al IVA, dirección de entrega y si lleva impresión.
@@ -239,6 +241,17 @@ Ojo con ese caso: los números vienen escritos en el mensaje, no los calculaste 
 export interface TurnoConversacion {
   role: 'user' | 'assistant';
   content: string;
+}
+
+/**
+ * Un archivo que vino con el mensaje y el modelo puede mirar: una foto o un
+ * PDF. Va por URL y no en base64 porque ya está guardado en el bucket público
+ * —el panel lo muestra desde ahí— y la API lo busca sola: mandar los bytes de
+ * nuevo sería pagar el mismo archivo dos veces por request.
+ */
+export interface AdjuntoAgente {
+  tipo: 'imagen' | 'pdf';
+  url: string;
 }
 
 export interface RespuestaAgente {
@@ -272,12 +285,29 @@ export async function responder(
   mensaje: string,
   historial: TurnoConversacion[] = [],
   contexto: ContextoAgente & { paginaActual?: string } = { canal: 'web' },
+  adjuntos: AdjuntoAgente[] = [],
 ): Promise<RespuestaAgente> {
   if (!anthropic) throw new Error('ANTHROPIC_API_KEY no configurada');
 
   const dondeEsta = contexto.paginaActual
     ? `\n\nLa persona está en la página ${contexto.paginaActual} del sitio.`
     : '';
+
+  // Con adjuntos el turno va como bloques —las fotos o PDFs primero, el texto
+  // después, que es el orden en que mejor los lee el modelo—. Sin adjuntos
+  // sigue siendo un string, que es lo mismo para la API y más fácil de leer en
+  // un log.
+  const contenido: string | Anthropic.Beta.BetaContentBlockParam[] =
+    adjuntos.length === 0
+      ? mensaje + dondeEsta
+      : [
+          ...adjuntos.map((a): Anthropic.Beta.BetaContentBlockParam =>
+            a.tipo === 'imagen'
+              ? { type: 'image', source: { type: 'url', url: a.url } }
+              : { type: 'document', source: { type: 'url', url: a.url } },
+          ),
+          { type: 'text', text: mensaje + dondeEsta },
+        ];
 
   const runner = anthropic.beta.messages.toolRunner({
     model: MODELO,
@@ -295,7 +325,7 @@ export async function responder(
     max_iterations: 6,
     messages: [
       ...historial.slice(-10).map((t) => ({ role: t.role, content: t.content })),
-      { role: 'user' as const, content: mensaje + dondeEsta },
+      { role: 'user' as const, content: contenido },
     ],
   });
 

@@ -281,7 +281,7 @@ export async function getRecentConversationHistory(
     const desde = new Date(Date.now() - HISTORIAL_VIGENTE_DIAS * 24 * 60 * 60 * 1000).toISOString();
     const { data } = await supabase
       .from('communications')
-      .select('direction, content')
+      .select('direction, content, metadata')
       .eq('channel', 'whatsapp')
       .eq('metadata->>phone', phoneNumber)
       .gte('created_at', desde)
@@ -292,10 +292,21 @@ export async function getRecentConversationHistory(
 
     const turns: ConversationTurn[] = data
       .reverse()
-      .map((m) => ({
-        role: (m.direction === 'inbound' ? 'user' : 'assistant') as 'user' | 'assistant',
-        content: m.content || '',
-      }))
+      .map((m) => {
+        // Una foto sin texto quedaba con content vacio y desaparecia del
+        // historial: el agente contestaba el turno siguiente como si la foto
+        // nunca hubiera existido. La marca no reemplaza al archivo —el adjunto
+        // solo viaja en el turno en que llega— pero deja constancia de que
+        // hubo uno y de que tipo.
+        const media = (m.metadata as { media?: Array<{ tipo?: string }> } | null)?.media;
+        const marca = Array.isArray(media) && media.length
+          ? `[Mandó un adjunto: ${media.map((x) => x.tipo || 'archivo').join(', ')}]`
+          : '';
+        return {
+          role: (m.direction === 'inbound' ? 'user' : 'assistant') as 'user' | 'assistant',
+          content: m.content || marca,
+        };
+      })
       .filter((t) => t.content.trim().length > 0);
 
     return turns;

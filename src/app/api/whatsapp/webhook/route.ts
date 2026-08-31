@@ -20,9 +20,11 @@ import {
   getShippingMessage,
   getOutOfHoursMessage,
   getUnsupportedMediaMessage,
+  getMediaRecibidaMessage,
   isWithinBusinessHours,
   getPhoneQuoteHistory,
   detectarOpcion,
+  contienePalabra,
   esSoloUnSaludo,
   asistentePausado,
   pausarAsistente,
@@ -30,7 +32,12 @@ import {
   ClientType,
 } from '@/lib/whatsapp';
 import { calcularCotizacion } from '@/lib/cotizacion/motor';
-import { responder, agenteDisponible } from '@/lib/agente';
+import { responder, agenteDisponible, type AdjuntoAgente } from '@/lib/agente';
+import {
+  procesarMediaEntrante,
+  esAdjuntoParaAgente,
+  notasParaElAgente,
+} from '@/lib/whatsapp-media';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { HORARIO, RETAIL_CONFIG } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
@@ -58,6 +65,15 @@ import {
   isWhatsAppAIEnabled,
   type BoxTemplateResponse,
 } from '@/lib/whatsapp-ai';
+
+/**
+ * Este endpoint encadena llamadas lentas: descargar el adjunto de Meta,
+ * transcribirlo si es audio, y el ida y vuelta de herramientas del agente.
+ * Sin esto corre con el timeout por defecto del plan de Vercel, que un audio
+ * largo más una cotización pueden superar — y un timeout acá corta la
+ * respuesta DESPUÉS de haber cobrado el mensaje como procesado.
+ */
+export const maxDuration = 60;
 
 /**
  * Cotiza usando el mismo motor que la web, la API y el MCP.
@@ -363,13 +379,35 @@ export async function POST(request: NextRequest) {
       texto: aAtender.map((e) => e.texto).filter(Boolean).join('\n').trim(),
       tieneMedia: aAtender.some((e) => e.tieneMedia),
       id: aAtender[0].id,
+      // Cada mensaje trae a lo sumo un adjunto; el lote puede traer varios.
+      media: aAtender.flatMap((e) => (e.media ? [e.media] : [])),
     };
     if (aAtender.length > 1) {
       console.log('[WhatsApp] lote de %d mensajes de %s, se atiende junto', aAtender.length, entrante.telefono);
     }
 
     const phoneNumber = entrante.telefono;
-    const body = entrante.texto;
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Los adjuntos se procesan ANTES de armar el texto y de guardar nada:
+    // la transcripción de un audio y el texto que acompaña una foto SON el
+    // mensaje. Un audio que dice "necesito 500 cajas de 40x30x30" tiene que
+    // entrar al historial, al panel y al agente igual que si lo hubieran
+    // tipeado.
+    //
+    // Descargar y transcribir tarda un par de segundos que se suman antes del
+    // 200 a Meta. Si Meta reintenta por eso, el reclamo de arriba corta el
+    // duplicado, que es el mismo trato que ya tiene la llamada al modelo.
+    // ─────────────────────────────────────────────────────────────────────
+    const mediaGuardada = entrante.media.length
+      ? await procesarMediaEntrante(entrante.media, phoneNumber)
+      : [];
+
+    const body = [
+      entrante.texto,
+      ...mediaGuardada.map((m) => m.caption || ''),
+      ...mediaGuardada.map((m) => m.transcripcion || ''),
+    ].filter(Boolean).join('\n').trim();
     const from = phoneNumber;
     telefonoParaAvisarDelError = phoneNumber;
     const bodyLower = body.toLowerCase();
@@ -406,6 +444,19 @@ export async function POST(request: NextRequest) {
     // Guardar mensaje entrante con client_id si hay match
     await saveCommunication(phoneNumber, 'inbound', body, {
       hasMedia: entrante.tieneMedia,
+      // Con url en null el adjunto existió pero no se pudo traer: el panel
+      // muestra el aviso de siempre en vez de un archivo roto.
+      ...(mediaGuardada.length
+        ? {
+            media: mediaGuardada.map((m) => ({
+              tipo: m.tipo,
+              url: m.url,
+              mime: m.mime,
+              nombre: m.nombreDeArchivo,
+              transcrito: !!m.transcripcion,
+            })),
+          }
+        : {}),
     }, clientId);
 
     // ─────────────────────────────────────────────────────────────────────
@@ -457,7 +508,7 @@ export async function POST(request: NextRequest) {
       await notificarRespuestaEnConversacionTomada({
         telefono: phoneNumber,
         nombre: state.clientName || state.companyName,
-        mensaje: body,
+        mensaje: body || 'Mandó un archivo adjunto — se ve en el panel',
         tomadaPor: quien?.attended_by ?? null,
         urlDelPanel: `${SITE_URL}/whatsapp`,
       }).catch((e) => console.error('[WhatsApp] no se pudo avisar por Telegram:', e));
@@ -476,12 +527,30 @@ export async function POST(request: NextRequest) {
     // respaldo por si la API no esta disponible: es el mismo criterio que en el
     // chat del sitio, y no comparte proveedor con el camino principal.
     //
-    // Se salta cuando llega media, que el agente no puede leer, y cuando la
-    // conversacion ya venia a mitad de un flujo viejo, para no cortarle el paso
-    // a alguien que quedo esperando responder "1" o "2".
+    // Se salta cuando la conversacion ya venia a mitad de un flujo viejo, para
+    // no cortarle el paso a alguien que quedo esperando responder "1" o "2".
+    //
+    // La media YA NO lo saltea: las fotos y los PDFs van adjuntos y el modelo
+    // los mira; los audios entran transcriptos en el texto; y lo que no se
+    // puede ver —un video, un archivo caido— va como nota entre corchetes para
+    // que el agente lo diga en vez de contestar como si no hubiera llegado
+    // nada.
     // ─────────────────────────────────────────────────────────────────────
     const enFlujoViejo = state.step !== 'initial';
-    if (!entrante.tieneMedia && !enFlujoViejo && agenteDisponible()) {
+    const adjuntos: AdjuntoAgente[] = mediaGuardada
+      .filter(esAdjuntoParaAgente)
+      .map((m) => ({
+        tipo: m.tipo === 'documento' ? ('pdf' as const) : ('imagen' as const),
+        // El filtro de arriba garantiza que hay URL.
+        url: m.url!,
+      }));
+    const notasDeMedia = notasParaElAgente(mediaGuardada);
+    const mensajeParaAgente = [
+      body || (adjuntos.length ? '(La persona mandó solo el adjunto, sin texto.)' : ''),
+      ...notasDeMedia,
+    ].filter(Boolean).join('\n').trim();
+
+    if (mensajeParaAgente && !enFlujoViejo && agenteDisponible()) {
       try {
         const historial = await getRecentConversationHistory(phoneNumber, 10);
         // El teléfono viene solo, pero el nombre no: si el perfil del contacto
@@ -489,11 +558,11 @@ export async function POST(request: NextRequest) {
         // lo pida (una vez, después de resolver). Una conversación entera se
         // cerró con cotización y muestra sin saber cómo se llamaba el cliente.
         const perfil = await getContactProfileByPhone(phoneNumber);
-        const r = await responder(body, historial, {
+        const r = await responder(mensajeParaAgente, historial, {
           canal: 'whatsapp',
           telefono: phoneNumber,
           yaTenemosContacto: !!perfil?.displayName,
-        });
+        }, adjuntos);
         if (r.texto) {
           console.log(
             '[WhatsApp] agente ok. herramientas: %s',
@@ -536,11 +605,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Detectar media (audio/imagen/video)
-    if (entrante.tieneMedia) {
-      responseMessage = getUnsupportedMediaMessage();
+    // Media sin nada de texto que el respaldo pueda atender —ni tipeado, ni
+    // caption, ni transcripción— y el agente no estaba o no contestó. Si el
+    // archivo quedó guardado, se dice eso: el equipo lo ve en el panel. Solo si
+    // ni eso se pudo, vale el mensaje viejo de que no se pudo procesar.
+    if (entrante.tieneMedia && !body) {
+      responseMessage = mediaGuardada.some((m) => m.url)
+        ? getMediaRecibidaMessage()
+        : getUnsupportedMediaMessage();
     }
-    // Continuar con el flujo normal si no hay media
+    // Con texto (tipeado, caption o transcripto), el flujo de respaldo sigue normal
     else {
       // Patrones de mensajes de cierre
       const closingPatterns = [
@@ -563,12 +637,19 @@ export async function POST(request: NextRequest) {
       // Salidas de emergencia. Antes solo funcionaban con el texto exacto, asi
       // que "quiero cancelar" o "cancelar por favor" no hacian nada y la
       // persona quedaba atrapada en el paso donde estuviera.
-      const quiereSalir = detectarOpcion(body, [
-        { n: 1, palabras: ['cancelar', 'reiniciar', 'empezar', 'basta', 'salir'] },
-      ]) === 1;
-      const pideHumano = state.step !== 'quoted' && detectarOpcion(body, [
-        { n: 1, palabras: ['asesor', 'vendedor', 'humano'] },
-      ]) === 1;
+      //
+      // POR PALABRA, NUNCA POR NUMERO. Esto usaba detectarOpcion con n:1, y
+      // detectarOpcion tambien acepta el numero de la opcion: cualquier "1"
+      // —justo lo que piden los menus del flujo ("1 - Particular")— se leia
+      // como "cancelar" y borraba la conversacion entera. Paso el 31-08-2026:
+      // una clienta contesto los menus con "1" tres veces y las tres veces el
+      // bot le contesto "empezamos de cero". Y "empezar" a secas tampoco: es
+      // como la gente ARRANCA ("quiero empezar una cotizacion"), no como sale.
+      const quiereSalir = contienePalabra(body, [
+        'cancelar', 'reiniciar', 'empezar de nuevo', 'basta', 'salir',
+      ]);
+      const pideHumano =
+        state.step !== 'quoted' && contienePalabra(body, ['asesor', 'vendedor', 'humano']);
 
       // Comandos especiales
       if (quiereSalir) {

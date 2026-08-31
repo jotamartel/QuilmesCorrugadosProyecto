@@ -847,6 +847,21 @@ Queres confirmar el pedido?
  * limite de palabra. Si no hay nada claro devuelve null y quien llama vuelve a
  * preguntar, que es mucho mejor que adivinar.
  */
+/**
+ * Si el texto contiene alguna de las palabras o frases, con límite de palabra.
+ *
+ * Para DETECTORES de intención ("cancelar", "asesor"), no para menús.
+ * detectarOpcion también acepta el número de la opción, y usado como detector
+ * convertía cualquier "1" en la opción 1: el 31-08-2026 toda respuesta "1"
+ * —justo lo que piden los menús del flujo ("1 - Particular")— caía en la
+ * salida de emergencia "cancelar" y borraba la conversación entera.
+ */
+export function contienePalabra(texto: string, palabras: string[]): boolean {
+  const plano =
+    ' ' + texto.trim().toLowerCase().replace(/[^a-záéíóúüñ0-9]+/gi, ' ').trim() + ' ';
+  return palabras.some((p) => plano.includes(' ' + p.toLowerCase() + ' '));
+}
+
 export function detectarOpcion(
   texto: string,
   opciones: Array<{
@@ -997,6 +1012,10 @@ O si queres una cotizacion rapida, escribi "cotizar" y nuestro asistente automat
 
 /**
  * Genera mensaje para media no soportada (audio/imagen)
+ *
+ * Queda solo para el caso en que el archivo NO se pudo descargar: desde que
+ * los adjuntos se guardan y el agente los mira, "no puedo procesarlo" dejo de
+ * ser verdad para el resto de los casos.
  */
 export function getUnsupportedMediaMessage(): string {
   return `No puedo procesar audios ni imagenes.
@@ -1004,6 +1023,18 @@ export function getUnsupportedMediaMessage(): string {
 Por favor, escribi tu consulta como texto.
 
 Escribe "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
+}
+
+/**
+ * El archivo llego y quedo guardado, pero no hay agente que lo mire en el
+ * momento (API caida o sin configurar). Distinto del de arriba: aca el
+ * archivo NO se perdio, y decir "no puedo procesarlo" seria mentirle a
+ * alguien cuyo archivo el equipo va a ver en el panel.
+ */
+export function getMediaRecibidaMessage(): string {
+  return `Recibimos tu archivo y queda guardado para que lo vea el equipo.
+
+Si me contas por texto que necesitas, te ayudo en el momento. Escribi "cotizar" para una cotizacion o "asesor" para hablar con alguien.`;
 }
 
 /**

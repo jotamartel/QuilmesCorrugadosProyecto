@@ -21,6 +21,8 @@ import {
   Mail,
   ExternalLink,
   FileText,
+  Pencil,
+  Check,
   ShoppingCart,
   Bell,
 } from 'lucide-react';
@@ -40,6 +42,14 @@ interface WhatsAppConversation {
   /** Mientras esté en el futuro, el asistente no responde esta conversación. */
   bot_pausado_hasta?: string | null;
   notes?: string;
+  /**
+   * El nombre para mostrar, ya resuelto por el endpoint: el que puso alguien
+   * del panel, el que dejó la persona, o el de su perfil de WhatsApp. Null si
+   * no hay ninguno.
+   */
+  nombre?: string | null;
+  /** El que se puso a mano desde el panel. */
+  nombre_panel?: string | null;
   last_interaction: string;
   created_at: string;
   // Stats calculadas
@@ -99,6 +109,11 @@ export default function WhatsAppPage() {
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
   const [reabriendo, setReabriendo] = useState(false);
+  // Ponerle nombre a un chat. Pedido de Florencia: con varias consultas
+  // entrando, reconocer cada chat por el número obligaba a abrirlos uno por uno.
+  const [editandoNombre, setEditandoNombre] = useState(false);
+  const [nombreNuevo, setNombreNuevo] = useState('');
+  const [guardandoNombre, setGuardandoNombre] = useState(false);
 
   // Filtros
   const [filter, setFilter] = useState<FilterType>('all');
@@ -233,6 +248,25 @@ export default function WhatsAppPage() {
     }
   };
 
+  const guardarNombre = async (phoneNumber: string) => {
+    setGuardandoNombre(true);
+    try {
+      const res = await fetch('/api/whatsapp/conversations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber, nombre: nombreNuevo }),
+      });
+      if (res.ok) {
+        setEditandoNombre(false);
+        fetchConversations(true);
+      } else {
+        alert('No se pudo guardar el nombre');
+      }
+    } finally {
+      setGuardandoNombre(false);
+    }
+  };
+
   const markAsAttended = async (phoneNumber: string, notes?: string) => {
     try {
       const response = await fetch('/api/whatsapp/conversations', {
@@ -266,8 +300,9 @@ export default function WhatsAppPage() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Teléfono', 'Última interacción', 'Mensajes', 'Cotizaciones', 'Total cotizado', 'Pide asesor', 'Atendido'];
+    const headers = ['Nombre', 'Teléfono', 'Última interacción', 'Mensajes', 'Cotizaciones', 'Total cotizado', 'Pide asesor', 'Atendido'];
     const rows = conversations.map(conv => [
+      conv.nombre || '',
       conv.phone_number,
       new Date(conv.last_interaction).toLocaleString('es-AR'),
       conv.message_count,
@@ -520,7 +555,7 @@ export default function WhatsAppPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Buscar por teléfono..."
+                placeholder="Buscar por nombre o teléfono..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
@@ -568,7 +603,7 @@ export default function WhatsAppPage() {
               conversations.map((conv) => (
                 <button
                   key={conv.id}
-                  onClick={() => setSelectedConversation(conv.phone_number)}
+                  onClick={() => { setSelectedConversation(conv.phone_number); setEditandoNombre(false); }}
                   className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${
                     selectedConversation === conv.phone_number ? 'bg-blue-50' : ''
                   }`}
@@ -592,9 +627,10 @@ export default function WhatsAppPage() {
                       </div>
                       <div>
                         <p className={`font-medium ${conv.attended ? 'text-gray-500' : 'text-gray-900'}`}>
-                          {formatPhone(conv.phone_number)}
+                          {conv.nombre || formatPhone(conv.phone_number)}
                         </p>
                         <p className="text-sm text-gray-500">
+                          {conv.nombre ? `${formatPhone(conv.phone_number)} · ` : ''}
                           {conv.message_count} msgs · {conv.quotes_count} cot.
                         </p>
                       </div>
@@ -645,7 +681,47 @@ export default function WhatsAppPage() {
                     )}
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900">{formatPhone(selectedConv.phone_number)}</p>
+                    {editandoNombre ? (
+                      <form
+                        className="flex items-center gap-1"
+                        onSubmit={(e) => { e.preventDefault(); guardarNombre(selectedConv.phone_number); }}
+                      >
+                        <input
+                          autoFocus
+                          value={nombreNuevo}
+                          onChange={(e) => setNombreNuevo(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Escape') setEditandoNombre(false); }}
+                          placeholder="Nombre (ej: Hernán - ventiladores)"
+                          maxLength={120}
+                          className="px-2 py-1 border border-gray-300 rounded text-sm w-64 focus:ring-2 focus:ring-green-500"
+                        />
+                        <button type="submit" disabled={guardandoNombre} title="Guardar"
+                          className="p-1.5 text-green-700 hover:bg-green-50 rounded">
+                          <Check className="w-4 h-4" />
+                        </button>
+                        <button type="button" onClick={() => setEditandoNombre(false)} title="Cancelar"
+                          className="p-1.5 text-gray-500 hover:bg-gray-100 rounded">
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      </form>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <p className="font-semibold text-gray-900">
+                          {selectedConv.nombre || formatPhone(selectedConv.phone_number)}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => { setNombreNuevo(selectedConv.nombre_panel || selectedConv.nombre || ''); setEditandoNombre(true); }}
+                          title="Ponerle un nombre a este chat"
+                          className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                    {selectedConv.nombre && (
+                      <p className="text-xs text-gray-500">{formatPhone(selectedConv.phone_number)}</p>
+                    )}
                     <div className="flex items-center gap-2">
                       <p className="text-sm text-gray-500">{selectedConv.message_count} mensajes</p>
                       {selectedConv.needs_advisor && !selectedConv.attended && (

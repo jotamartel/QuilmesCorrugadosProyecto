@@ -83,6 +83,9 @@ verificar('texto', uno(transporteMeta.leerEntrantes(mensajeDeTexto, pedido('http
   texto: 'Hola, necesito cajas',
   tieneMedia: false,
   id: 'wamid.ABC',
+  // El nombre del perfil, que viene en contacts: es lo que el panel muestra en
+  // vez del número.
+  nombrePerfil: 'Cliente',
 });
 
 // Un aviso de estado llega por el MISMO webhook. Confundirlo con un mensaje

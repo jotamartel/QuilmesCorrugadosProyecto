@@ -75,6 +75,13 @@ export interface MensajeEntrante {
    */
   media?: MediaEntrante;
   /**
+   * El nombre que la persona tiene puesto en su perfil de WhatsApp, si el
+   * proveedor lo manda. No es un dato verificado —puede ser un apodo o el
+   * nombre del comercio—, pero es mucho mejor que un número para reconocer una
+   * conversación en el panel. Opcional por lo mismo que media.
+   */
+  nombrePerfil?: string;
+  /**
    * El id que le puso el proveedor a este mensaje.
    *
    * Todavía no se usa. Queda expuesto porque es lo que hace falta para volver

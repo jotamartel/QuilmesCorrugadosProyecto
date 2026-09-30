@@ -104,6 +104,7 @@ export const transporteTwilio: Transporte = {
       texto: (params.Body || '').trim(),
       tieneMedia,
       id: params.MessageSid || null,
+      ...(params.ProfileName?.trim() ? { nombrePerfil: params.ProfileName.trim() } : {}),
     };
     return [entrante];
   },

@@ -57,10 +57,8 @@ export async function GET(request: NextRequest) {
       query = query.lte('last_interaction', dateTo + 'T23:59:59');
     }
 
-    // Aplicar búsqueda por teléfono
-    if (search) {
-      query = query.ilike('phone_number', `%${search}%`);
-    }
+    // La búsqueda se aplica más abajo, sobre el nombre Y el teléfono: el
+    // nombre puede venir de contact_profiles, que no está en esta consulta.
 
     // Aplicar filtro de estado
     if (filter === 'unattended') {
@@ -72,6 +70,17 @@ export async function GET(request: NextRequest) {
     if (error) {
       throw error;
     }
+
+    // Los nombres que dejó cada persona (o que tomó el bot) viven en
+    // contact_profiles. Se traen en una sola consulta para todas.
+    const telefonos = (conversations || []).map((c) => c.phone_number);
+    const { data: perfiles } = telefonos.length
+      ? await supabase
+          .from('contact_profiles')
+          .select('phone_number, display_name, company_name')
+          .in('phone_number', telefonos)
+      : { data: [] as Array<{ phone_number: string; display_name: string | null; company_name: string | null }> };
+    const perfilDe = new Map((perfiles || []).map((p) => [p.phone_number, p]));
 
     // Obtener estadísticas de cada conversación desde communications
     const enrichedConversations = await Promise.all(
@@ -96,8 +105,21 @@ export async function GET(request: NextRequest) {
           (m.metadata as Record<string, unknown>)?.needsAdvisor
         ) || false;
 
+        // El nombre para mostrar, en orden de confianza: el que puso
+        // Florencia a mano, el que dejó la persona (o su empresa), el de su
+        // perfil de WhatsApp. Null si no hay ninguno: el panel muestra el número.
+        const perfil = perfilDe.get(conv.phone_number);
+        const nombreConocido = perfil?.display_name || conv.client_name || null;
+        const empresa = perfil?.company_name || conv.company_name || null;
+        const nombre =
+          conv.nombre_panel ||
+          (nombreConocido && empresa ? `${nombreConocido} (${empresa})` : nombreConocido || empresa) ||
+          conv.nombre_perfil ||
+          null;
+
         return {
           ...conv,
+          nombre,
           message_count: messageCount,
           quotes_count: quotedMessages.length,
           total_quoted: totalQuoted,
@@ -108,6 +130,18 @@ export async function GET(request: NextRequest) {
 
     // Filtrar por needs_advisor o quoted si es necesario
     let filteredConversations = enrichedConversations;
+    if (search) {
+      // Por nombre o por teléfono, sin importar mayúsculas ni tildes. Los
+      // dígitos se comparan aparte para que "1133" encuentre "+54 9 11 3341".
+      const sinTildes = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const buscado = sinTildes(search.trim());
+      const digitos = search.replace(/\D/g, '');
+      filteredConversations = filteredConversations.filter((c) =>
+        (c.nombre && sinTildes(c.nombre).includes(buscado)) ||
+        (c.nombre_perfil && sinTildes(c.nombre_perfil).includes(buscado)) ||
+        (digitos.length >= 3 && c.phone_number.replace(/\D/g, '').includes(digitos)),
+      );
+    }
     if (filter === 'needs_advisor') {
       filteredConversations = enrichedConversations.filter(c => c.needs_advisor);
     } else if (filter === 'quoted') {
@@ -163,6 +197,19 @@ export async function PATCH(request: NextRequest) {
         { error: 'phoneNumber es requerido' },
         { status: 400 }
       );
+    }
+
+    // Ponerle nombre a una conversación, desde el panel. Va sola: no toca si
+    // está atendida ni las notas. Vacío borra el nombre y vuelve a mostrarse
+    // el que haya (perfil de WhatsApp o el que dejó la persona).
+    if ('nombre' in body) {
+      const nombre = typeof body.nombre === 'string' ? body.nombre.trim().slice(0, 120) : '';
+      const { error } = await supabase
+        .from('whatsapp_conversations')
+        .update({ nombre_panel: nombre || null })
+        .eq('phone_number', phoneNumber);
+      if (error) throw error;
+      return NextResponse.json({ success: true });
     }
 
     const { error } = await supabase

@@ -422,6 +422,7 @@ export async function POST(request: NextRequest) {
       id: aAtender[0].id,
       // Cada mensaje trae a lo sumo un adjunto; el lote puede traer varios.
       media: aAtender.flatMap((e) => (e.media ? [e.media] : [])),
+      nombrePerfil: aAtender.find((e) => e.nombrePerfil)?.nombrePerfil,
     };
     if (aAtender.length > 1) {
       console.log('[WhatsApp] lote de %d mensajes de %s, se atiende junto', aAtender.length, entrante.telefono);
@@ -521,6 +522,19 @@ export async function POST(request: NextRequest) {
     // por lo que ordena el panel.
     // ─────────────────────────────────────────────────────────────────────
     await updateConversationState(phoneNumber, {});
+
+    // El nombre del perfil de WhatsApp, para que el panel muestre un nombre y
+    // no un número. Se pisa cada vez por si la persona lo cambió; el que pone
+    // Florencia a mano va en otra columna (nombre_panel) y no se toca.
+    if (entrante.nombrePerfil) {
+      await createAdminClient()
+        .from('whatsapp_conversations')
+        .update({ nombre_perfil: entrante.nombrePerfil.slice(0, 120) })
+        .eq('phone_number', phoneNumber)
+        .then(({ error }) => {
+          if (error) console.error('[WhatsApp] no se pudo guardar el nombre del perfil:', error);
+        });
+    }
     // ─────────────────────────────────────────────────────────────────────
     // Si una persona esta atendiendo esta conversacion, el asistente se calla.
     //

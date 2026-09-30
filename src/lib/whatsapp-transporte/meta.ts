@@ -394,9 +394,20 @@ export const transporteMeta: Transporte = {
             ? (valor!.messages as unknown[])
             : [];
 
+          // El nombre del perfil viaja aparte, en contacts, atado al wa_id.
+          const nombres = new Map<string, string>();
+          for (const c of Array.isArray(valor?.contacts) ? (valor!.contacts as unknown[]) : []) {
+            const contacto = c as { wa_id?: unknown; profile?: { name?: unknown } };
+            if (typeof contacto?.wa_id === 'string' && typeof contacto.profile?.name === 'string' && contacto.profile.name.trim()) {
+              nombres.set(contacto.wa_id, contacto.profile.name.trim());
+            }
+          }
+
           for (const bruto of mensajes) {
             const entrante = comoMensajeEntrante(bruto as Record<string, unknown>);
-            if (entrante) entrantes.push(entrante);
+            if (!entrante) continue;
+            const nombre = nombres.get(String((bruto as Record<string, unknown>)?.from ?? ''));
+            entrantes.push(nombre ? { ...entrante, nombrePerfil: nombre } : entrante);
           }
         }
       }

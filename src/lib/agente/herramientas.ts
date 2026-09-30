@@ -33,6 +33,7 @@ import { sendNotification } from '@/lib/notifications';
 import { CONTACTO } from '@/lib/contacto';
 import { upsertContactProfile } from '@/lib/contact-matching';
 import { SITE_URL } from '@/lib/site';
+import { leerRollos, buscarRollo, cotizarRollos, nombreDeRollo } from '@/lib/rollos';
 
 /**
  * Las herramientas del agente de ventas.
@@ -1379,6 +1380,112 @@ export function crearHerramientas(ctx: ContextoAgente) {
    * Si la configuracion esta incompleta, la herramienta lo dice y el agente
    * deriva — nunca da la mitad de los datos.
    */
+  /**
+   * Rollos de cartón corrugado para embalaje.
+   *
+   * Faltaba: la fábrica vende rollos y el bot contestaba "no tengo la certeza
+   * de si vendemos rollos", así que cada consulta la cotizaba una persona. Los
+   * precios salen de Configuración → Rollos (tabla rollos_precios).
+   */
+  const preciosDeRollos = betaTool({
+    name: 'precios_de_rollos',
+    description:
+      'Rollos de cartón corrugado para embalaje (para envolver, proteger o separar; NO son ' +
+      'cajas). Sin parámetros devuelve las medidas que se venden con su precio. Con la medida ' +
+      'y la cantidad devuelve la cotización: precio por rollo, subtotal sin IVA, IVA y total. ' +
+      'Es la ÚNICA fuente de precios de rollos: nunca los estimes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ancho: {
+          type: 'number',
+          description: 'Ancho del rollo en metros (1.2) o centímetros (120), como lo dijo la persona.',
+        },
+        largo_m: { type: 'number', description: 'Largo del rollo en metros (20, 25). Opcional si hay una sola medida con ese ancho.' },
+        cantidad: { type: 'integer', description: 'Cantidad de rollos, si la dijo.' },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    run: async (args) => {
+      let rollos;
+      try {
+        rollos = await leerRollos();
+      } catch {
+        return JSON.stringify({
+          hay_precio: false,
+          instruccion: 'No se pudieron leer los precios de rollos. No inventes uno: usá no_se_la_respuesta para que el equipo lo cotice.',
+        });
+      }
+      if (!rollos.length) {
+        return JSON.stringify({
+          hay_precio: false,
+          instruccion: 'Hoy no hay rollos con precio cargado. Usá no_se_la_respuesta para que el equipo lo cotice a mano.',
+        });
+      }
+
+      const lista = rollos.map((r) => ({
+        medida: nombreDeRollo(r),
+        precio_por_rollo_sin_iva: r.precio_unitario,
+        ...(r.precio_mayorista !== null
+          ? { precio_mayorista_sin_iva: r.precio_mayorista, mayorista_desde_rollos: r.mayorista_desde }
+          : {}),
+      }));
+      const condiciones =
+        'Precios por rollo, en pesos y sin IVA (21%). El envío no está incluido: se retira en ' +
+        `la fábrica (${CONTACTO.direccion}) o se cotiza el flete aparte.`;
+
+      if (typeof args.ancho !== 'number') {
+        return JSON.stringify({
+          medidas_disponibles: lista,
+          condiciones,
+          instruccion:
+            'Pasale las medidas con su precio (y el mayorista si lo hay) y preguntale qué medida y ' +
+            'cuántos rollos necesita para darle el total.',
+        });
+      }
+
+      const rollo = buscarRollo(rollos, args.ancho, args.largo_m);
+      if (!rollo) {
+        return JSON.stringify({
+          hay_precio: false,
+          medidas_disponibles: lista,
+          condiciones,
+          instruccion:
+            'Esa medida no está entre las que tienen precio. Ofrecele las de medidas_disponibles; ' +
+            'si necesita otra, usá no_se_la_respuesta para que el equipo la cotice.',
+        });
+      }
+
+      if (typeof args.cantidad !== 'number' || args.cantidad < 1) {
+        return JSON.stringify({
+          medida: nombreDeRollo(rollo),
+          precio_por_rollo_sin_iva: rollo.precio_unitario,
+          ...(rollo.precio_mayorista !== null
+            ? { precio_mayorista_sin_iva: rollo.precio_mayorista, mayorista_desde_rollos: rollo.mayorista_desde }
+            : {}),
+          condiciones,
+          instruccion: 'Pasale el precio por rollo y preguntale cuántos necesita para darle el total.',
+        });
+      }
+
+      const q = cotizarRollos(rollo, args.cantidad);
+      return JSON.stringify({
+        ...q,
+        condiciones,
+        ...pedirContactoSiCorresponde(),
+        instruccion:
+          'Dale el precio por rollo, el subtotal sin IVA y el total con IVA, en pesos, y aclarale ' +
+          'que el envío va aparte. ' +
+          (q.es_precio_mayorista ? 'Decile que es el precio mayorista. ' : '') +
+          (q.mayorista && q.mayorista.faltan <= q.mayorista.desde * 0.5
+            ? `Contale que desde ${q.mayorista.desde} rollos el precio baja a $${q.mayorista.precio.toLocaleString('es-AR')} por rollo. `
+            : '') +
+          'Si quiere avanzar, guardá sus datos con guardar_lead contando los rollos en el resumen.',
+      });
+    },
+  });
+
   const datosParaTransferir = betaTool({
     name: 'datos_para_transferir',
     description:
@@ -1424,6 +1531,7 @@ export function crearHerramientas(ctx: ContextoAgente) {
     plantillaDeImpresion,
     condicionesDePago,
     datosParaTransferir,
+    preciosDeRollos,
     guardarLead,
     noSeLaRespuesta,
     derivarAHumano,

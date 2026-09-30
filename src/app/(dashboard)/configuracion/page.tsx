@@ -20,13 +20,15 @@ import {
   XCircle,
   RefreshCw,
   Palette,
-  Layers
+  Layers,
+  Package
 } from 'lucide-react';
+import { RollosConfig } from '@/components/config/RollosConfig';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { formatDate } from '@/lib/utils/dates';
 import type { PricingConfig, FullSystemConfig } from '@/lib/types/database';
 
-type Tab = 'precios' | 'empresa' | 'xubio' | 'arba';
+type Tab = 'precios' | 'rollos' | 'empresa' | 'xubio' | 'arba';
 
 export default function ConfiguracionPage() {
   const [activeTab, setActiveTab] = useState<Tab>('precios');
@@ -228,6 +230,7 @@ export default function ConfiguracionPage() {
 
   const tabs = [
     { id: 'precios' as Tab, label: 'Precios', icon: DollarSign },
+    { id: 'rollos' as Tab, label: 'Rollos', icon: Package },
     { id: 'empresa' as Tab, label: 'Empresa', icon: Building2 },
     { id: 'xubio' as Tab, label: 'Xubio', icon: Link },
     { id: 'arba' as Tab, label: 'ARBA COT', icon: FileText },
@@ -824,6 +827,9 @@ export default function ConfiguracionPage() {
             </Card>
           </div>
         )}
+
+        {/* Rollos: los precios que usa el bot para cotizar rollos */}
+        {activeTab === 'rollos' && <RollosConfig />}
 
         {/* ARBA Tab */}
         {activeTab === 'arba' && (

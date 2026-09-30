@@ -1,6 +1,6 @@
 {
   "name": "quilmes-corrugados",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "CLI oficial de Quilmes Corrugados: cotizá cajas de cartón corrugado a medida en Argentina desde la terminal, con el precio real de fábrica. Sin registro.",
   "type": "module",
   "bin": {

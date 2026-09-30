@@ -44,7 +44,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         subtotal,
         estimated_days,
         status,
-        created_at
+        created_at,
+        material,
+        items
       `)
       .eq('id', id)
       .single();

@@ -2,6 +2,8 @@
 
 export type PaymentTerms = 'contado' | 'cheque_30';
 import { SENA_PCT } from '@/lib/pagos/esquemas';
+import type { Material } from '@/lib/cotizacion/material';
+import type { ItemDeCotizacionWeb } from '@/lib/cotizacion/web';
 
 export type PaymentMethod = 'transferencia' | 'cheque' | 'efectivo' | 'echeq';
 export type QuoteStatus = 'draft' | 'sent' | 'approved' | 'rejected' | 'expired' | 'converted';
@@ -1083,6 +1085,14 @@ export interface PublicQuote {
   quantity: number | null;
   has_printing: boolean;
   printing_colors: number;
+  material?: Material;
+  /**
+   * El pedido entero cuando viene del cotizador del sitio, una entrada por
+   * medida (migración 042). Las columnas de caja de arriba son la PRIMERA
+   * medida; total_sqm y subtotal, los del pedido entero. Null en consultas
+   * viejas o del bot: ahí la única medida es la de las columnas.
+   */
+  items?: ItemDeCotizacionWeb[] | null;
 
   // Diseño
   design_file_url: string | null;

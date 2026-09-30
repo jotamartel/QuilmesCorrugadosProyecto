@@ -50,8 +50,8 @@ console.log('\nReforzado 130 libras: la caja de 1000x600x600 para tambores');
   ok('se cotiza', q.cotizable);
   if (q.cotizable) {
     const b = q.boxes[0];
-    const esperado = 1300 * (b.pieces === 2 ? 1.25 : 1);
-    ok('a $1.300 por m² (con el 25% si va en mitades)', b.price_per_m2 === esperado, `${b.price_per_m2} vs ${esperado}`);
+    const esperado = config.price_per_m2_r130! * (b.pieces === 2 ? 1.25 : 1);
+    ok('al precio del panel (con el 25% si va en mitades)', b.price_per_m2 === esperado, `${b.price_per_m2} vs ${esperado}`);
     ok('el resumen nombra el 130', q.summary.includes('reforzado 130 libras'), q.summary);
     console.log(`        precio por caja: $${b.unit_price} (Florencia: $5.850)`);
   }

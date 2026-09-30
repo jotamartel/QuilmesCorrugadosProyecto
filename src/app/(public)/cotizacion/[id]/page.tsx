@@ -13,6 +13,9 @@ import { formatCurrency } from '@/lib/utils/pricing';
 import { precioUnitarioARS, VARIACION_PRODUCCION_PCT } from '@/lib/cotizacion/motor';
 import { SENA_PCT } from '@/lib/pagos/esquemas';
 import { CONTACTO } from '@/lib/contacto';
+import { MedidasDelPedido, tieneVariasMedidas } from '@/components/public/MedidasDelPedido';
+import { MATERIALES, type Material } from '@/lib/cotizacion/material';
+import type { ItemDeCotizacionWeb } from '@/lib/cotizacion/web';
 
 // Importar BoxPreview3D dinámicamente
 const BoxPreview3D = dynamic(
@@ -49,6 +52,8 @@ interface PublicQuoteData {
   estimated_days: number;
   status: string;
   created_at: string;
+  material: Material | null;
+  items: ItemDeCotizacionWeb[] | null;
 }
 
 const WHATSAPP_NUMBER = CONTACTO.telefonoE164;
@@ -147,7 +152,11 @@ export default function QuoteConfirmationPage() {
   }
 
   const createdDate = new Date(quote.created_at);
-  const whatsappMessage = `Hola, acabo de enviar una cotización web (${quote.quote_number_formatted}) para ${quote.quantity} cajas de ${quote.length_mm}x${quote.width_mm}x${quote.height_mm}mm`;
+  const varias = tieneVariasMedidas(quote.items);
+  const whatsappMessage = varias
+    ? `Hola, acabo de enviar una cotización web (${quote.quote_number_formatted}) con ${quote.items!.length} medidas: ` +
+      quote.items!.map((i) => `${i.quantity} de ${i.length_mm}x${i.width_mm}x${i.height_mm}mm`).join(', ')
+    : `Hola, acabo de enviar una cotización web (${quote.quote_number_formatted}) para ${quote.quantity} cajas de ${quote.length_mm}x${quote.width_mm}x${quote.height_mm}mm`;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -195,6 +204,24 @@ export default function QuoteConfirmationPage() {
                   Resumen del pedido
                 </h2>
 
+                {varias ? (
+                  <div className="space-y-3 text-sm">
+                    <MedidasDelPedido items={quote.items!} />
+                    <hr className="my-3" />
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">m² totales:</span>
+                      <span className="font-medium">{quote.total_sqm.toLocaleString('es-AR', { minimumFractionDigits: 2 })} m²</span>
+                    </div>
+                    <div className="flex justify-between text-lg font-bold">
+                      <span>Total estimado:</span>
+                      <span className="text-amber-600">{formatCurrency(quote.subtotal)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-600 bg-gray-50 rounded-lg p-3 mt-4">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <span>Entrega estimada: <strong>{quote.estimated_days} días hábiles</strong></span>
+                    </div>
+                  </div>
+                ) : (
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-500">Dimensiones:</span>
@@ -204,6 +231,12 @@ export default function QuoteConfirmationPage() {
                     <span className="text-gray-500">Cantidad:</span>
                     <span className="font-medium">{quote.quantity.toLocaleString('es-AR')} unidades</span>
                   </div>
+                  {quote.material && quote.material !== 'simple' && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Cartón:</span>
+                      <span className="font-medium">{MATERIALES[quote.material].nombre}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-500">Impresión:</span>
                     <span className="font-medium">
@@ -249,6 +282,7 @@ export default function QuoteConfirmationPage() {
                     <span>Entrega estimada: <strong>{quote.estimated_days} días hábiles</strong></span>
                   </div>
                 </div>
+                )}
               </div>
             </div>
 
@@ -357,7 +391,7 @@ export default function QuoteConfirmationPage() {
               </a>
 
               {/* Botón para pedidos menores al mínimo */}
-              {pricingConfig && quote.total_sqm > pricingConfig.wholesale_min_m2 && (
+              {pricingConfig && !varias && quote.total_sqm > pricingConfig.wholesale_min_m2 && (
                 <button
                   onClick={() => setShowBelowMinimumModal(true)}
                   className="w-full px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"

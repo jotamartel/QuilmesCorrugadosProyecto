@@ -154,7 +154,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           // la cotización era la que mentía.
           channel: publicQuote.source === 'whatsapp' ? 'whatsapp' : 'web',
           total_m2: publicQuote.total_sqm,
-          price_per_m2: publicQuote.price_per_m2,
+          // Con varias medidas cada una tiene su precio por m²; la cotización
+          // lleva el promedio ponderado, que es el que cierra con el subtotal.
+          price_per_m2:
+            Array.isArray(publicQuote.items) && publicQuote.items.length > 1 && publicQuote.total_sqm > 0
+              ? Math.round((publicQuote.subtotal / publicQuote.total_sqm) * 100) / 100
+              : publicQuote.price_per_m2,
           subtotal: publicQuote.subtotal,
           has_printing: publicQuote.has_printing,
           printing_colors: publicQuote.printing_colors || 0,
@@ -191,18 +196,26 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         }
 
         if (!quoteError && quote) {
-          // Crear item de cotización
-          const itemData = {
+          // Un item por medida. Las consultas viejas (y las del bot) no traen
+          // items: ahí la única medida es la de las columnas.
+          const medidas: Array<{
+            length_mm: number; width_mm: number; height_mm: number;
+            sheet_length_mm: number; sheet_width_mm: number;
+            sqm_per_box: number; quantity: number; total_sqm: number;
+          }> = Array.isArray(publicQuote.items) && publicQuote.items.length
+            ? publicQuote.items
+            : [publicQuote];
+          const itemData = medidas.map((m) => ({
             quote_id: quote.id,
-            length_mm: publicQuote.length_mm,
-            width_mm: publicQuote.width_mm,
-            height_mm: publicQuote.height_mm,
-            unfolded_length_mm: publicQuote.sheet_length_mm,
-            unfolded_width_mm: publicQuote.sheet_width_mm,
-            m2_per_box: publicQuote.sqm_per_box,
-            quantity: publicQuote.quantity,
-            total_m2: publicQuote.total_sqm,
-          };
+            length_mm: m.length_mm,
+            width_mm: m.width_mm,
+            height_mm: m.height_mm,
+            unfolded_length_mm: m.sheet_length_mm,
+            unfolded_width_mm: m.sheet_width_mm,
+            m2_per_box: m.sqm_per_box,
+            quantity: m.quantity,
+            total_m2: m.total_sqm,
+          }));
 
           console.log('Creating quote item with data:', itemData);
 

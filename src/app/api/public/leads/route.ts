@@ -6,13 +6,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { calculateUnfolded, calculateTotalM2, RECARGO_DOS_MITADES } from '@/lib/utils/box-calculations';
-import { getPricePerM2, calculateSubtotal } from '@/lib/utils/pricing';
-import { sendNotification } from '@/lib/notifications';
+import { calcularCajasWeb } from '@/lib/cotizacion/web';
 import { notifyNewRetailLead } from '@/lib/telegram/notifications';
 import { sanitizarAtribucion } from '@/lib/utils/atribucion';
 import type { PricingConfig } from '@/lib/types/database';
-import { leerMaterial, materialDisponible, type Material } from '@/lib/cotizacion/material';
+import type { Material } from '@/lib/cotizacion/material';
 
 interface BoxData {
   length_mm: number;
@@ -105,45 +103,11 @@ export async function POST(request: NextRequest) {
     // CALCULAR TOTALES PARA TODAS LAS CAJAS
     // ═══════════════════════════════════════════════════════════
 
-    let totalSqmAll = 0;
-    const boxCalculations = body.boxes.map(box => {
-      // Un material que no se reconoce o que ya no tiene precio se cotiza en el
-      // estándar, que es lo mismo que muestra el formulario en ese caso.
-      const pedido = leerMaterial(box.material) ?? 'simple';
-      const material: Material = materialDisponible(config, pedido) ? pedido : 'simple';
-      const unfolded = calculateUnfolded(box.length_mm, box.width_mm, box.height_mm);
-      const totalSqm = calculateTotalM2(unfolded.m2, box.quantity);
-      totalSqmAll += totalSqm;
-      return {
-        ...box,
-        material,
-        design_file_url: box.design_file_url || null,
-        design_file_name: box.design_file_name || null,
-        design_preview_url: box.design_preview_url || null,
-        sheetWidth: unfolded.unfoldedWidth,
-        sheetLength: unfolded.unfoldedLength,
-        pieces: unfolded.pieces,
-        sqmPerBox: unfolded.m2,
-        totalSqm,
-      };
-    });
-
-    // El doble triple tiene precio propio por calidad; la onda simple sigue la
-    // escalera por el volumen del pedido entero.
-    const precioDe = (m: Material) => getPricePerM2(totalSqmAll, config, m);
-    const pricePerM2 = precioDe(boxCalculations[0].material);
-    // El recargo de dos mitades es POR CAJA, no por pedido: el m² de esas
-    // cajas ya trae la solapa extra y acá se les cobra el pegado, igual que
-    // en el motor. Sin esto el lead quedaba guardado 25% más barato que lo
-    // que el mismo pedido cotiza por la API o el bot.
-    const totalSubtotal =
-      Math.round(
-        boxCalculations.reduce(
-          (s, b) =>
-            s + b.totalSqm * precioDe(b.material) * (b.pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1),
-          0,
-        ) * 100,
-      ) / 100;
+    // Cada medida con su precio, igual que la muestra el formulario. Antes se
+    // guardaba solo la primera caja, con el precio del escalón del pedido
+    // entero: con varias medidas, ni las cajas ni el precio eran los que la
+    // persona había visto. Ver cotizacion/web.ts.
+    const { items, total_sqm: totalSqmAll, subtotal: totalSubtotal } = calcularCajasWeb(body.boxes, config);
 
     // ═══════════════════════════════════════════════════════════
     // CAPTURAR METADATA
@@ -158,7 +122,7 @@ export async function POST(request: NextRequest) {
     // GUARDAR EN PUBLIC_QUOTES (como lead con precio revelado)
     // ═══════════════════════════════════════════════════════════
 
-    const firstBox = boxCalculations[0];
+    const firstBox = items[0];
     const hasPrinting = body.boxes.some(b => b.has_printing);
     const estimatedDays = hasPrinting ? (config.production_days_printing || 14) : (config.production_days_standard || 7);
 
@@ -183,18 +147,23 @@ export async function POST(request: NextRequest) {
         height_mm: firstBox.height_mm,
         quantity: firstBox.quantity,
         has_printing: firstBox.has_printing,
-        printing_colors: firstBox.printing_colors || 0,
+        printing_colors: firstBox.printing_colors,
         material: firstBox.material,
+        // El pedido entero. Las columnas de arriba son la primera medida.
+        items,
         // Guardar diseño si existe
         design_file_url: firstBox.design_file_url || null,
         design_file_name: firstBox.design_file_name || null,
         design_preview_url: firstBox.design_preview_url || null,
-        sheet_width_mm: firstBox.sheetWidth,
-        sheet_length_mm: firstBox.sheetLength,
-        sqm_per_box: firstBox.sqmPerBox,
+        sheet_width_mm: firstBox.sheet_width_mm,
+        sheet_length_mm: firstBox.sheet_length_mm,
+        sqm_per_box: firstBox.sqm_per_box,
         total_sqm: totalSqmAll,
-        price_per_m2: pricePerM2,
-        unit_price: Math.round((totalSubtotal / firstBox.quantity) * 100) / 100,
+        price_per_m2: firstBox.price_per_m2,
+        // El de la primera medida. Antes era el subtotal del pedido entero
+        // dividido las cajas de la primera, que con varias medidas no es el
+        // precio de ninguna caja.
+        unit_price: firstBox.unit_price,
         subtotal: totalSubtotal,
         estimated_days: estimatedDays,
         source_ip: sourceIp,
@@ -230,15 +199,15 @@ export async function POST(request: NextRequest) {
         email: body.requester_email.trim(),
         telefono: body.requester_phone,
         cuit: body.requester_cuit || null,
-        boxes: boxCalculations.map(b => ({
+        boxes: items.map(b => ({
           largo: b.length_mm,
           ancho: b.width_mm,
           alto: b.height_mm,
           cantidad: b.quantity,
-          precioUnitario: Math.round((calculateSubtotal(b.totalSqm, pricePerM2) / b.quantity) * 100) / 100,
-          subtotal: calculateSubtotal(b.totalSqm, pricePerM2),
-          m2PerBox: b.sqmPerBox,
-          totalM2: b.totalSqm,
+          precioUnitario: b.unit_price,
+          subtotal: b.subtotal,
+          m2PerBox: b.sqm_per_box,
+          totalM2: b.total_sqm,
           isMayorista: true,
         })),
         shippingMethod: null,
@@ -255,8 +224,8 @@ export async function POST(request: NextRequest) {
       id: quote.id,
       totalSqm: totalSqmAll,
       totalSubtotal,
-      pricePerM2,
-      boxes: boxCalculations,
+      pricePerM2: firstBox.price_per_m2,
+      boxes: items,
     }, { status: 201 });
 
   } catch (error) {

@@ -5,9 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { calculateUnfolded, calculateTotalM2, RECARGO_DOS_MITADES } from '@/lib/utils/box-calculations';
-import { getPricePerM2, calculateSubtotal, getProductionDays } from '@/lib/utils/pricing';
-import { leerMaterial, materialDisponible } from '@/lib/cotizacion/material';
+import { getProductionDays } from '@/lib/utils/pricing';
+import { calcularCajasWeb, type CajaDelFormulario } from '@/lib/cotizacion/web';
 import { porQueNoSeFabrica } from '@/lib/cotizacion/motor';
 import { sendNotification } from '@/lib/notifications';
 import { notifyNewRetailLead } from '@/lib/telegram/notifications';
@@ -42,16 +41,35 @@ export async function POST(request: NextRequest) {
     // botón "Quiero que me contacten" rechazaba cajas que el formulario ya
     // había cotizado, como una de 1030x500x620 para sillas: la persona veía
     // el precio y después no podía pedir que la llamen.
-    if (!body.length_mm || !body.width_mm || !body.height_mm) {
-      errors.push('Faltan medidas: hacen falta largo, ancho y alto en milímetros');
-    } else {
+    const cajaPrincipal: CajaDelFormulario = {
+      length_mm: body.length_mm,
+      width_mm: body.width_mm,
+      height_mm: body.height_mm,
+      quantity: body.quantity,
+      has_printing: body.has_printing,
+      printing_colors: body.printing_colors,
+      material: (body as { material?: unknown }).material,
+      design_file_url: body.design_file_url,
+      design_file_name: body.design_file_name,
+      design_preview_url: (body as { design_preview_url?: string }).design_preview_url,
+    };
+    const adicionalesCrudas = (body as { additional_boxes?: unknown }).additional_boxes;
+    const adicionales: CajaDelFormulario[] = Array.isArray(adicionalesCrudas)
+      ? (adicionalesCrudas as CajaDelFormulario[]).slice(0, 20)
+      : [];
+    for (const [i, caja] of [cajaPrincipal, ...adicionales].entries()) {
+      const cual = adicionales.length ? `Caja ${i + 1}: ` : '';
+      if (!caja.length_mm || !caja.width_mm || !caja.height_mm) {
+        errors.push(`${cual}Faltan medidas: hacen falta largo, ancho y alto en milímetros`);
+        continue;
+      }
+      if (!caja.quantity || caja.quantity < 1) {
+        errors.push(`${cual}La cantidad debe ser al menos 1 unidad`);
+      }
       const motivos = porQueNoSeFabrica({
-        length_mm: body.length_mm,
-        width_mm: body.width_mm,
-        height_mm: body.height_mm,
-        quantity: body.quantity,
+        length_mm: caja.length_mm, width_mm: caja.width_mm, height_mm: caja.height_mm, quantity: caja.quantity,
       });
-      if (motivos.length) errors.push(`Esa caja no se puede fabricar: ${motivos.join('; y ')}`);
+      if (motivos.length) errors.push(`${cual}Esa caja no se puede fabricar: ${motivos.join('; y ')}`);
     }
     // El minimo no se mide en cajas sino en m² de carton, y eso depende de la
     // medida: 100 cajas chicas son 34 m² y 100 grandes pasan los 100 m². El
@@ -90,30 +108,14 @@ export async function POST(request: NextRequest) {
     // CALCULAR DIMENSIONES Y PRECIOS
     // ═══════════════════════════════════════════════════════════
 
-    // Calcular plancha desplegada
-    const unfolded = calculateUnfolded(body.length_mm, body.width_mm, body.height_mm);
+    // Todas las medidas del pedido, cada una con su precio (ver
+    // cotizacion/web.ts). Las adicionales llegaban en additional_boxes y se
+    // tiraban: quien pedía tres medidas quedaba registrado con una.
+    const { items, total_sqm: totalSqm, subtotal } = calcularCajasWeb([cajaPrincipal, ...adicionales], config);
+    const primera = items[0];
 
-    // Calcular m² totales
-    const totalSqm = calculateTotalM2(unfolded.m2, body.quantity);
-
-    // Obtener precio por m² según volumen, o el del doble triple elegido. Un
-    // material que ya no tiene precio se cotiza en el estándar, igual que en
-    // el formulario.
-    const materialPedido = leerMaterial((body as { material?: unknown }).material) ?? 'simple';
-    const material = materialDisponible(config, materialPedido) ? materialPedido : 'simple';
-    const pricePerM2 = getPricePerM2(totalSqm, config, material);
-
-    // Calcular subtotal. Si la caja va en dos mitades (su desarrollo no entra
-    // en el largo de plancha), el m² ya trae la solapa extra y acá se cobra
-    // el pegado, igual que en el motor.
-    const factorMitades = unfolded.pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1;
-    const subtotal = Math.round(totalSqm * pricePerM2 * factorMitades * 100) / 100;
-
-    // Calcular precio unitario
-    const unitPrice = Math.round((subtotal / body.quantity) * 100) / 100;
-
-    // Días de producción
-    const estimatedDays = getProductionDays(body.has_printing || false, config);
+    // Días de producción: con impresión en cualquier medida, el plazo largo.
+    const estimatedDays = getProductionDays(items.some((i) => i.has_printing), config);
 
     // ═══════════════════════════════════════════════════════════
     // CAPTURAR METADATA
@@ -168,6 +170,25 @@ export async function POST(request: NextRequest) {
           design_file_url: body.design_file_url || null,
           design_file_name: body.design_file_name || null,
           design_preview_url: (body as { design_preview_url?: string }).design_preview_url || null,
+          // Las cajas y el precio, por si volvió al paso 1 y cambió algo
+          // después de ver el precio: el vendedor tiene que llamar por lo que
+          // la persona pidió al final.
+          length_mm: primera.length_mm,
+          width_mm: primera.width_mm,
+          height_mm: primera.height_mm,
+          quantity: primera.quantity,
+          has_printing: primera.has_printing,
+          printing_colors: primera.printing_colors,
+          material: primera.material,
+          sheet_width_mm: primera.sheet_width_mm,
+          sheet_length_mm: primera.sheet_length_mm,
+          sqm_per_box: primera.sqm_per_box,
+          price_per_m2: primera.price_per_m2,
+          unit_price: primera.unit_price,
+          items,
+          total_sqm: totalSqm,
+          subtotal,
+          estimated_days: estimatedDays,
         })
         .eq('id', existingLead.id)
         .select()
@@ -196,14 +217,16 @@ export async function POST(request: NextRequest) {
           distance_km: (body as unknown as { distance_km?: number }).distance_km ?? null,
           is_free_shipping: (body as unknown as { is_free_shipping?: boolean }).is_free_shipping ?? false,
 
-          // Datos de la caja
-          length_mm: body.length_mm,
-          width_mm: body.width_mm,
-          height_mm: body.height_mm,
-          quantity: body.quantity,
-          has_printing: body.has_printing || false,
-          printing_colors: body.printing_colors || 0,
-          material,
+          // Datos de la caja: la primera medida en las columnas de siempre, y
+          // el pedido entero en items.
+          length_mm: primera.length_mm,
+          width_mm: primera.width_mm,
+          height_mm: primera.height_mm,
+          quantity: primera.quantity,
+          has_printing: primera.has_printing,
+          printing_colors: primera.printing_colors,
+          material: primera.material,
+          items,
 
           // Diseño
           design_file_url: body.design_file_url || null,
@@ -211,12 +234,12 @@ export async function POST(request: NextRequest) {
           design_preview_url: (body as { design_preview_url?: string }).design_preview_url || null,
 
           // Cálculos
-          sheet_width_mm: unfolded.unfoldedWidth,
-          sheet_length_mm: unfolded.unfoldedLength,
-          sqm_per_box: unfolded.m2,
+          sheet_width_mm: primera.sheet_width_mm,
+          sheet_length_mm: primera.sheet_length_mm,
+          sqm_per_box: primera.sqm_per_box,
           total_sqm: totalSqm,
-          price_per_m2: pricePerM2,
-          unit_price: unitPrice,
+          price_per_m2: primera.price_per_m2,
+          unit_price: primera.unit_price,
           subtotal: subtotal,
           estimated_days: estimatedDays,
 
@@ -281,17 +304,17 @@ export async function POST(request: NextRequest) {
           email: body.requester_email.trim(),
           telefono: body.requester_phone,
           cuit: body.requester_cuit || null,
-          boxes: [{
-            largo: body.length_mm,
-            ancho: body.width_mm,
-            alto: body.height_mm,
-            cantidad: body.quantity,
-            precioUnitario: unitPrice,
-            subtotal: subtotal,
-            m2PerBox: unfolded.m2,
-            totalM2: totalSqm,
+          boxes: items.map((b) => ({
+            largo: b.length_mm,
+            ancho: b.width_mm,
+            alto: b.height_mm,
+            cantidad: b.quantity,
+            precioUnitario: b.unit_price,
+            subtotal: b.subtotal,
+            m2PerBox: b.sqm_per_box,
+            totalM2: b.total_sqm,
             isMayorista: true,
-          }],
+          })),
           shippingMethod: null,
           shippingCost: 0,
           shippingCostConfirmed: false,

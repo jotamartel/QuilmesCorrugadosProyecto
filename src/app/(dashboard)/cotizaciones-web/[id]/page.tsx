@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/pricing';
 import type { PublicQuote, PublicQuoteStatus } from '@/lib/types/database';
+import { MedidasDelPedido, tieneVariasMedidas } from '@/components/public/MedidasDelPedido';
+import { MATERIALES } from '@/lib/cotizacion/material';
 
 // Importar BoxPreview3D dinámicamente
 const BoxPreview3D = dynamic(
@@ -267,7 +269,44 @@ export default function CotizacionWebDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Datos de la caja */}
+          {/* Pedido con varias medidas: la lista entera. Antes el panel
+              mostraba solo la primera caja aunque el cliente hubiera pedido
+              tres. */}
+          {tieneVariasMedidas(quote.items) ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="w-5 h-5" />
+                Medidas del pedido ({quote.items.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MedidasDelPedido items={quote.items} />
+              <hr className="my-4" />
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500">m² totales</p>
+                  <p className="font-medium">{quote.total_sqm?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Días de producción</p>
+                  <p className="font-medium">{quote.estimated_days != null ? `${quote.estimated_days} días` : '—'}</p>
+                </div>
+              </div>
+              {quote.items.some((i) => i.design_file_url) && (
+                <div className="mt-4 space-y-1 text-sm">
+                  {quote.items.map((i, n) => i.design_file_url && (
+                    <a key={n} href={i.design_file_url} target="_blank" rel="noopener noreferrer"
+                      className="font-medium text-blue-600 hover:underline flex items-center gap-1">
+                      <FileText className="w-4 h-4" />
+                      Diseño medida {n + 1}: {i.design_file_name || 'archivo'}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          ) : (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -305,6 +344,11 @@ export default function CotizacionWebDetailPage() {
                     <p className="font-medium">
                       {quote.has_printing ? `Sí, ${quote.printing_colors} color${quote.printing_colors > 1 ? 'es' : ''}` : 'No'}
                     </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-500">Cartón</p>
+                    <p className="font-medium">{MATERIALES[quote.material ?? 'simple'].nombre}</p>
                   </div>
 
                   {quote.design_file_name && (
@@ -372,6 +416,7 @@ export default function CotizacionWebDetailPage() {
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Mensaje del cliente */}
           {quote.message && (
@@ -408,7 +453,9 @@ export default function CotizacionWebDetailPage() {
               <p className="text-sm text-amber-700">Total cotizado</p>
               <p className="text-3xl font-bold text-amber-700">{formatCurrency(quote.subtotal)}</p>
               <p className="text-sm text-amber-600 mt-1">
-                {formatCurrency(quote.unit_price)} por caja
+                {tieneVariasMedidas(quote.items)
+                  ? `${quote.items.length} medidas, sin IVA`
+                  : `${formatCurrency(quote.unit_price)} por caja`}
               </p>
             </CardContent>
           </Card>

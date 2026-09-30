@@ -185,6 +185,11 @@ export default function CotizacionesWebPage() {
                           <span className="text-gray-500 ml-1">
                             ({quote.quantity?.toLocaleString('es-AR') ?? '—'} u.)
                           </span>
+                          {Array.isArray(quote.items) && quote.items.length > 1 && (
+                            <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                              +{quote.items.length - 1} medida{quote.items.length > 2 ? 's' : ''}
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right text-sm">
                           {quote.total_sqm?.toLocaleString('es-AR', { minimumFractionDigits: 0 }) ?? '—'}

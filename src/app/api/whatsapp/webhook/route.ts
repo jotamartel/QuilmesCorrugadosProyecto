@@ -118,13 +118,13 @@ async function saveCommunication(
   content: string,
   metadata?: Record<string, unknown>,
   clientId?: string | null
-) {
+): Promise<string | null> {
   try {
     // Service role a proposito: este endpoint lo llama el proveedor de
     // WhatsApp, no un usuario logueado, asi que no hay sesion que satisfaga las
     // policies de RLS.
     const supabase = createAdminClient();
-    const { error } = await supabase.from('communications').insert({
+    const { data, error } = await supabase.from('communications').insert({
       channel: 'whatsapp',
       direction,
       content,
@@ -133,10 +133,51 @@ async function saveCommunication(
         phone: phoneNumber,
         ...metadata,
       },
-    });
+    }).select('created_at').single();
     if (error) console.error('[WhatsApp] Error guardando comunicacion:', error);
+    // Cuándo quedó guardado: con eso se sabe si después llegó otro mensaje.
+    return data?.created_at ?? null;
   } catch (error) {
     console.error('[WhatsApp] Error guardando comunicacion:', error);
+    return null;
+  }
+}
+
+/**
+ * Cuánto se espera antes de contestar, por si la persona sigue escribiendo.
+ *
+ * POR QUE
+ *
+ * La gente escribe en ráfagas: "Hola" y "cómo va" en el mismo segundo, o las
+ * medidas en un mensaje y la cantidad en el siguiente. Meta a veces los junta
+ * en un solo POST —eso ya se atendía como una consulta— pero muchas veces los
+ * manda en POSTs separados, y cada uno corría el agente por su cuenta. En el
+ * historial de septiembre de 2026 pasó en seis conversaciones: dos saludos
+ * seguidos, o la misma cotización repetida dos veces con distinta redacción.
+ *
+ * El arreglo es que cada POST, antes de contestar, mire si llegó un mensaje más
+ * nuevo del mismo teléfono. Si llegó, se calla: el POST de ese mensaje nuevo va
+ * a contestar, y su historial ya trae este. Contesta siempre el ÚLTIMO.
+ */
+const ESPERA_POR_RAFAGA_MS = 4000;
+
+/** Si entró un mensaje de este teléfono después del que se está atendiendo. */
+async function llegoUnMensajeMasNuevo(phoneNumber: string, guardadoEn: string | null): Promise<boolean> {
+  if (!guardadoEn) return false;
+  try {
+    const { data } = await createAdminClient()
+      .from('communications')
+      .select('id')
+      .eq('channel', 'whatsapp')
+      .eq('direction', 'inbound')
+      .eq('metadata->>phone', phoneNumber)
+      .gt('created_at', guardadoEn)
+      .limit(1);
+    return !!data?.length;
+  } catch {
+    // Ante la duda se contesta: un duplicado molesta, un mensaje sin
+    // respuesta pierde la consulta.
+    return false;
   }
 }
 
@@ -442,7 +483,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Guardar mensaje entrante con client_id si hay match
-    await saveCommunication(phoneNumber, 'inbound', body, {
+    const entranteGuardadoEn = await saveCommunication(phoneNumber, 'inbound', body, {
       hasMedia: entrante.tieneMedia,
       // Con url en null el adjunto existió pero no se pudo traer: el panel
       // muestra el aviso de siempre en vez de un archivo roto.
@@ -516,6 +557,16 @@ export async function POST(request: NextRequest) {
       return await recibido();
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Ráfagas: si la persona sigue escribiendo, contesta el último mensaje.
+    // Ver ESPERA_POR_RAFAGA_MS.
+    // ─────────────────────────────────────────────────────────────────────
+    await new Promise((r) => setTimeout(r, ESPERA_POR_RAFAGA_MS));
+    if (await llegoUnMensajeMasNuevo(phoneNumber, entranteGuardadoEn)) {
+      console.log('[WhatsApp] llegó otro mensaje de %s, contesta ese:', phoneNumber);
+      return await recibido();
+    }
+
     let responseMessage: string | BoxTemplateResponse = '';
     let quoteData: { total: number; totalM2: number } | null = null;
     let needsAdvisor = false;
@@ -576,6 +627,14 @@ export async function POST(request: NextRequest) {
           // chequeo evita empezar; este evita terminar.
           if (await asistentePausado(phoneNumber)) {
             console.log('[WhatsApp] una persona tomo la conversacion mientras el agente pensaba, no se envia:', phoneNumber);
+            return await recibido();
+          }
+
+          // Mismo criterio para la ráfaga: el modelo tarda segundos, y si en ese
+          // rato la persona escribió otra cosa, esta respuesta ya quedó vieja.
+          // La del mensaje nuevo sale con todo el contexto.
+          if (await llegoUnMensajeMasNuevo(phoneNumber, entranteGuardadoEn)) {
+            console.log('[WhatsApp] llegó otro mensaje mientras el agente pensaba, contesta ese:', phoneNumber);
             return await recibido();
           }
 

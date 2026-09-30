@@ -47,7 +47,10 @@ export const CONTACTO = {
   /** Para href="tel:". */
   tel: `+${E164}`,
 
-  email: 'ventas@quilmescorrugados.com.ar',
+  // El mail que se publica y al que llegan los avisos es el de Florencia, que
+  // es quien atiende las consultas (pedido de Julián, 30-09-2026). Antes era
+  // ventas@.
+  email: 'fmartinez@quilmescorrugados.com.ar',
 
   direccion: 'Lugones 219, B1878 Quilmes, Buenos Aires',
   localidad: 'Quilmes',

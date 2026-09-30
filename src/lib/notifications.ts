@@ -5,7 +5,7 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || 'ventas@quilmescorrugados.com.ar';
+const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || 'fmartinez@quilmescorrugados.com.ar';
 const FROM_EMAIL = process.env.FROM_EMAIL || 'notificaciones@quilmescorrugados.com.ar';
 
 // Tipos de notificaciones

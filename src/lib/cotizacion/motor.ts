@@ -1285,7 +1285,7 @@ export function calcularCotizacion(
     contact: {
       whatsapp_url: CONTACTO.whatsappCon(whatsappMessage),
       whatsapp_message: whatsappMessage,
-      email: 'ventas@quilmescorrugados.com.ar',
+      email: 'fmartinez@quilmescorrugados.com.ar',
       email_subject: cotizable
         ? `Cotizacion web: ${detalleCajas} — ${ars(totalSubtotal)}`
         : `Consulta web: ${detalleCajas}`,
@@ -1409,9 +1409,9 @@ export function calcularCotizacion(
             'dibuja el desplegado como si fuera de una pieza, con las áreas donde va el diseño, ' +
             'y una nota que aclara que es la referencia para ubicar el arte. El despiece real en ' +
             'dos mitades lo prepara la fábrica con la orden. Ubicá tu diseño sobre esas áreas y ' +
-            'mandá el archivo a ventas@quilmescorrugados.com.ar o por WhatsApp.'
+            'mandá el archivo a fmartinez@quilmescorrugados.com.ar o por WhatsApp.'
           : impresionDisponible
-            ? 'Descargá el PDF de la plantilla: trae la caja desplegada con las líneas de corte, las de plegado y las áreas donde puede ir el diseño. Ubicá tu arte sobre esas áreas y mandá el archivo a ventas@quilmescorrugados.com.ar o por WhatsApp, y se produce con eso. No hace falta pedir la plantilla: se genera sola con las medidas.'
+            ? 'Descargá el PDF de la plantilla: trae la caja desplegada con las líneas de corte, las de plegado y las áreas donde puede ir el diseño. Ubicá tu arte sobre esas áreas y mandá el archivo a fmartinez@quilmescorrugados.com.ar o por WhatsApp, y se produce con eso. No hace falta pedir la plantilla: se genera sola con las medidas.'
             : 'Para imprimir hay que producir a medida. Si el pedido llega al mínimo, la plantilla se descarga de template_pdf.',
     },
     total_m2: totalM2,

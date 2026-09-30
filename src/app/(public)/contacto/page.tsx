@@ -79,11 +79,11 @@ export default function ContactoPage() {
                   <div>
                     <h3 className="font-semibold text-gray-900">Email</h3>
                     <a 
-                      href="mailto:ventas@quilmescorrugados.com.ar" 
+                      href="mailto:fmartinez@quilmescorrugados.com.ar" 
                       onClick={() => trackEvent('email_click')}
                       className="text-gray-600 hover:text-[#002E55]"
                     >
-                      ventas@quilmescorrugados.com.ar
+                      fmartinez@quilmescorrugados.com.ar
                     </a>
                   </div>
                 </div>
@@ -126,7 +126,7 @@ export default function ContactoPage() {
                 </a>
 
                 <a
-                  href="mailto:ventas@quilmescorrugados.com.ar?subject=Consulta%20cajas%20de%20cart%C3%B3n"
+                  href="mailto:fmartinez@quilmescorrugados.com.ar?subject=Consulta%20cajas%20de%20cart%C3%B3n"
                   onClick={() => trackEvent('email_click', { source: 'contacto_page' })}
                   className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
                 >

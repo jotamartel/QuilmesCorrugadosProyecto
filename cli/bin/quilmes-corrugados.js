@@ -198,7 +198,7 @@ async function plantilla(posicionales, flags) {
   const destino = resolve(flags.salida || `plantilla-${medidas.largo}x${medidas.ancho}x${medidas.alto}.pdf`);
   writeFileSync(destino, Buffer.from(await res.arrayBuffer()));
   console.log(`Plantilla guardada en ${destino}`);
-  console.log('Las áreas verdes marcan dónde va el diseño. Se manda el arte a ventas@quilmescorrugados.com.ar o por WhatsApp.');
+  console.log('Las áreas verdes marcan dónde va el diseño. Se manda el arte a fmartinez@quilmescorrugados.com.ar o por WhatsApp.');
 }
 
 const [comando, ...resto] = process.argv.slice(2);

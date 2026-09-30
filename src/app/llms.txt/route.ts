@@ -259,7 +259,7 @@ ${BASE_URL}/api/box-template?length=400&width=600&height=600
 
 Devuelve un PDF con la caja desplegada: líneas de corte, líneas de plegado y
 las áreas donde puede ir el diseño. El flujo es: descargar el PDF, ubicar el
-arte sobre esas áreas, y enviarlo a ventas@quilmescorrugados.com.ar o por
+arte sobre esas áreas, y enviarlo a fmartinez@quilmescorrugados.com.ar o por
 WhatsApp. Con eso se produce.
 
 Parámetros: length, width, height en milímetros. Mínimo ${MEDIDA_MINIMA.largo} x ${MEDIDA_MINIMA.ancho} x ${MEDIDA_MINIMA.alto} mm,
@@ -355,7 +355,7 @@ producción.
 ## Contacto
 
 - WhatsApp: ${CONTACTO.telefonoVisible} — ${CONTACTO.whatsapp}
-- Email: ventas@quilmescorrugados.com.ar
+- Email: fmartinez@quilmescorrugados.com.ar
 - Dirección: Lugones 219, B1878 Quilmes, Buenos Aires, Argentina
 - Horario: ${HORARIO.texto.toLowerCase()} (hora de Argentina)
 

@@ -483,7 +483,7 @@ console.log(\`Total: ARS \${quote.subtotal.toLocaleString()}\`);`;
             Si necesitás un rate limit mayor para tu integración, contactanos para obtener una API key personalizada.
           </p>
           <a
-            href="mailto:ventas@quilmescorrugados.com.ar?subject=Solicitud%20de%20API%20Key"
+            href="mailto:fmartinez@quilmescorrugados.com.ar?subject=Solicitud%20de%20API%20Key"
             className="inline-flex items-center gap-2 px-4 py-2 bg-white text-[#002E55] rounded-lg font-medium hover:bg-gray-100 transition-colors"
           >
             Solicitar API Key

@@ -641,7 +641,7 @@ export async function GET(request: NextRequest) {
       },
       contact: {
         whatsapp: CONTACTO.telefonoVisible,
-        email: 'ventas@quilmescorrugados.com.ar',
+        email: 'fmartinez@quilmescorrugados.com.ar',
         address: 'Lugones 219, B1878 Quilmes, Buenos Aires, Argentina',
       },
     }, { headers });

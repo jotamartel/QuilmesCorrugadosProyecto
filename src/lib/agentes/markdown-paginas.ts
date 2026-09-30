@@ -27,7 +27,7 @@ const PIE = `
 ---
 
 - Cotizador online: ${B}/#cotizador · API: ${B}/api/v1/quote · Guía completa para agentes: ${B}/llms.txt
-- WhatsApp ${CONTACTO.telefonoVisible} · ventas@quilmescorrugados.com.ar · Lugones 219, B1878 Quilmes, Buenos Aires, Argentina
+- WhatsApp ${CONTACTO.telefonoVisible} · fmartinez@quilmescorrugados.com.ar · Lugones 219, B1878 Quilmes, Buenos Aires, Argentina
 - Horario: ${HORARIO.corto} (hora de Argentina)
 `;
 
@@ -87,7 +87,7 @@ ${PIE}`,
   '/contacto': () => `# Contacto — Quilmes Corrugados
 
 - WhatsApp: ${CONTACTO.telefonoVisible} — ${CONTACTO.whatsapp}
-- Email: ventas@quilmescorrugados.com.ar
+- Email: fmartinez@quilmescorrugados.com.ar
 - Dirección: Lugones 219, B1878 Quilmes, Buenos Aires, Argentina
 - Horario: ${HORARIO.corto} (hora de Argentina)
 
@@ -109,7 +109,7 @@ ${PIE}`,
 La política completa está en ${B}/privacidad (HTML). En resumen: los datos que
 se cargan al cotizar (nombre, email, teléfono, medidas del pedido) se usan para
 responder la consulta y coordinar la venta; no se venden a terceros. Contacto
-por dudas: ventas@quilmescorrugados.com.ar.
+por dudas: fmartinez@quilmescorrugados.com.ar.
 ${PIE}`,
 
   '/terminos': () => `# Términos y condiciones — Quilmes Corrugados
@@ -179,7 +179,7 @@ Probá ahora mismo:
 
     curl "${B}/api/v1/quote?length_mm=400&width_mm=600&height_mm=600&quantity=3000"
 
-API keys con rate limit extendido: escribí a ventas@quilmescorrugados.com.ar
+API keys con rate limit extendido: escribí a fmartinez@quilmescorrugados.com.ar
 con asunto "API key".
 ${PIE}`,
 };

@@ -40,8 +40,8 @@ export function LandingFooter() {
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-[#4F6D87]" />
-                <a href="mailto:ventas@quilmescorrugados.com.ar" onClick={() => trackEvent('email_click', { source: 'footer' })} className="hover:text-white">
-                  ventas@quilmescorrugados.com.ar
+                <a href="mailto:fmartinez@quilmescorrugados.com.ar" onClick={() => trackEvent('email_click', { source: 'footer' })} className="hover:text-white">
+                  fmartinez@quilmescorrugados.com.ar
                 </a>
               </li>
               <li className="flex items-center gap-2">

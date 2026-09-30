@@ -244,7 +244,7 @@ export async function POST(request: NextRequest) {
         to: fromEmail,
         subject: emailResponse.subject,
         text: emailResponse.body,
-        replyTo: 'ventas@quilmescorrugados.com.ar',
+        replyTo: 'fmartinez@quilmescorrugados.com.ar',
       });
 
       if (error) {

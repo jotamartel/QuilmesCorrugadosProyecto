@@ -25,7 +25,7 @@ const BASE = (process.env.QUILMES_API_URL || 'https://www.quilmescorrugados.com.
 const AYUDA = `quilmes-corrugados — cotizá cajas de cartón corrugado (Argentina) desde la terminal
 
 USO
-  quilmes-corrugados cotizar <LARGOxANCHOxALTO[cm]> <cantidad> [--colores N] [--json]
+  quilmes-corrugados cotizar <LARGOxANCHOxALTO[cm]> <cantidad> [--colores N] [--carton TIPO] [--json]
   quilmes-corrugados precios [--json]
   quilmes-corrugados plantilla <LARGOxANCHOxALTO[cm]> [-o archivo.pdf]
 
@@ -38,6 +38,8 @@ EJEMPLOS
 
 OPCIONES
   --colores N     colores de impresión flexográfica (0-3)
+  --carton TIPO   simple (90 libras, por defecto), r130 (reforzado 130 libras),
+                  dt120 (doble triple 120 liner) o dt150 (doble triple 150 kraft)
   --json          imprime la respuesta cruda de la API (para scripts y agentes)
   -o ARCHIVO      dónde guardar el PDF de la plantilla
   --api-key KEY   API key para rate limit extendido (o env QUILMES_API_KEY)
@@ -78,11 +80,12 @@ function cabeceras(apiKey) {
 /** Separa flags conocidos de los argumentos posicionales. */
 function parsearArgs(argv) {
   const posicionales = [];
-  const flags = { json: false, colores: 0, salida: null, apiKey: null };
+  const flags = { json: false, colores: 0, carton: 'simple', salida: null, apiKey: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--json') flags.json = true;
     else if (a === '--colores') flags.colores = parseInt(argv[++i], 10);
+    else if (a === '--carton') flags.carton = String(argv[++i] || '').toLowerCase();
     else if (a === '-o' || a === '--salida') flags.salida = argv[++i];
     else if (a === '--api-key') flags.apiKey = argv[++i];
     else if (a === '--help' || a === '-h' || a === 'ayuda') salirConAyuda();
@@ -101,6 +104,9 @@ async function cotizar(posicionales, flags) {
   if (Number.isNaN(flags.colores) || flags.colores < 0 || flags.colores > 3) {
     salirConAyuda('--colores va de 0 a 3');
   }
+  if (!['simple', 'r130', 'dt120', 'dt150'].includes(flags.carton)) {
+    salirConAyuda('--carton va con simple, r130, dt120 o dt150');
+  }
 
   const url = new URL(`${BASE}/api/v1/quote`);
   url.searchParams.set('length_mm', String(medidas.largo));
@@ -108,6 +114,7 @@ async function cotizar(posicionales, flags) {
   url.searchParams.set('height_mm', String(medidas.alto));
   url.searchParams.set('quantity', String(cantidad));
   if (flags.colores > 0) url.searchParams.set('printing_colors', String(flags.colores));
+  if (flags.carton !== 'simple') url.searchParams.set('material', flags.carton);
 
   const res = await fetch(url, { headers: cabeceras(flags.apiKey) });
   const datos = await res.json();
@@ -142,7 +149,8 @@ async function cotizar(posicionales, flags) {
     console.log(`\n${q.printing.price_note}`);
   }
   const sufijo = flags.colores > 0 ? `-${flags.colores}` : '';
-  console.log(`\nVer y compartir: ${BASE}/cotizar/${medidas.largo}x${medidas.ancho}x${medidas.alto}/${cantidad}${sufijo}`);
+  const carton = flags.carton !== 'simple' ? `?carton=${flags.carton}` : '';
+  console.log(`\nVer y compartir: ${BASE}/cotizar/${medidas.largo}x${medidas.ancho}x${medidas.alto}/${cantidad}${sufijo}${carton}`);
 }
 
 async function precios(flags) {

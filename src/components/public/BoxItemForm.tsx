@@ -8,11 +8,13 @@ import {
   calculateTotalM2,
   excedeMedidaMaxima,
   MEDIDA_MAXIMA,
+  MEDIDA_MINIMA,
   LARGO_MAXIMO_PLANCHA,
   RECARGO_DOS_MITADES,
 } from '@/lib/utils/box-calculations';
 import { getPricePerM2 } from '@/lib/utils/pricing';
 import type { PricingConfig } from '@/lib/types/database';
+import { MATERIALES, esReforzado, materialDisponible, type Material } from '@/lib/cotizacion/material';
 
 export interface BoxItemData {
   id: string;
@@ -22,6 +24,8 @@ export interface BoxItemData {
   quantity: number;
   has_printing: boolean;
   printing_colors: number;
+  /** Tipo de cartón. Cada reforzado solo se ofrece si tiene precio cargado. */
+  material: Material;
   design_file_url: string;
   design_file_name: string;
   design_preview_url: string; // URL de imagen para vista 3D (generada desde PDF o la imagen original)
@@ -46,6 +50,12 @@ export interface BoxCalculations {
   esDeStock: boolean;
   /** 2 = caja en dos mitades pegadas; el precio ya trae su recargo. */
   pieces: 1 | 2;
+  material: Material;
+  /**
+   * Doble triple por debajo de su mínimo. Es el equivalente de esDeStock para
+   * ese material, pero sin derivación: los reforzados no tienen stock.
+   */
+  bajoMinimoReforzado: boolean;
 }
 
 interface BoxItemFormProps {
@@ -57,6 +67,11 @@ interface BoxItemFormProps {
   onDelete: (id: string) => void;
   onToggleCollapse: (id: string) => void;
   calculations: BoxCalculations | null;
+  /**
+   * Los cartones que se pueden elegir: la onda simple y las calidades de doble
+   * triple que tienen precio. Con uno solo no se muestra el selector.
+   */
+  materiales: Material[];
 }
 
 const MAX_LENGTH_PLUS_WIDTH = 1200;
@@ -105,7 +120,12 @@ export function calculateBoxItem(box: BoxItemData, pricingConfig?: PricingConfig
     return null; // No calcular si no hay configuración
   }
 
-  const pricePerM2 = getPricePerM2(totalSqm, pricingConfig);
+  // Si un reforzado dejó de tener precio mientras la caja lo tenía elegido,
+  // se cotiza en el estándar: el selector ya no se muestra y no puede quedar
+  // una caja con un material que no se vende.
+  const material: Material =
+    materialDisponible(pricingConfig, box.material) ? box.material : 'simple';
+  const pricePerM2 = getPricePerM2(totalSqm, pricingConfig, material);
 
   // Dos mitades: mismo recargo que el motor, para que el numero que la
   // persona ve en el formulario sea el mismo que despues guarda el lead.
@@ -116,7 +136,12 @@ export function calculateBoxItem(box: BoxItemData, pricingConfig?: PricingConfig
   // precio: este cotizador fabrica la medida que le pidan, y eso arranca en
   // wholesale_min_m2. Antes sugería el de 3.000, que es donde baja el precio, y
   // eso pedía el triple de lo necesario para poder comprar.
-  const minCajasAMedida = Math.ceil(pricingConfig.wholesale_min_m2 / unfolded.m2);
+  // Los reforzados tienen su propio mínimo y nunca son de stock.
+  const minM2AMedida =
+    esReforzado(material)
+      ? pricingConfig.min_m2_reforzado ?? pricingConfig.wholesale_min_m2
+      : pricingConfig.wholesale_min_m2;
+  const minCajasAMedida = Math.ceil(minM2AMedida / unfolded.m2);
   const minCajasPiso = Math.ceil(pricingConfig.min_m2_pedido / unfolded.m2);
 
   return {
@@ -129,10 +154,12 @@ export function calculateBoxItem(box: BoxItemData, pricingConfig?: PricingConfig
     subtotal,
     minCajasAMedida,
     minCajasPiso,
-    minM2AMedida: pricingConfig.wholesale_min_m2,
+    minM2AMedida,
     minM2Piso: pricingConfig.min_m2_pedido,
-    esDeStock: totalSqm < pricingConfig.wholesale_min_m2,
+    esDeStock: material === 'simple' && totalSqm < pricingConfig.wholesale_min_m2,
     pieces: unfolded.pieces,
+    material,
+    bajoMinimoReforzado: esReforzado(material) && totalSqm < minM2AMedida,
   };
 }
 
@@ -188,6 +215,7 @@ export function BoxItemForm({
   onDelete,
   onToggleCollapse,
   calculations,
+  materiales,
 }: BoxItemFormProps) {
   const handleFieldUpdate = (field: keyof BoxItemData, value: BoxItemData[keyof BoxItemData]) => {
     onUpdate(box.id, field, value);
@@ -203,7 +231,8 @@ export function BoxItemForm({
 
   // Header colapsable con resumen
   const headerSummary = calculations
-    ? `${box.length_mm}×${box.width_mm}×${box.height_mm}mm - ${box.quantity.toLocaleString('es-AR')} uds`
+    ? `${box.length_mm}×${box.width_mm}×${box.height_mm}mm - ${box.quantity.toLocaleString('es-AR')} uds` +
+      (esReforzado(calculations.material) ? ` - ${MATERIALES[calculations.material].nombre}` : '')
     : exceedsDimensionLimit
     ? 'Dimensiones excedidas'
     : 'Completar dimensiones';
@@ -272,7 +301,7 @@ export function BoxItemForm({
                   isLengthWidthError ? 'border-red-400 bg-red-50' : 'border-gray-300'
                 }`}
               />
-              <p className="text-xs text-gray-400 mt-0.5">200-800</p>
+              <p className="text-xs text-gray-400 mt-0.5">{MEDIDA_MINIMA.largo}-{MEDIDA_MAXIMA.largo}</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -292,7 +321,7 @@ export function BoxItemForm({
                   isLengthWidthError || isWidthHeightError ? 'border-red-400 bg-red-50' : 'border-gray-300'
                 }`}
               />
-              <p className="text-xs text-gray-400 mt-0.5">200-600</p>
+              <p className="text-xs text-gray-400 mt-0.5">{MEDIDA_MINIMA.ancho}-{MEDIDA_MAXIMA.ancho}</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -312,7 +341,7 @@ export function BoxItemForm({
                   isWidthHeightError ? 'border-red-400 bg-red-50' : 'border-gray-300'
                 }`}
               />
-              <p className="text-xs text-gray-400 mt-0.5">100-600</p>
+              <p className="text-xs text-gray-400 mt-0.5">{MEDIDA_MINIMA.alto}-{MEDIDA_MAXIMA.alto}</p>
             </div>
           </div>
 
@@ -327,6 +356,45 @@ export function BoxItemForm({
                 </p>
               </div>
             </div>
+          )}
+
+          {/* Tipo de cartón. Se pregunta acá y no se deduce: en WhatsApp llegaba
+              gente que necesitaba doble triple, cotizaba en la web sin que
+              nadie le preguntara y se llevaba el precio de la onda simple. */}
+          {materiales.length > 1 && (
+            <fieldset>
+              <legend className="block text-sm font-medium text-gray-700 mb-1">Tipo de cartón</legend>
+              <div className="grid grid-cols-1 gap-2">
+                {materiales.map((m) => (
+                  <label
+                    key={m}
+                    className={`flex cursor-pointer flex-col rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      box.material === m
+                        ? 'border-[#002E55] bg-blue-50 ring-1 ring-[#002E55]'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name={`material-${box.id}`}
+                        value={m}
+                        checked={box.material === m}
+                        onChange={() => handleFieldUpdate('material', m)}
+                        className="h-4 w-4 text-[#002E55] focus:ring-[#4F6D87]"
+                      />
+                      <span className="font-medium text-gray-900">
+                        {MATERIALES[m].nombre.charAt(0).toUpperCase() + MATERIALES[m].nombre.slice(1)}
+                      </span>
+                      <span className="text-gray-500">{MATERIALES[m].espesor_mm} mm</span>
+                    </span>
+                    <span className="mt-0.5 pl-6 text-xs text-gray-500">
+                      {MATERIALES[m].para_que}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           )}
 
           {/* Cantidad */}
@@ -350,8 +418,9 @@ export function BoxItemForm({
               }`}
             />
             {calculations && (
-              <p className={`text-xs mt-1 ${calculations.esDeStock ? 'text-yellow-600' : 'text-gray-400'}`}>
-                Mínimo para fabricar a medida: {calculations.minCajasAMedida.toLocaleString('es-AR')} uds
+              <p className={`text-xs mt-1 ${calculations.esDeStock || calculations.bajoMinimoReforzado ? 'text-yellow-600' : 'text-gray-400'}`}>
+                {esReforzado(calculations.material) ? `Mínimo en ${MATERIALES[calculations.material].nombre}` : 'Mínimo para fabricar a medida'}:{' '}
+                {calculations.minCajasAMedida.toLocaleString('es-AR')} uds
               </p>
             )}
           </div>
@@ -463,6 +532,16 @@ export function BoxItemForm({
               medidas estándar de catálogo que se venden de stock. Decir "el
               mínimo de compra es 158" acá prometía fabricar a medida por
               debajo de los 1.000 m², que es justo lo que no hacemos. */}
+          {calculations && calculations.bajoMinimoReforzado && (
+            <div className="p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+              <p className="text-xs text-yellow-800">
+                El {MATERIALES[calculations.material].nombre} se fabrica a pedido desde{' '}
+                {calculations.minM2AMedida.toLocaleString('es-AR')} m²: con esta medida son{' '}
+                <strong>{calculations.minCajasAMedida.toLocaleString('es-AR')}</strong> cajas.
+              </p>
+            </div>
+          )}
+
           {calculations && calculations.esDeStock && (
             <div className="p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
               <p className="text-xs text-yellow-800">

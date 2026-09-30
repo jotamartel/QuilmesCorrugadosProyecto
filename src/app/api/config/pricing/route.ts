@@ -63,6 +63,8 @@ export async function POST(request: NextRequest) {
       'production_days_standard',
       'production_days_printing',
       'quote_validity_days',
+      'min_m2_pedido',
+      'min_m2_reforzado',
     ];
 
     for (const field of numericFields) {
@@ -73,6 +75,29 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+
+    // Los precios de los reforzados admiten null: es como se deja de ofrecer
+    // ese cartón sin tocar código. Cero no, porque se leería como "gratis".
+    for (const field of ['price_per_m2_r130', 'price_per_m2_dt120', 'price_per_m2_dt150']) {
+      const v = body[field];
+      if (v !== undefined && v !== null && (typeof v !== 'number' || v <= 0)) {
+        return NextResponse.json(
+          { error: 'El precio de un cartón reforzado tiene que ser mayor a cero, o quedar vacío para no ofrecerlo' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Lo que el formulario no manda se hereda de la fila vigente, no de un
+    // default escrito acá: min_m2_pedido no estaba en el insert y cada guardado
+    // desde el panel lo devolvía al default de la columna.
+    const { data: vigente } = await supabase
+      .from('pricing_config')
+      .select('min_m2_pedido, price_per_m2_r130, price_per_m2_dt120, price_per_m2_dt150, min_m2_reforzado')
+      .eq('is_active', true)
+      .order('valid_from', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     // Desactivar configuración anterior
     await supabase
@@ -104,6 +129,14 @@ export async function POST(request: NextRequest) {
         production_days_standard: body.production_days_standard ?? 7,
         production_days_printing: body.production_days_printing ?? 14,
         quote_validity_days: body.quote_validity_days ?? 7,
+        min_m2_pedido: body.min_m2_pedido ?? vigente?.min_m2_pedido ?? 500,
+        price_per_m2_r130:
+          body.price_per_m2_r130 !== undefined ? body.price_per_m2_r130 : vigente?.price_per_m2_r130 ?? null,
+        price_per_m2_dt120:
+          body.price_per_m2_dt120 !== undefined ? body.price_per_m2_dt120 : vigente?.price_per_m2_dt120 ?? null,
+        price_per_m2_dt150:
+          body.price_per_m2_dt150 !== undefined ? body.price_per_m2_dt150 : vigente?.price_per_m2_dt150 ?? null,
+        min_m2_reforzado: body.min_m2_reforzado ?? vigente?.min_m2_reforzado ?? 1000,
         valid_from: body.valid_from || new Date().toISOString().split('T')[0],
         is_active: true,
       })

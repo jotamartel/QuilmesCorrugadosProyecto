@@ -5,6 +5,7 @@ import { LandingHeader } from '@/components/public/LandingHeader';
 import { LandingFooter } from '@/components/public/LandingFooter';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calcularCotizacion, validarCajas } from '@/lib/cotizacion/motor';
+import { leerMaterial, queryDeMaterial, MATERIALES, esReforzado, type Material } from '@/lib/cotizacion/material';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import { MEDIDA_MINIMA, LARGO_MAXIMO_PLANCHA } from '@/lib/utils/box-calculations';
 import { SITE_URL } from '@/lib/site';
@@ -41,6 +42,13 @@ export const revalidate = 300;
 
 interface Props {
   params: Promise<{ medidas: string; cantidad: string }>;
+  /**
+   * ?carton=dt120 o dt150 para cotizar en doble triple. Va como query y no
+   * como segmento para que los links viejos, que son todos de onda simple,
+   * sigan siendo la misma URL. Sin el parámetro, o con uno que no se
+   * reconoce, es onda simple.
+   */
+  searchParams: Promise<{ carton?: string }>;
 }
 
 /**
@@ -119,13 +127,18 @@ type Caja = {
   quantity: number;
   printing_colors: number;
   has_printing: boolean;
+  material: Material;
 };
 
 type Resultado =
   | { errores: string[]; caja: Caja }
   | { cotizacion: ReturnType<typeof calcularCotizacion>; caja: Caja };
 
-async function cotizar(medidas: string, cantidadCruda: string): Promise<Resultado | null> {
+async function cotizar(
+  medidas: string,
+  cantidadCruda: string,
+  material: Material,
+): Promise<Resultado | null> {
   const canonico = canonizarMedidas(medidas);
   if (!canonico) return null;
   const m = leerMedidas(canonico);
@@ -139,10 +152,8 @@ async function cotizar(medidas: string, cantidadCruda: string): Promise<Resultad
     quantity: c.cantidad,
     printing_colors: c.colores,
     has_printing: c.colores > 0,
+    material,
   };
-
-  const errores = validarCajas([caja]);
-  if (errores.length) return { errores, caja };
 
   const db = createAdminClient();
   const { data: config } = await db
@@ -154,6 +165,11 @@ async function cotizar(medidas: string, cantidadCruda: string): Promise<Resultad
     .single();
   if (!config) return null;
 
+  // Con la config: así un doble triple sin precio cargado sale como error
+  // explicado y no como una excepción del motor.
+  const errores = validarCajas([caja], config as PricingConfig);
+  if (errores.length) return { errores, caja };
+
   const { data: catalogo } = await db
     .from('boxes')
     .select('length_mm, width_mm, height_mm, stock')
@@ -163,10 +179,12 @@ async function cotizar(medidas: string, cantidadCruda: string): Promise<Resultad
   return { cotizacion: calcularCotizacion([caja], config as PricingConfig, catalogo || []), caja };
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { medidas, cantidad } = await params;
-  const r = await cotizar(medidas, cantidad);
-  const url = `${SITE_URL}/cotizar/${medidas}/${cantidad}`;
+  const material = leerMaterial((await searchParams).carton) ?? 'simple';
+  const r = await cotizar(medidas, cantidad, material);
+  const url = `${SITE_URL}/cotizar/${medidas}/${cantidad}${queryDeMaterial(material)}`;
+  const enCarton = esReforzado(material) ? ` en ${MATERIALES[material].nombre}` : '';
 
   if (!r || 'errores' in r) {
     return { title: 'Cotización', robots: { index: false }, alternates: { canonical: url } };
@@ -209,7 +227,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     // El title lleva el precio: es lo primero que ve un asistente en un
     // resultado de busqueda, antes de decidir si abre la pagina.
-    title: `${caja.quantity.toLocaleString('es-AR')} cajas de ${caja.length_mm}x${caja.width_mm}x${caja.height_mm} mm: $${Math.round(q.boxes[0].unit_price).toLocaleString('es-AR')} c/u`,
+    title: `${caja.quantity.toLocaleString('es-AR')} cajas de ${caja.length_mm}x${caja.width_mm}x${caja.height_mm} mm${enCarton}: $${Math.round(q.boxes[0].unit_price).toLocaleString('es-AR')} c/u`,
     description: q.summary,
     alternates: { canonical: url },
     openGraph: { title: q.summary.slice(0, 90), description: q.summary, url, type: 'website' },
@@ -218,21 +236,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 const ars = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`;
 
-export default async function CotizarPage({ params }: Props) {
+export default async function CotizarPage({ params, searchParams }: Props) {
   const { medidas, cantidad } = await params;
+  const material = leerMaterial((await searchParams).carton) ?? 'simple';
 
   // Si la direccion no venia en la forma canonica —porque usaron "×", "X", un
   // asterisco o centimetros— se manda a la buena. Asi una misma cotizacion
   // tiene una sola URL indexable, y el que la escribio distinto igual llega.
   const canonico = canonizarMedidas(medidas);
   if (canonico && canonico !== medidas) {
-    redirect(`/cotizar/${canonico}/${cantidad}`);
+    redirect(`/cotizar/${canonico}/${cantidad}${queryDeMaterial(material)}`);
   }
 
-  const r = await cotizar(medidas, cantidad);
+  const r = await cotizar(medidas, cantidad, material);
   if (!r) notFound();
 
-  const url = `${SITE_URL}/cotizar/${medidas}/${cantidad}`;
+  const url = `${SITE_URL}/cotizar/${medidas}/${cantidad}${queryDeMaterial(material)}`;
 
   if ('errores' in r) {
     return (
@@ -402,7 +421,8 @@ export default async function CotizarPage({ params }: Props) {
 
         {/* El resumen primero y en una sola frase: es lo que un asistente
             levanta textual para contestarle a quien pregunto. */}
-        <p className="mb-8 text-lg leading-relaxed text-gray-700">{q.summary}</p>
+        <p className="mb-4 text-lg leading-relaxed text-gray-700">{q.summary}</p>
+        <p className="mb-8 text-sm leading-relaxed text-gray-600">{q.material_note}</p>
 
         <div className="mb-8 overflow-x-auto rounded-xl border border-gray-200">
           <table className="w-full text-left text-sm">

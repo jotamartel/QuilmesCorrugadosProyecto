@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { calculateUnfolded, calculateTotalM2, RECARGO_DOS_MITADES } from '@/lib/utils/box-calculations';
 import { getPricePerM2, calculateSubtotal, getProductionDays } from '@/lib/utils/pricing';
+import { leerMaterial, materialDisponible } from '@/lib/cotizacion/material';
+import { porQueNoSeFabrica } from '@/lib/cotizacion/motor';
 import { sendNotification } from '@/lib/notifications';
 import { notifyNewRetailLead } from '@/lib/telegram/notifications';
 import type { CreatePublicQuoteRequest, PricingConfig } from '@/lib/types/database';
@@ -35,15 +37,21 @@ export async function POST(request: NextRequest) {
       errors.push('El teléfono es requerido');
     }
 
-    // Dimensiones de la caja
-    if (!body.length_mm || body.length_mm < 200 || body.length_mm > 800) {
-      errors.push('El largo debe estar entre 200 y 800 mm');
-    }
-    if (!body.width_mm || body.width_mm < 200 || body.width_mm > 600) {
-      errors.push('El ancho debe estar entre 200 y 600 mm');
-    }
-    if (!body.height_mm || body.height_mm < 100 || body.height_mm > 600) {
-      errors.push('El alto debe estar entre 100 y 600 mm');
+    // Dimensiones de la caja: los límites reales de fabricación, los mismos
+    // del motor. Acá había topes viejos escritos a mano (800x600x600) y el
+    // botón "Quiero que me contacten" rechazaba cajas que el formulario ya
+    // había cotizado, como una de 1030x500x620 para sillas: la persona veía
+    // el precio y después no podía pedir que la llamen.
+    if (!body.length_mm || !body.width_mm || !body.height_mm) {
+      errors.push('Faltan medidas: hacen falta largo, ancho y alto en milímetros');
+    } else {
+      const motivos = porQueNoSeFabrica({
+        length_mm: body.length_mm,
+        width_mm: body.width_mm,
+        height_mm: body.height_mm,
+        quantity: body.quantity,
+      });
+      if (motivos.length) errors.push(`Esa caja no se puede fabricar: ${motivos.join('; y ')}`);
     }
     // El minimo no se mide en cajas sino en m² de carton, y eso depende de la
     // medida: 100 cajas chicas son 34 m² y 100 grandes pasan los 100 m². El
@@ -88,8 +96,12 @@ export async function POST(request: NextRequest) {
     // Calcular m² totales
     const totalSqm = calculateTotalM2(unfolded.m2, body.quantity);
 
-    // Obtener precio por m² según volumen
-    const pricePerM2 = getPricePerM2(totalSqm, config);
+    // Obtener precio por m² según volumen, o el del doble triple elegido. Un
+    // material que ya no tiene precio se cotiza en el estándar, igual que en
+    // el formulario.
+    const materialPedido = leerMaterial((body as { material?: unknown }).material) ?? 'simple';
+    const material = materialDisponible(config, materialPedido) ? materialPedido : 'simple';
+    const pricePerM2 = getPricePerM2(totalSqm, config, material);
 
     // Calcular subtotal. Si la caja va en dos mitades (su desarrollo no entra
     // en el largo de plancha), el m² ya trae la solapa extra y acá se cobra
@@ -191,6 +203,7 @@ export async function POST(request: NextRequest) {
           quantity: body.quantity,
           has_printing: body.has_printing || false,
           printing_colors: body.printing_colors || 0,
+          material,
 
           // Diseño
           design_file_url: body.design_file_url || null,

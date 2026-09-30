@@ -29,6 +29,7 @@ import { RETAIL_CONFIG, MATERIAL, HORARIO, MINIMOS } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
 import type { PricingConfig } from '@/lib/types/database';
 import { notaImpresion } from '@/lib/cotizacion/motor';
+import { leerMaterial, esReforzado, reforzadosDisponibles, precioReforzado, MATERIALES } from '@/lib/cotizacion/material';
 
 export const runtime = 'nodejs';
 
@@ -117,6 +118,9 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       MINIMOS.largo,
       notaImpresion(c),
       `Material: ${MATERIAL.nota}`,
+      ...reforzadosDisponibles(c).map(
+        (m) => `· ${MATERIALES[m].nombre}: ${ars(precioReforzado(c, m)!)}/m², un solo precio sin escalones, a pedido desde ${n(c.min_m2_reforzado ?? c.wholesale_min_m2)} m²`,
+      ),
       `Plazos: stock en 24 a 48 horas; producción a medida en ${c.production_days_standard} días ` +
         `hábiles, ${c.production_days_printing} con impresión.`,
       `Envío: gratis en pedidos mayoristas desde ${c.free_shipping_min_m2.toLocaleString('es-AR')} m² y hasta ` +
@@ -192,6 +196,15 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
   if (nombre === 'cotizar_cajas_carton') {
     const cantidad = Number(args.cantidad);
     const colores = Number(args.colores_impresion ?? 0) || 0;
+    const material = args.material === undefined || args.material === '' ? 'simple' : leerMaterial(args.material);
+    if (!material) {
+      registrar(req, nombre, 400, 'material_invalido');
+      return resultado(
+        `El material "${String(args.material)}" no existe. Valores: simple, r130, dt120, dt150.`,
+        undefined,
+        true,
+      );
+    }
 
     if (![largo, ancho, alto, cantidad].every(Number.isFinite)) {
       registrar(req, nombre, 400, 'faltan_parametros');
@@ -210,6 +223,7 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       quantity: cantidad,
       printing_colors: colores,
       has_printing: colores > 0,
+      material,
     };
 
     const errores = validarCajas([caja]);
@@ -230,6 +244,12 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
     if (!config) {
       registrar(req, nombre, 500, 'sin_configuracion_de_precios');
       return resultado('No se pudo leer la configuración de precios en este momento.', undefined, true);
+    }
+
+    const erroresDeMaterial = validarCajas([caja], config);
+    if (erroresDeMaterial.length) {
+      registrar(req, nombre, 400, `material_sin_precio:${material}`);
+      return resultado(erroresDeMaterial.join(' '), undefined, true);
     }
 
     const { data: catalogo } = await createAdminClient()
@@ -264,7 +284,8 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
         // Los umbrales solo cuando el problema ES un umbral. Para una caja que
         // no entra en el rollo, hablar del minimo de compra es cambiarle el
         // tema al cliente: no le falta volumen, le sobra ancho.
-        ...(imp.tipo === 'no_fabricable'
+        // Para un reforzado el piso es el suyo, y ya lo dice el summary.
+        ...(imp.tipo === 'no_fabricable' || esReforzado(material)
           ? []
           : [
               imp.tipo === 'medida_propia_sin_volumen'
@@ -305,6 +326,7 @@ async function ejecutarTool(req: NextRequest, nombre: string, args: Record<strin
       cotizacion.summary,
       '',
       cotizacion.channel_note,
+      cotizacion.material_note,
       '',
       // En dos mitades van las dos cosas: el proceso explicado y la plantilla,
       // que ahora existe como desplegado de referencia con su nota.

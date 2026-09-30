@@ -57,6 +57,16 @@ export interface PricingConfig {
   printing_min_m2: number;              // Desde que m2 se ofrece impresion
   printing_included_min_m2: number;     // Desde que m2 el costo ya viene incluido
   printing_surcharge_per_color: number; // Recargo por color entre esos dos umbrales (0.15 = +15%)
+
+  // Cartones reforzados: 130 libras onda C y doble triple (7 mm) en dos
+  // calidades. Precio único por m²
+  // cada una, sin escalera de volumen. Null = esa calidad no tiene precio y no
+  // se ofrece en ningún canal. El mínimo es compartido.
+  // Opcionales porque la fila vieja (antes de las migraciones 040 y 041) no los trae.
+  price_per_m2_r130?: number | null;
+  price_per_m2_dt120?: number | null;
+  price_per_m2_dt150?: number | null;
+  min_m2_reforzado?: number;
   free_shipping_min_m2: number;
   free_shipping_max_km: number;
   production_days_standard: number;

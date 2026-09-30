@@ -29,6 +29,14 @@ import { SITE_URL } from '@/lib/site';
 import { CONTACTO } from '@/lib/contacto';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import type { PricingConfig } from '@/lib/types/database';
+import { leerMaterial } from '@/lib/cotizacion/material';
+
+/**
+ * Los valores de material que acepta la API, para los mensajes de error. El
+ * material es opcional: sin él se cotiza la onda simple, como siempre, así que
+ * ningún integrador existente cambia de precio.
+ */
+const MATERIALES_API = 'simple, r130, dt120, dt150';
 import {
   calcularCotizacion,
   validarCajas,
@@ -324,8 +332,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // El material llega como texto libre ("dt120", "doble-triple-120"...): se
+    // normaliza, y uno que no se reconoce es error, no onda simple. Cotizar
+    // otro cartón que el que pidieron es peor que rechazar.
+    const materialesInvalidos: string[] = [];
+    body.boxes = body.boxes.map((b, i) => {
+      const crudo = (b as { material?: unknown }).material;
+      if (crudo === undefined || crudo === null || crudo === '') return { ...b, material: 'simple' as const };
+      const m = leerMaterial(crudo);
+      if (!m) materialesInvalidos.push(`Caja ${i + 1}: material "${String(crudo)}" no existe. Valores: ${MATERIALES_API}.`);
+      return { ...b, material: m ?? 'simple' };
+    });
+
     // Validar cada caja
-    const errors = validarCajas(body.boxes);
+    const errors = [...materialesInvalidos, ...validarCajas(body.boxes)];
 
     if (errors.length > 0) {
       await logRequest(400);
@@ -354,6 +374,16 @@ export async function POST(request: NextRequest) {
     }
 
     const config = pricingConfig as PricingConfig;
+
+    // Con la config: un reforzado sin precio cargado se rechaza acá, explicado.
+    const erroresDeMaterial = validarCajas(body.boxes, config);
+    if (erroresDeMaterial.length > 0) {
+      await logRequest(400);
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', errors: erroresDeMaterial },
+        { status: 400, headers: rateLimitHeaders }
+      );
+    }
 
     const { data: catalogo } = await supabase
       .from('boxes')
@@ -487,6 +517,8 @@ export async function GET(request: NextRequest) {
   const alto = num('height_mm', 'alto_mm', 'h') ?? cm(num('height_cm', 'alto_cm', 'alto'));
   const cantidad = num('quantity', 'cantidad', 'qty', 'q');
   const colores = num('printing_colors', 'colores') ?? 0;
+  const materialCrudo = searchParams.get('material') ?? searchParams.get('carton');
+  const material = materialCrudo ? leerMaterial(materialCrudo) : 'simple';
 
   const pidioCotizacion = largo !== null || ancho !== null || alto !== null || cantidad !== null;
 
@@ -594,6 +626,7 @@ export async function GET(request: NextRequest) {
         height_mm: `Alto en mm (${MEDIDA_MINIMA.alto}-${MEDIDA_MAXIMA.alto}). Alias: alto_cm, h`,
         quantity: 'Cantidad de cajas (entero ≥ 1). Alias: cantidad, qty',
         printing_colors: `Colores de impresión (0-${RETAIL_CONFIG.MAX_PRINTING_COLORS}, opcional). La impresión está incluida en el precio por m²; aparte solo se cobra el polímero`,
+        material: `Tipo de cartón (opcional, alias carton): simple = onda simple 90 libras (default), r130 = reforzado 130 libras, dt120 = doble triple 120 liner, dt150 = doble triple 150 kraft`,
       },
       batch: {
         method: 'POST',
@@ -640,9 +673,18 @@ export async function GET(request: NextRequest) {
     }, { status: 400, headers });
   }
 
+  if (!material) {
+    registrar(400, `material_invalido:${String(materialCrudo).slice(0, 40)}`);
+    return NextResponse.json({
+      success: false,
+      error: `El material "${materialCrudo}" no existe. Valores: ${MATERIALES_API}.`,
+    }, { status: 400, headers });
+  }
+
   const box: BoxInput = {
     length_mm: largo!, width_mm: ancho!, height_mm: alto!,
     quantity: cantidad!, printing_colors: colores, has_printing: colores > 0,
+    material,
   };
 
   const errors = validarCajas([box]);
@@ -679,6 +721,15 @@ export async function GET(request: NextRequest) {
       .select('length_mm, width_mm, height_mm, stock')
       .eq('is_standard', true)
       .eq('is_active', true);
+
+    const erroresDeMaterial = validarCajas([box], pricingConfig as PricingConfig);
+    if (erroresDeMaterial.length) {
+      registrar(400, `material_sin_precio:${material}`);
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', errors: erroresDeMaterial },
+        { status: 400, headers },
+      );
+    }
 
     const quote = calcularCotizacion([box], pricingConfig as PricingConfig, catalogo || []);
 

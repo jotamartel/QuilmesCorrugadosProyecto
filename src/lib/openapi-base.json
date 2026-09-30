@@ -243,6 +243,12 @@
             "in": "query",
             "description": "Colores de impresión, hasta 3. No suma al precio por m²: la impresión está incluida y aparte solo se cobra el polímero. Si el pedido no llega al volumen mínimo de impresión, se cotiza igual pero sin imprimir, y quote.printing.price_note lo explica.",
             "schema": { "type": "integer", "minimum": 0, "maximum": 3, "default": 0 }
+          },
+          {
+            "name": "material",
+            "in": "query",
+            "description": "Tipo de cartón. simple = onda simple kraft 90 libras, 4 mm (el estándar). r130 = reforzado 130 libras, misma onda con papel más pesado. dt120 = doble triple 120 liner y dt150 = doble triple 150 kraft, doble pared de 7 mm. Los reforzados tienen un solo precio por m², sin escalones de volumen, se fabrican a pedido y tienen su propio mínimo en m²; uno sin precio cargado se rechaza con 400. Alias: carton.",
+            "schema": { "type": "string", "enum": ["simple", "r130", "dt120", "dt150"], "default": "simple" }
           }
         ],
         "responses": {
@@ -323,6 +329,12 @@
             "maximum": 3,
             "default": 0,
             "description": "Cantidad de colores de impresión (0-3). La impresión está incluida en el precio por m²; aparte solo se cobra el polímero. Si el pedido no llega al volumen mínimo de impresión, se cotiza igual pero sin imprimir, y quote.printing.price_note lo explica"
+          },
+          "material": {
+            "type": "string",
+            "enum": ["simple", "r130", "dt120", "dt150"],
+            "default": "simple",
+            "description": "Tipo de cartón. simple = onda simple kraft 90 libras, 4 mm (el estándar). r130 = reforzado 130 libras, misma onda con papel más pesado. dt120 = doble triple 120 liner y dt150 = doble triple 150 kraft, doble pared de 7 mm. Los reforzados tienen un solo precio por m², sin escalones de volumen, se fabrican a pedido y tienen su propio mínimo en m²; uno sin precio cargado se rechaza con 400."
           }
         }
       },
@@ -499,6 +511,7 @@
           "quantity": { "type": "integer" },
           "has_printing": { "type": "boolean" },
           "printing_colors": { "type": "integer" },
+          "material": { "type": "string", "enum": ["simple", "r130", "dt120", "dt150"], "description": "El cartón cotizado. La explicación en castellano viene en quote.material_note." },
           "sheet_width_mm": {
             "type": "integer",
             "description": "Ancho de la plancha desplegada en mm"

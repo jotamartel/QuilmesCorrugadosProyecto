@@ -19,7 +19,8 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
-  Palette
+  Palette,
+  Layers
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { formatDate } from '@/lib/utils/dates';
@@ -59,6 +60,11 @@ export default function ConfiguracionPage() {
     production_days_standard: 7,
     production_days_printing: 14,
     quote_validity_days: 7,
+    // Vacío (null) = ese cartón reforzado no se ofrece en la web ni en el bot.
+    price_per_m2_r130: null as number | null,
+    price_per_m2_dt120: null as number | null,
+    price_per_m2_dt150: null as number | null,
+    min_m2_reforzado: 1000,
   });
 
   // Form state for system config
@@ -94,6 +100,10 @@ export default function ConfiguracionPage() {
           production_days_standard: data.production_days_standard,
           production_days_printing: data.production_days_printing,
           quote_validity_days: data.quote_validity_days,
+          price_per_m2_r130: data.price_per_m2_r130 ?? null,
+          price_per_m2_dt120: data.price_per_m2_dt120 ?? null,
+          price_per_m2_dt150: data.price_per_m2_dt150 ?? null,
+          min_m2_reforzado: data.min_m2_reforzado ?? 1000,
         });
       }
 
@@ -345,6 +355,57 @@ export default function ConfiguracionPage() {
                     onChange={(e) => setPricingFormData({ ...pricingFormData, volume_threshold_m2: Number(e.target.value) })}
                     disabled={!editMode}
                     hint="m2 a partir de los cuales aplica precio por volumen"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Layers className="w-5 h-5" />
+                  Cartones reforzados
+                </CardTitle>
+                <CardDescription>
+                  Para cargas pesadas: 130 libras (onda C, 4 mm) y doble triple (doble pared, 7 mm) en
+                  dos calidades. Cada uno tiene un solo precio por m², sin escalones de volumen, y
+                  siempre se fabrica a pedido. Un cartón con el precio vacío no se ofrece en la web ni
+                  en el asistente.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {([
+                    ['price_per_m2_r130', 'Reforzado 130 libras ($/m2)'],
+                    ['price_per_m2_dt120', 'Doble triple 120 liner ($/m2)'],
+                    ['price_per_m2_dt150', 'Doble triple 150 kraft ($/m2)'],
+                  ] as const).map(([campo, etiqueta]) => (
+                    <Input
+                      key={campo}
+                      label={etiqueta}
+                      type="number"
+                      value={pricingFormData[campo] ?? ''}
+                      onChange={(e) =>
+                        setPricingFormData({
+                          ...pricingFormData,
+                          [campo]: e.target.value === '' ? null : Number(e.target.value),
+                        })
+                      }
+                      disabled={!editMode}
+                      hint={
+                        pricingConfig?.[campo]
+                          ? `Actual: ${formatCurrency(pricingConfig[campo])}`
+                          : 'Sin precio: hoy no se ofrece. Vacío = no se ofrece.'
+                      }
+                    />
+                  ))}
+                  <Input
+                    label="Mínimo reforzados (m2)"
+                    type="number"
+                    value={pricingFormData.min_m2_reforzado}
+                    onChange={(e) => setPricingFormData({ ...pricingFormData, min_m2_reforzado: Number(e.target.value) })}
+                    disabled={!editMode}
+                    hint="Por debajo de estos m² no se cotiza en ningún cartón reforzado."
                   />
                 </div>
               </CardContent>

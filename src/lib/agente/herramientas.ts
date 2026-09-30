@@ -12,6 +12,15 @@ import {
 } from '@/lib/cotizacion/motor';
 import { RETAIL_CONFIG, MINIMOS, ENVIO, HORARIO, MATERIAL } from '@/lib/retail/config';
 import {
+  MATERIALES,
+  esReforzado,
+  materialDisponible,
+  reforzadosDisponibles,
+  precioReforzado,
+  queryDeMaterial,
+  type Material,
+} from '@/lib/cotizacion/material';
+import {
   MEDIDA_MINIMA,
   MEDIDA_MAXIMA,
   LARGO_MAXIMO_PLANCHA,
@@ -154,12 +163,28 @@ export function crearHerramientas(ctx: ContextoAgente) {
           'llamá con 1 y explicá después lo que diga impresion.como_se_cobra ' +
           '(cuando viene incluida, de 1 a 3 colores el precio es el mismo).',
       },
+      carton: {
+        type: 'string',
+        enum: ['simple', 'r130', 'dt120', 'dt150'],
+        description:
+          'Tipo de cartón. "simple" es la onda simple de 90 libras (4 mm), el estándar: usala ' +
+          'si la persona no dijo nada del material. "r130" es reforzado de 130 libras, misma ' +
+          'onda C y 4 mm con papel más pesado: para productos de peso medio (15 a 20 kilos), o ' +
+          'cuando pida "130 libras", "más libras" o "más resistente" sin hablar de doble. ' +
+          '"dt120" es doble triple 120 liner y "dt150" doble triple 150 kraft, los dos de doble ' +
+          'pared y 7 mm. Usá doble triple cuando la persona lo pida con cualquier nombre (doble ' +
+          'triple, doble corrugado, doble onda, doble pared, onda BC, 7 mm, como las de ' +
+          'verdulería). Si pidió doble triple sin decir cuál, usá dt120 y contale que también ' +
+          'está el 150 kraft, más resistente. dt150 cuando pida lo más resistente, papel kraft ' +
+          'puro, o exportación.',
+      },
     },
     required: ['largo_mm', 'ancho_mm', 'alto_mm', 'cantidad', 'colores_impresion'],
     additionalProperties: false,
   },
   run: async (args) => {
     const { largo_mm, ancho_mm, alto_mm, cantidad, colores_impresion } = args;
+    const carton: Material = args.carton ?? 'simple';
 
     // Las validaciones van acá y no en el prompt: un limite de fabricacion que
     // el modelo tiene que recordar es un limite que alguna vez va a olvidar.
@@ -208,6 +233,18 @@ export function crearHerramientas(ctx: ContextoAgente) {
       });
     }
 
+    // Una calidad sin precio cargado no se cotiza: se dice y se ofrece la otra.
+    if (!materialDisponible(config, carton)) {
+      const otras = reforzadosDisponibles(config);
+      return JSON.stringify({
+        se_puede_cotizar: false,
+        motivos: [`El ${MATERIALES[carton].nombre} no tiene precio cargado.`],
+        instruccion: otras.length
+          ? `Ese cartón no lo cotizás en línea. Ofrecele ${otras.map((m) => MATERIALES[m].nombre).join(' o ')}, que sí tiene precio, y recotizá con ese.`
+          : 'Los cartones reforzados hoy no se cotizan en línea. Usá no_se_la_respuesta para que el equipo se lo cotice a mano, y mientras tanto ofrecele la cotización en onda simple.',
+      });
+    }
+
     const q = calcularCotizacion(
       [{
         length_mm: largo_mm,
@@ -215,6 +252,7 @@ export function crearHerramientas(ctx: ContextoAgente) {
         height_mm: alto_mm,
         quantity: cantidad,
         printing_colors: colores_impresion,
+        material: carton,
       }],
       config,
       await leerCatalogoDeStock(),
@@ -233,6 +271,7 @@ export function crearHerramientas(ctx: ContextoAgente) {
         // El tipo viaja al modelo, no solo el texto: si la instruccion falla,
         // esto le sigue diciendo de que clase de "no" se trata.
         motivo_tipo: imp.tipo,
+        carton: MATERIALES[carton].nombre,
         motivo: imp.motivo,
         // El "no" ya redactado, con el motivo primero y las alternativas
         // despues. Es el mismo texto que usan la web y el respaldo de WhatsApp.
@@ -318,6 +357,11 @@ export function crearHerramientas(ctx: ContextoAgente) {
       medidas_mm: `${largo_mm}x${ancho_mm}x${alto_mm}`,
       cantidad,
       colores_impresion: caja.printing_colors,
+      // El cartón cotizado, ya escrito. Si es onda simple y hay reforzados con
+      // precio, lo menciona: es lo que quien pregunta "¿algo más rígido?" o
+      // "¿aguanta 20 kilos?" necesita saber que existe.
+      carton: MATERIALES[carton].nombre,
+      material: q.material_note,
       // Caja en dos mitades: el precio de abajo YA incluye el recargo y la
       // solapa extra. Contáselo en una frase, sin sumarle nada más.
       ...(caja.pieces === 2 ? { fabricacion: caja.pieces_note } : {}),
@@ -420,11 +464,17 @@ export function crearHerramientas(ctx: ContextoAgente) {
                   'lo menciones: ofrecer algo que después hay que negar es peor que no ' +
                   'ofrecerlo. Si pregunta la persona, contale lo que dice por_que.',
               },
-      link_para_compartir: `${SITE_URL}/cotizar/${largo_mm}x${ancho_mm}x${alto_mm}/${cantidad}`,
+      link_para_compartir: `${SITE_URL}/cotizar/${largo_mm}x${ancho_mm}x${alto_mm}/${cantidad}${queryDeMaterial(carton)}`,
       ...pedirContactoSiCorresponde(),
       instruccion:
         'Al dar el precio decí siempre que es en pesos, que el subtotal va sin IVA y ' +
         'el total con IVA incluido, el plazo y hasta cuándo vale. Pasale el link. ' +
+        (esReforzado(carton)
+          ? `Nombrá el cartón junto al precio ("en ${MATERIALES[carton].nombre}"), así no se confunde con la onda simple. ` +
+            (carton === 'dt120' && materialDisponible(config, 'dt150')
+              ? 'Cerrá con una frase contando que también está el doble triple 150 kraft, de papel puro y más resistente, y ofrecé cotizarlo. '
+              : '')
+          : '') +
         'Y hacé lo que diga impresion.que_hacer, que ya viene resuelto para este pedido.',
     });
   },
@@ -558,6 +608,19 @@ export function crearHerramientas(ctx: ContextoAgente) {
           'cantidad del pedido y te devuelve la seña en pesos.',
       },
       material: MATERIAL.nota,
+      // Los cartones con precio, para contestar "¿qué materiales tienen?" sin
+      // cotizar. Cada reforzado lleva su precio por m².
+      cartones: c
+        ? [
+            { carton: 'simple', ...MATERIALES.simple },
+            ...reforzadosDisponibles(c).map((m) => ({
+              carton: m,
+              ...MATERIALES[m],
+              precio_por_m2_sin_iva: precioReforzado(c, m),
+              minimo_m2: c.min_m2_reforzado ?? c.wholesale_min_m2,
+            })),
+          ]
+        : null,
       impresion: c
         ? {
             max_colores: RETAIL_CONFIG.MAX_PRINTING_COLORS,
@@ -684,6 +747,11 @@ export function crearHerramientas(ctx: ContextoAgente) {
         ancho_mm: { type: 'integer', description: 'Solo si ya cotizaste' },
         alto_mm: { type: 'integer', description: 'Solo si ya cotizaste' },
         cantidad: { type: 'integer', description: 'Solo si ya cotizaste' },
+        carton: {
+          type: 'string',
+          enum: ['simple', 'r130', 'dt120', 'dt150'],
+          description: 'Tipo de cartón. Tiene que ser el MISMO que usaste al cotizar: con otro cambia el total.',
+        },
       },
       required: ['resumen'],
       additionalProperties: false,
@@ -763,6 +831,7 @@ export function crearHerramientas(ctx: ContextoAgente) {
                 height_mm: args.alto_mm!,
                 quantity: args.cantidad!,
                 printing_colors: 0,
+                material: args.carton && materialDisponible(config, args.carton) ? args.carton : 'simple',
               }],
               config,
               await leerCatalogoDeStock(),
@@ -850,6 +919,9 @@ export function crearHerramientas(ctx: ContextoAgente) {
             width_mm: hayCotizacion ? args.ancho_mm : null,
             height_mm: hayCotizacion ? args.alto_mm : null,
             quantity: hayCotizacion ? args.cantidad : null,
+            // Undefined y no 'simple' cuando no vino: al actualizar no se pisa
+            // un reforzado ya guardado por una segunda llamada sin el dato.
+            material: args.carton ?? (hayCotizacion ? 'simple' : undefined),
             // Los m² y los precios, ya resueltos por el motor. Van sueltos para
             // que el spread no meta claves con undefined cuando no hay calculo.
             ...(calculos ?? {}),
@@ -1170,6 +1242,11 @@ export function crearHerramientas(ctx: ContextoAgente) {
             'MISMO que usaste al cotizar: con otro numero cambia el total y la seña ' +
             'te sale distinta a la que le pasaste.',
         },
+        carton: {
+          type: 'string',
+          enum: ['simple', 'r130', 'dt120', 'dt150'],
+          description: 'Tipo de cartón. Tiene que ser el MISMO que usaste al cotizar: con otro cambia el total.',
+        },
       },
       required: [],
       additionalProperties: false,
@@ -1238,6 +1315,7 @@ export function crearHerramientas(ctx: ContextoAgente) {
           height_mm: args.alto_mm!,
           quantity: args.cantidad!,
           printing_colors: args.colores_impresion,
+          material: args.carton && materialDisponible(config, args.carton) ? args.carton : 'simple',
         }],
         config,
         await leerCatalogoDeStock(),

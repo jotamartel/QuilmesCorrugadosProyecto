@@ -5,6 +5,7 @@
 
 import type { PricingConfig } from '@/lib/types/database';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { esReforzado, precioReforzado, type Material } from '@/lib/cotizacion/material';
 
 /**
  * Obtiene la configuración de precios activa desde la base de datos
@@ -45,8 +46,24 @@ export async function getActivePricingConfig(): Promise<PricingConfig | null> {
  *
  * Los cuatro precios y los tres cortes salen de pricing_config, editable desde
  * el dashboard: no hay ningún umbral escrito en el código.
+ *
+ * Los reforzados (130 libras y doble triple) no tienen escalera: un precio por m² cada uno,
+ * también de pricing_config. Sin precio cargado no se cotiza, y pedirlo igual
+ * es un error de quien llama (tiene que haber mirado materialDisponible).
  */
-export function getPricePerM2(totalM2: number, config: PricingConfig): number {
+export function getPricePerM2(
+  totalM2: number,
+  config: PricingConfig,
+  material: Material = 'simple',
+): number {
+  if (esReforzado(material)) {
+    const precio = precioReforzado(config, material);
+    if (precio === null) {
+      throw new Error(`El ${material} no tiene precio cargado en pricing_config.`);
+    }
+    return precio;
+  }
+
   // Por debajo del mínimo para producir a medida se vende de stock.
   if (totalM2 < config.wholesale_min_m2) {
     return config.price_per_m2_retail;

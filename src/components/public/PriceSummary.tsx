@@ -5,6 +5,7 @@ import { Package, Clock, Truck, Send, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/pricing';
 import { BoxItemData, BoxCalculations } from './BoxItemForm';
 import { precioUnitarioARS } from '@/lib/cotizacion/motor';
+import { MATERIALES, esReforzado } from '@/lib/cotizacion/material';
 
 interface PriceSummaryProps {
   boxes: BoxItemData[];
@@ -46,13 +47,16 @@ export function PriceSummary({
   const totalQuantity = boxes.reduce((sum, b) => sum + b.quantity, 0);
 
   const hasValidBoxes = totalSqm > 0 && validCalculations.length > 0;
-  const hasVolumeDiscount = totalSqm >= volumeThresholdM2;
+  // Los reforzados no tienen escalera de volumen ni stock.
+  const hayReforzado = validCalculations.some((c) => esReforzado(c.material));
+  const bajoMinimoReforzado = validCalculations.some((c) => c.bajoMinimoReforzado);
+  const hasVolumeDiscount = !hayReforzado && totalSqm >= volumeThresholdM2;
   // Volumen de stock: no se produce a medida, se compra hecho desde /cajas.
-  const esPedidoDeStock = totalSqm > 0 && totalSqm < stockMaxM2;
+  const esPedidoDeStock = !hayReforzado && totalSqm > 0 && totalSqm < stockMaxM2;
   // Piso de venta EXCLUYENTE. Por debajo no hay precio ni derivacion a /cajas
   // (ese canal tambien pide 500 m² minimo). Es agregado, no por caja: dos
   // cajas de 300 m² suman 600 y sí llegan.
-  const bajoMinimoPiso = totalSqm > 0 && totalSqm < pisoMinM2;
+  const bajoMinimoPiso = (totalSqm > 0 && totalSqm < pisoMinM2) || bajoMinimoReforzado;
   // Con una sola medida podemos ser concretos y decirle exactamente cuantas
   // cajas mas hacen falta. OJO CON EL OBJETIVO: este cotizador fabrica a
   // medida, y eso arranca en minM2AMedida (1.000 m²), no en el piso de venta
@@ -68,7 +72,28 @@ export function PriceSummary({
   // Aviso de "no llegas al minimo". Aparece MIENTRAS ajusta cantidades, no al
   // final. El minimo no se negocia: por eso el tono rojo y no se ofrece
   // "hablemoslo".
-  const panelBajoMinimo = (
+  const panelBajoMinimo = bajoMinimoReforzado ? (
+    // Sin derivación a /cajas: el catálogo es de onda simple, y a quien eligió
+    // un reforzado por el peso de lo que embala no le sirve.
+    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+      <p className="text-red-900 font-medium">Todavía no llegás al mínimo</p>
+      <p className="text-sm text-red-800 mt-1">
+        {validCalculations.length === 1 && esReforzado(validCalculations[0].material)
+          ? `El ${MATERIALES[validCalculations[0].material].nombre}`
+          : 'El cartón reforzado'}{' '}
+        se fabrica a pedido desde{' '}
+        <strong>{minM2AMedida.toLocaleString('es-AR')} m²</strong> de cartón
+        {cajasParaAMedida !== null ? (
+          <>
+            {' '}
+            — <strong>{cajasParaAMedida.toLocaleString('es-AR')}</strong> cajas de esta
+            medida
+          </>
+        ) : null}
+        .
+      </p>
+    </div>
+  ) : (
     <div className="bg-red-50 border border-red-200 rounded-lg p-4">
       <p className="text-red-900 font-medium">Todavía no llegás al mínimo</p>
       <p className="text-sm text-red-800 mt-1">
@@ -150,6 +175,7 @@ export function PriceSummary({
               </div>
               <div className="ml-7 text-gray-600 space-y-0.5">
                 <p>Cantidad: {box.quantity.toLocaleString('es-AR')} uds</p>
+                <p>Cartón: {MATERIALES[calc.material].nombre}</p>
                 {box.has_printing && <p className="text-[#002E55]">Con impresión ({box.printing_colors} color{box.printing_colors > 1 ? 'es' : ''})</p>}
                 <div className="flex justify-between text-xs text-gray-500">
                   <span>{calc.totalSqm.toLocaleString('es-AR', { minimumFractionDigits: 2 })} m²</span>

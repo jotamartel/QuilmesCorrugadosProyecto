@@ -471,6 +471,12 @@ async function tryQuoteFromConversation(
     userMessage,
   ].join(' ');
 
+  // Este respaldo solo sabe cotizar onda simple. Si la persona pidió un
+  // reforzado o doble triple, un precio de onda simple es peor que ninguno:
+  // es el error que Florencia tuvo que desmentir a mano en septiembre. Se deja
+  // la respuesta al modelo, que no inventa precios.
+  if (/doble|triple|\bdt\s*1[25]0\b|7\s*mm|reforzad|onda\s*bc|130\s*(lb|libras)/i.test(combinedText)) return null;
+
   let parsed = parseBoxDimensions(userMessage);
   if (!parsed?.length || !parsed?.width || !parsed?.height || !parsed?.quantity) {
     parsed = parseBoxDimensions(combinedText);

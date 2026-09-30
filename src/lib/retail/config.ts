@@ -202,7 +202,7 @@ export const MINIMOS = {
  * El papel con el que se fabrica. Es una pregunta que hace todo comprador
  * tecnico y hasta ahora no estaba escrita en ningun lado del sitio.
  *
- * HOY HAY UN SOLO GRAMAJE, y por eso vive aca como constante. Cuando se
+ * (Historia: cuando habia un solo gramaje vivia aca como constante. Cuando se
  * comercialice mas de uno con precios distintos, esto se muda a
  * pricing_config: el gramaje va a pasar a ser una variable del precio, igual
  * que el volumen, y tiene que poder cambiarse desde el panel sin deployar.
@@ -221,10 +221,14 @@ export const MATERIAL = {
   /** Solo el papel, para meter en una oración que ya dijo "cartón corrugado". */
   detalle: 'kraft de 90 libras, onda simple',
   /** Deja la puerta abierta sin prometer nada que hoy no exista. */
+  // Desde septiembre de 2026 el doble triple se cotiza en la web y el bot, con
+  // su precio en pricing_config (ver cotizacion/material). Esta nota queda
+  // como texto fijo para superficies sin config a mano (llms.txt, markdown).
   nota:
-    'El estándar que cotiza la web es cartón kraft de 90 libras, onda simple. ' +
-    'También trabajamos materiales reforzados (onda triple y otras calidades), ' +
-    'que se cotizan aparte: consultanos y lo vemos.',
+    'El estándar es cartón kraft de 90 libras, onda simple (4 mm). Para cargas ' +
+    'pesadas también fabricamos reforzado de 130 libras (misma onda, papel más pesado) ' +
+    'y doble triple (doble pared, 7 mm) en dos calidades, 120 liner y 150 kraft, cada ' +
+    'uno con su propio precio por m².',
 } as const;
 
 /**

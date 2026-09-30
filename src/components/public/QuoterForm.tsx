@@ -8,6 +8,7 @@ import { ArrowLeft, ArrowRight, Loader2, Plus, Eye } from 'lucide-react';
 import { PriceSummary } from './PriceSummary';
 import { BoxItemForm, BoxItemData, calculateBoxItem } from './BoxItemForm';
 import type { TaxCondition, BuenosAiresCity, PricingConfig } from '@/lib/types/database';
+import { esReforzado, reforzadosDisponibles, type Material } from '@/lib/cotizacion/material';
 import { ARGENTINE_PROVINCES, FREE_SHIPPING_MAX_KM } from '@/lib/types/database';
 import { trackEvent, identificar } from '@/lib/utils/tracking';
 import { getAtribucion } from '@/lib/utils/atribucion';
@@ -67,6 +68,7 @@ const createNewBox = (): BoxItemData => ({
   quantity: 0,
   has_printing: false,
   printing_colors: 1,
+  material: 'simple',
   design_file_url: '',
   design_file_name: '',
   design_preview_url: '',
@@ -250,7 +252,12 @@ export function QuoterForm() {
   // Por debajo del límite no se produce a medida: se vende de stock desde
   // /cajas. Igual se lo deja avanzar para tomarle los datos — antes el botón
   // quedaba muerto en "Mínimo requerido" y ese visitante se perdía entero.
-  const esPedidoDeStock = totals.totalSqm > 0 && totals.totalSqm < wholesaleMinM2;
+  // Los reforzados no tienen stock: un pedido que los lleva nunca se deriva.
+  const hayReforzado = boxCalculations.some((c) => esReforzado(c?.material));
+  const esPedidoDeStock = !hayReforzado && totals.totalSqm > 0 && totals.totalSqm < wholesaleMinM2;
+  const materiales: Material[] = pricingConfig
+    ? ['simple', ...reforzadosDisponibles(pricingConfig)]
+    : ['simple'];
 
   // Validación del paso 1: alcanza con que las cajas estén completas.
   const isStep1Valid = useMemo(() => {
@@ -362,6 +369,7 @@ export function QuoterForm() {
           quantity: box.quantity,
           has_printing: box.has_printing,
           printing_colors: box.has_printing ? box.printing_colors : 0,
+          material: boxCalculations[boxes.indexOf(box)]?.material ?? 'simple',
           design_file_url: box.design_file_url || undefined,
           design_file_name: box.design_file_name || undefined,
           design_preview_url: box.design_preview_url || undefined,
@@ -463,17 +471,19 @@ export function QuoterForm() {
         quantity: boxes[0].quantity,
         has_printing: boxes[0].has_printing,
         printing_colors: boxes[0].has_printing ? boxes[0].printing_colors : 0,
+        material: boxCalculations[0]?.material ?? 'simple',
         design_file_url: boxes[0].design_file_url || undefined,
         design_file_name: boxes[0].design_file_name || undefined,
         design_preview_url: boxes[0].design_preview_url || undefined,
         // Cajas adicionales
-        additional_boxes: boxes.length > 1 ? boxes.slice(1).map(box => ({
+        additional_boxes: boxes.length > 1 ? boxes.slice(1).map((box, i) => ({
           length_mm: box.length_mm,
           width_mm: box.width_mm,
           height_mm: box.height_mm,
           quantity: box.quantity,
           has_printing: box.has_printing,
           printing_colors: box.has_printing ? box.printing_colors : 0,
+          material: boxCalculations[i + 1]?.material ?? 'simple',
           design_file_url: box.design_file_url || undefined,
           design_file_name: box.design_file_name || undefined,
           design_preview_url: box.design_preview_url || undefined,
@@ -579,6 +589,7 @@ export function QuoterForm() {
                 onDelete={handleDeleteBox}
                 onToggleCollapse={handleToggleCollapse}
                 calculations={boxCalculations[index]}
+                materiales={materiales}
               />
             ))}
 

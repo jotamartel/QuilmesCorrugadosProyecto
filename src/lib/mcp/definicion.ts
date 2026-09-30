@@ -71,6 +71,16 @@ export const HERRAMIENTAS = [
             `Colores de impresión flexográfica, de 0 a ${RETAIL_CONFIG.MAX_PRINTING_COLORS}. ` +
             `Hasta ${RETAIL_CONFIG.MAX_PRINTING_COLORS}. Opcional, por defecto 0.`,
         },
+        material: {
+          type: 'string',
+          enum: ['simple', 'r130', 'dt120', 'dt150'],
+          description:
+            'Tipo de cartón. Opcional, por defecto "simple" (onda simple kraft 90 libras, 4 mm, el ' +
+            'estándar). "r130" = reforzado 130 libras, misma onda con papel más pesado, para peso ' +
+            'medio. "dt120" = doble triple 120 liner y "dt150" = doble triple 150 kraft, doble ' +
+            'pared de 7 mm, para cargas pesadas, estiba o exportación. Si el usuario pide doble ' +
+            'triple, doble corrugado o doble pared, usá dt120 salvo que pida lo más resistente.',
+        },
       },
       required: ['largo_mm', 'ancho_mm', 'alto_mm', 'cantidad'],
     },

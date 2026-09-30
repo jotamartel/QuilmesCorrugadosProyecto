@@ -20,6 +20,7 @@ con el sufijo `cm`:
 quilmes-corrugados cotizar 400x600x600 3000
 quilmes-corrugados cotizar 40x60x60cm 3000
 quilmes-corrugados cotizar 400x600x600 3000 --colores 2   # con impresión
+quilmes-corrugados cotizar 700x500x500 1500 --carton dt120 # doble triple 120 liner
 quilmes-corrugados cotizar 400x600x600 3000 --json        # respuesta cruda de la API
 ```
 

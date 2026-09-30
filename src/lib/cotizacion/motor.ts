@@ -26,6 +26,13 @@ import { SITE_URL } from '@/lib/site';
 import { RETAIL_CONFIG } from '@/lib/retail/config';
 import { CONTACTO } from '@/lib/contacto';
 import type { PricingConfig } from '@/lib/types/database';
+import {
+  MATERIALES,
+  esReforzado,
+  materialDisponible,
+  reforzadosDisponibles,
+  type Material,
+} from '@/lib/cotizacion/material';
 
 const SITIO = SITE_URL;
 
@@ -88,6 +95,8 @@ export interface BoxInput {
   quantity: number;
   has_printing?: boolean;
   printing_colors?: number;
+  /** Sin especificar es 'simple', el estándar. Ver cotizacion/material. */
+  material?: Material;
 }
 
 export interface BoxResult {
@@ -102,6 +111,7 @@ export interface BoxResult {
    */
   has_printing: boolean;
   printing_colors: number;
+  material: Material;
   sheet_width_mm: number;
   /** De CADA plancha: el desarrollo entero si pieces=1, la mitad si pieces=2. */
   sheet_length_mm: number;
@@ -347,6 +357,16 @@ interface QuoteBase {
   /** Explicación en castellano, pensada para que un asistente la lea al usuario */
   channel_note: string;
   /**
+   * En qué cartón está cotizado, ya escrito para el cliente.
+   *
+   * Existe porque "¿de qué material es?" es la pregunta que sigue al precio y
+   * el bot no la sabía contestar: dijo "no fabricamos doble corrugado" (falso)
+   * y "no tengo la certeza de si manejamos algo más rígido" (sí manejamos).
+   * Cuando se cotiza onda simple y hay reforzados con precio, la nota los
+   * menciona, para que quien necesita más resistencia sepa que existe.
+   */
+  material_note: string;
+  /**
    * Frase lista para leerle al usuario. Existe para que un asistente no tenga
    * que recalcular ni parafrasear: si parafrasea, se equivoca.
    */
@@ -551,11 +571,21 @@ export function porQueNoSeFabrica(box: BoxInput): string[] {
   return motivos;
 }
 
-export function validarCajas(boxes: BoxInput[]): string[] {
+export function validarCajas(
+  boxes: BoxInput[],
+  /** Con la config se valida además que el material pedido tenga precio. */
+  config?: PricingConfig,
+): string[] {
   const errors: string[] = [];
 
   boxes.forEach((box, index) => {
     const cual = boxes.length > 1 ? `Caja ${index + 1}: ` : '';
+
+    if (box.material && config && !materialDisponible(config, box.material)) {
+      errors.push(
+        `${cual}El ${MATERIALES[box.material].nombre} todavía no se cotiza en línea: escribinos y te lo cotizamos a mano.`,
+      );
+    }
 
     if (!box.length_mm || !box.width_mm || !box.height_mm) {
       errors.push(`${cual}Faltan medidas: hacen falta largo, ancho y alto en milímetros.`);
@@ -798,7 +828,8 @@ export function calcularCotizacion(
     const llevaImpresion =
       (box.has_printing || printingColors > 0) && impresionDisponible;
 
-    const pricePerM2 = getPricePerM2(boxTotalSqm, config);
+    const material: Material = box.material ?? 'simple';
+    const pricePerM2 = getPricePerM2(boxTotalSqm, config, material);
 
     // El recargo por color solo aplica POR DEBAJO del volumen desde el cual la
     // impresión ya viene incluida en el precio por m². Antes se cobraba
@@ -848,6 +879,7 @@ export function calcularCotizacion(
       quantity: box.quantity,
       has_printing: llevaImpresion,
       printing_colors: llevaImpresion ? printingColors : 0,
+      material,
       sheet_width_mm: unfolded.unfoldedWidth,
       sheet_length_mm: unfolded.unfoldedLength,
       pieces: unfolded.pieces,
@@ -890,9 +922,25 @@ export function calcularCotizacion(
 
   const hayCatalogo = medidasEnStock.length > 0;
 
+  // Los reforzados (130 libras y doble triple) no tienen catálogo ni stock:
+  // todo se fabrica a pedido, con su propio mínimo. Las medidas de catálogo son
+  // de onda simple, así que ni cuentan como "de catálogo" ni se ofrecen como
+  // alternativa a quien pidió reforzado: sería recomendarle justo el cartón
+  // que no le sirve.
+  const m2Reforzado =
+    Math.round(
+      desarrollos
+        .filter((d) => esReforzado(d.box.material))
+        .reduce((suma, d) => suma + d.boxTotalSqm, 0) * 100,
+    ) / 100;
+  const hayReforzado = m2Reforzado > 0;
+  const todoReforzado = boxes.every((b) => esReforzado(b.material));
+  const minimoReforzado = config.min_m2_reforzado ?? config.wholesale_min_m2;
+
   // Si la medida pedida es una del catalogo. Las de catalogo se producen en
   // tirada larga sin arte: alcanzan volumen y aun asi no llevan impresion.
   const medidaDeCatalogo = hayCatalogo && boxResults.some((b) =>
+    b.material === 'simple' &&
     medidasEnStock.some((m) =>
       m.length_mm === b.length_mm && m.width_mm === b.width_mm && m.height_mm === b.height_mm,
     ),
@@ -926,7 +974,7 @@ export function calcularCotizacion(
   if (noFabricables.length > 0) {
     // Decir que no sin decir que si termina en una derivacion a un humano, asi
     // que va con las medidas de catalogo mas parecidas, igual que el otro.
-    const alternativas = hayCatalogo
+    const alternativas = hayCatalogo && !esReforzado(noFabricables[0].caja.material)
       ? buscarAlternativas(noFabricables[0].caja, config, medidasEnStock)
       : [];
 
@@ -989,7 +1037,28 @@ export function calcularCotizacion(
   if (impedimento) {
     // Ya hay uno y manda: no se puede fabricar. Los pisos de volumen no
     // agregan nada — "ademas te falta volumen" para una caja que no existe.
-  } else if (!medidaDeCatalogo && hayCatalogo && totalM2 < config.wholesale_min_m2) {
+  } else if (hayReforzado && m2Reforzado < minimoReforzado) {
+    // Los reforzados tienen su propio piso, que carga el dueño en el panel.
+    // Va sin alternativas de catálogo a propósito: el catálogo es de onda
+    // simple, y a quien pidió reforzado por el peso de lo que embala no le
+    // sirve una caja más blanda, por más que salga antes.
+    const cajas = todoReforzado ? cajasPara(minimoReforzado) : null;
+    const reforzadosPedidos = [...new Set(boxes.map((b) => b.material).filter(esReforzado))];
+    const cual = reforzadosPedidos.length === 1
+      ? `El ${MATERIALES[reforzadosPedidos[0]].nombre}`
+      : 'El cartón reforzado';
+    impedimento = {
+      tipo: 'bajo_minimo',
+      motivo:
+        `${cual} se fabrica a pedido desde ${minimoReforzado.toLocaleString('es-AR')} m² ` +
+        `de cartón y este pedido son ` +
+        `${m2Reforzado.toLocaleString('es-AR', { maximumFractionDigits: 1 })} m² en ese cartón.` +
+        (cajas ? ` Con esta medida, son ${cajas.toLocaleString('es-AR')} cajas.` : ''),
+      cajas_necesarias: cajas,
+      m2_faltantes: Math.round((minimoReforzado - m2Reforzado) * 10) / 10,
+      alternativas: [],
+    };
+  } else if (!todoReforzado && !medidaDeCatalogo && hayCatalogo && totalM2 < config.wholesale_min_m2) {
     const cajasParaAMedida = cajasPara(config.wholesale_min_m2);
     const alternativas = buscarAlternativas(boxes[0], config, medidasEnStock);
     impedimento = {
@@ -1058,7 +1127,8 @@ export function calcularCotizacion(
   validUntil.setDate(validUntil.getDate() + config.quote_validity_days);
 
   // Por debajo de wholesale_min_m2 no se produce a medida: se vende de stock.
-  const volumenDeStock = totalM2 < config.wholesale_min_m2;
+  // Los reforzados no tienen stock: siempre son producción a pedido.
+  const volumenDeStock = !hayReforzado && totalM2 < config.wholesale_min_m2;
 
   // Pero "canal de stock" no alcanza para poder comprarlo online. Hacen falta
   // dos cosas mas, y si falta cualquiera hay que coordinar con un vendedor:
@@ -1106,9 +1176,29 @@ export function calcularCotizacion(
 
   const ars = (n: number) => '$' + Math.round(n).toLocaleString('es-AR');
   const b0 = boxResults[0];
+  // El material se nombra solo cuando no es el estándar: "en doble triple" al
+  // lado de la medida es lo que evita que alguien lea ese precio como el de la
+  // onda simple, o al revés.
+  const enMaterial = (m: Material) => (esReforzado(m) ? ` en ${MATERIALES[m].nombre}` : '');
   const detalle = boxResults.length === 1
-    ? `${b0.quantity.toLocaleString('es-AR')} cajas de ${b0.length_mm}x${b0.width_mm}x${b0.height_mm} mm a ${precioUnitarioARS(b0.unit_price)} por caja`
+    ? `${b0.quantity.toLocaleString('es-AR')} cajas de ${b0.length_mm}x${b0.width_mm}x${b0.height_mm} mm${enMaterial(b0.material)} a ${precioUnitarioARS(b0.unit_price)} por caja`
     : `${boxResults.length} medidas distintas, ${boxResults.reduce((s, b) => s + b.quantity, 0).toLocaleString('es-AR')} cajas en total`;
+
+  const materialesUsados = [...new Set(boxResults.map((b) => b.material))];
+  const disponibles = reforzadosDisponibles(config);
+  // Las descripciones arrancan con mayúscula porque también se usan sueltas.
+  const enMinuscula = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+  const materialNote = hayReforzado
+    ? materialesUsados.length === 1
+      ? `Cotizado en ${enMinuscula(MATERIALES[materialesUsados[0]].descripcion)}`
+      : `Cada caja va en el cartón que figura al lado de su medida: ` +
+        materialesUsados.map((m) => MATERIALES[m].descripcion).join(' ')
+    : `Cotizado en ${enMinuscula(MATERIALES.simple.descripcion)} Es el material estándar.` +
+      (disponibles.length
+        ? ` Para productos pesados o estiba alta también fabricamos en cartón reforzado ` +
+          `(${disponibles.map((m) => MATERIALES[m].nombre).join(', ')}), cada uno con su ` +
+          `precio: se puede recotizar en cualquiera de ellos.`
+        : ` Para productos pesados también trabajamos materiales reforzados, que se cotizan aparte.`);
 
   // El resumen lleva los dos numeros: el subtotal, que es como cotizamos, y el
   // total con IVA, que es lo que el cliente termina pagando. Antes solo iba el
@@ -1155,6 +1245,7 @@ export function calcularCotizacion(
   // reconocer que la conversacion arranca con una cotizacion hecha.
   const detalleCajas = boxResults
     .map((b) => `${b.quantity.toLocaleString('es-AR')} de ${b.length_mm}x${b.width_mm}x${b.height_mm} mm` +
+      enMaterial(b.material) +
       (b.printing_colors > 0 ? ` con impresion a ${b.printing_colors} color${b.printing_colors > 1 ? 'es' : ''}` : ''))
     .join(' + ');
 
@@ -1204,6 +1295,8 @@ export function calcularCotizacion(
     },
     next_tier: (() => {
       if (boxes.length !== 1) return null; // Con varias medidas la cuenta no es directa.
+      // Los reforzados tienen un solo precio por m²: no hay escalón que cruzar.
+      if (hayReforzado) return null;
       const b0i = boxes[0];
       const m2PorCaja = boxResults[0].sqm_per_box;
       if (m2PorCaja <= 0) return null;
@@ -1331,6 +1424,7 @@ export function calcularCotizacion(
     meets_minimum: !esDeStock,
     channel: (esDeStock ? 'stock' : 'made_to_order') as 'stock' | 'made_to_order',
     can_buy_online: cotizable && sePuedeComprarOnline,
+    material_note: materialNote,
     channel_note: !cotizable
       ? impedimento!.motivo
       : !esDeStock

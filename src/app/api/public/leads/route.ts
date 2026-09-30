@@ -12,6 +12,7 @@ import { sendNotification } from '@/lib/notifications';
 import { notifyNewRetailLead } from '@/lib/telegram/notifications';
 import { sanitizarAtribucion } from '@/lib/utils/atribucion';
 import type { PricingConfig } from '@/lib/types/database';
+import { leerMaterial, materialDisponible, type Material } from '@/lib/cotizacion/material';
 
 interface BoxData {
   length_mm: number;
@@ -20,6 +21,7 @@ interface BoxData {
   quantity: number;
   has_printing: boolean;
   printing_colors: number;
+  material?: Material;
   design_file_url?: string;
   design_file_name?: string;
   design_preview_url?: string;
@@ -105,11 +107,16 @@ export async function POST(request: NextRequest) {
 
     let totalSqmAll = 0;
     const boxCalculations = body.boxes.map(box => {
+      // Un material que no se reconoce o que ya no tiene precio se cotiza en el
+      // estándar, que es lo mismo que muestra el formulario en ese caso.
+      const pedido = leerMaterial(box.material) ?? 'simple';
+      const material: Material = materialDisponible(config, pedido) ? pedido : 'simple';
       const unfolded = calculateUnfolded(box.length_mm, box.width_mm, box.height_mm);
       const totalSqm = calculateTotalM2(unfolded.m2, box.quantity);
       totalSqmAll += totalSqm;
       return {
         ...box,
+        material,
         design_file_url: box.design_file_url || null,
         design_file_name: box.design_file_name || null,
         design_preview_url: box.design_preview_url || null,
@@ -121,7 +128,10 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const pricePerM2 = getPricePerM2(totalSqmAll, config);
+    // El doble triple tiene precio propio por calidad; la onda simple sigue la
+    // escalera por el volumen del pedido entero.
+    const precioDe = (m: Material) => getPricePerM2(totalSqmAll, config, m);
+    const pricePerM2 = precioDe(boxCalculations[0].material);
     // El recargo de dos mitades es POR CAJA, no por pedido: el m² de esas
     // cajas ya trae la solapa extra y acá se les cobra el pegado, igual que
     // en el motor. Sin esto el lead quedaba guardado 25% más barato que lo
@@ -130,7 +140,7 @@ export async function POST(request: NextRequest) {
       Math.round(
         boxCalculations.reduce(
           (s, b) =>
-            s + b.totalSqm * pricePerM2 * (b.pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1),
+            s + b.totalSqm * precioDe(b.material) * (b.pieces === 2 ? 1 + RECARGO_DOS_MITADES : 1),
           0,
         ) * 100,
       ) / 100;
@@ -174,6 +184,7 @@ export async function POST(request: NextRequest) {
         quantity: firstBox.quantity,
         has_printing: firstBox.has_printing,
         printing_colors: firstBox.printing_colors || 0,
+        material: firstBox.material,
         // Guardar diseño si existe
         design_file_url: firstBox.design_file_url || null,
         design_file_name: firstBox.design_file_name || null,
